@@ -20,6 +20,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<CheckIn> CheckIns { get; set; } = null!;
     public DbSet<Guest> Guests { get; set; } = null!;
     public DbSet<User> Users { get; set; } = null!;
+    public DbSet<Reservation> Reservations { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -31,13 +32,15 @@ public class ApplicationDbContext : DbContext
         modelBuilder.ApplyConfiguration(new CheckInConfiguration());
         modelBuilder.ApplyConfiguration(new GuestConfiguration());
         modelBuilder.ApplyConfiguration(new UserConfiguration());
+        modelBuilder.ApplyConfiguration(new ReservationConfiguration());
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         // Update timestamps for audit fields
         var entries = ChangeTracker.Entries()
-            .Where(e => e.Entity is CheckIn && (e.State == EntityState.Added || e.State == EntityState.Modified));
+            .Where(e => (e.Entity is CheckIn || e.Entity is Reservation) &&
+                       (e.State == EntityState.Added || e.State == EntityState.Modified));
 
         foreach (var entry in entries)
         {
@@ -50,6 +53,17 @@ public class ApplicationDbContext : DbContext
                 else if (entry.State == EntityState.Modified)
                 {
                     checkIn.UpdatedAt = DateTime.UtcNow;
+                }
+            }
+            else if (entry.Entity is Reservation reservation)
+            {
+                if (entry.State == EntityState.Added)
+                {
+                    reservation.CreatedAt = DateTime.UtcNow;
+                }
+                else if (entry.State == EntityState.Modified)
+                {
+                    reservation.UpdatedAt = DateTime.UtcNow;
                 }
             }
         }

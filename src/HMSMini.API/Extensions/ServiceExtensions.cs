@@ -23,6 +23,7 @@ public static class ServiceExtensions
         services.AddScoped<IGuestService, GuestService>();
         services.AddScoped<IOcrService, OcrService>();
         services.AddScoped<IImageStorageService, ImageStorageService>();
+        services.AddScoped<IReservationService, ReservationService>();
 
         return services;
     }
