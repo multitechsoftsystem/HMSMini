@@ -4,6 +4,7 @@ using FluentAssertions;
 using HMSMini.API.Models.DTOs.CheckIn;
 using HMSMini.API.Models.DTOs.Guest;
 using HMSMini.API.Models.DTOs.Room;
+using HMSMini.API.Models.Enums;
 
 namespace HMSMini.Tests.IntegrationTests;
 
@@ -17,17 +18,24 @@ public class GuestsControllerTests : IClassFixture<CustomWebApplicationFactory>
         _client = factory.CreateClient();
     }
 
-    private async Task<CheckInWithGuestsDto> CreateTestCheckInWithGuest()
+    private async Task<(CheckInWithGuestsDto CheckIn, string Token)> CreateTestCheckInWithGuest()
     {
+        var token = await TestAuthHelper.GetAuthTokenAsync(_client, UserRole.Receptionist);
+        var managerToken = await TestAuthHelper.GetAuthTokenAsync(_client, UserRole.Manager);
         var roomNumber = Interlocked.Increment(ref _roomCounter).ToString();
 
-        // Create a room first
+        // Create a room first (requires Manager or Admin)
         var createRoomDto = new CreateRoomDto
         {
             RoomNumber = roomNumber,
             RoomTypeId = 1 // Single room type
         };
-        await _client.PostAsJsonAsync("/api/rooms", createRoomDto);
+        var createRoomRequest = new HttpRequestMessage(HttpMethod.Post, "/api/rooms")
+        {
+            Content = JsonContent.Create(createRoomDto)
+        };
+        createRoomRequest.AddAuthorizationHeader(managerToken);
+        await _client.SendAsync(createRoomRequest);
 
         var checkInDto = new CreateCheckInDto
         {
@@ -49,7 +57,12 @@ public class GuestsControllerTests : IClassFixture<CustomWebApplicationFactory>
             }
         };
 
-        var response = await _client.PostAsJsonAsync("/api/checkins", checkInDto);
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/checkins")
+        {
+            Content = JsonContent.Create(checkInDto)
+        };
+        request.AddAuthorizationHeader(token);
+        var response = await _client.SendAsync(request);
         response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync<CheckInWithGuestsDto>();
 
@@ -60,18 +73,19 @@ public class GuestsControllerTests : IClassFixture<CustomWebApplicationFactory>
             throw new InvalidOperationException($"Failed to create check-in with guest. Response: {errorContent}");
         }
 
-        return result;
+        return (result, token);
     }
 
     [Fact]
     public async Task GetGuestById_WithValidId_ShouldReturnOk()
     {
         // Arrange
-        var checkIn = await CreateTestCheckInWithGuest();
+        var (checkIn, token) = await CreateTestCheckInWithGuest();
         var guestId = checkIn.Guests.First().Id;
+        var request = TestAuthHelper.CreateAuthenticatedRequest(HttpMethod.Get, $"/api/guests/{guestId}", token);
 
         // Act
-        var response = await _client.GetAsync($"/api/guests/{guestId}");
+        var response = await _client.SendAsync(request);
         var guest = await response.Content.ReadFromJsonAsync<GuestDto>();
 
         // Assert
@@ -84,8 +98,12 @@ public class GuestsControllerTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task GetGuestById_WithInvalidId_ShouldReturnNotFound()
     {
+        // Arrange
+        var token = await TestAuthHelper.GetAuthTokenAsync(_client);
+        var request = TestAuthHelper.CreateAuthenticatedRequest(HttpMethod.Get, "/api/guests/999", token);
+
         // Act
-        var response = await _client.GetAsync("/api/guests/999");
+        var response = await _client.SendAsync(request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -94,7 +112,10 @@ public class GuestsControllerTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task GetGuestsByCheckInId_ShouldReturnAllGuests()
     {
-        // Arrange - Create check-in with multiple guests
+        // Arrange
+        var token = await TestAuthHelper.GetAuthTokenAsync(_client, UserRole.Receptionist);
+
+        // Create check-in with multiple guests
         var checkInDto = new CreateCheckInDto
         {
             RoomNumber = "102",
@@ -106,11 +127,18 @@ public class GuestsControllerTests : IClassFixture<CustomWebApplicationFactory>
                 new CreateGuestDto { GuestName = "Guest 2" }
             }
         };
-        var createResponse = await _client.PostAsJsonAsync("/api/checkins", checkInDto);
+        var createRequest = new HttpRequestMessage(HttpMethod.Post, "/api/checkins")
+        {
+            Content = JsonContent.Create(checkInDto)
+        };
+        createRequest.AddAuthorizationHeader(token);
+        var createResponse = await _client.SendAsync(createRequest);
         var checkIn = await createResponse.Content.ReadFromJsonAsync<CheckInWithGuestsDto>();
 
+        var request = TestAuthHelper.CreateAuthenticatedRequest(HttpMethod.Get, $"/api/guests/checkin/{checkIn!.Id}", token);
+
         // Act
-        var response = await _client.GetAsync($"/api/guests/checkin/{checkIn!.Id}");
+        var response = await _client.SendAsync(request);
         var guests = await response.Content.ReadFromJsonAsync<List<GuestDto>>();
 
         // Assert
@@ -124,7 +152,7 @@ public class GuestsControllerTests : IClassFixture<CustomWebApplicationFactory>
     public async Task UpdateGuest_WithValidData_ShouldReturnOk()
     {
         // Arrange
-        var checkIn = await CreateTestCheckInWithGuest();
+        var (checkIn, token) = await CreateTestCheckInWithGuest();
         var guestId = checkIn.Guests.First().Id;
 
         var updateDto = new CreateGuestDto
@@ -138,8 +166,14 @@ public class GuestsControllerTests : IClassFixture<CustomWebApplicationFactory>
             PanOrAadharNo = "UPDATED1234Y"
         };
 
+        var request = new HttpRequestMessage(HttpMethod.Put, $"/api/guests/{guestId}")
+        {
+            Content = JsonContent.Create(updateDto)
+        };
+        request.AddAuthorizationHeader(token);
+
         // Act
-        var response = await _client.PutAsJsonAsync($"/api/guests/{guestId}", updateDto);
+        var response = await _client.SendAsync(request);
         var updatedGuest = await response.Content.ReadFromJsonAsync<GuestDto>();
 
         // Assert
@@ -155,13 +189,20 @@ public class GuestsControllerTests : IClassFixture<CustomWebApplicationFactory>
     public async Task UpdateGuest_WithInvalidId_ShouldReturnNotFound()
     {
         // Arrange
+        var token = await TestAuthHelper.GetAuthTokenAsync(_client, UserRole.Receptionist);
         var updateDto = new CreateGuestDto
         {
             GuestName = "Test"
         };
 
+        var request = new HttpRequestMessage(HttpMethod.Put, "/api/guests/999")
+        {
+            Content = JsonContent.Create(updateDto)
+        };
+        request.AddAuthorizationHeader(token);
+
         // Act
-        var response = await _client.PutAsJsonAsync("/api/guests/999", updateDto);
+        var response = await _client.SendAsync(request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -171,25 +212,33 @@ public class GuestsControllerTests : IClassFixture<CustomWebApplicationFactory>
     public async Task DeleteGuest_WithValidId_ShouldReturnNoContent()
     {
         // Arrange
-        var checkIn = await CreateTestCheckInWithGuest();
+        var (checkIn, _) = await CreateTestCheckInWithGuest();
+        var adminToken = await TestAuthHelper.GetAuthTokenAsync(_client, UserRole.Admin);
         var guestId = checkIn.Guests.First().Id;
 
+        var request = TestAuthHelper.CreateAuthenticatedRequest(HttpMethod.Delete, $"/api/guests/{guestId}", adminToken);
+
         // Act
-        var response = await _client.DeleteAsync($"/api/guests/{guestId}");
+        var response = await _client.SendAsync(request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         // Verify guest is deleted
-        var getResponse = await _client.GetAsync($"/api/guests/{guestId}");
+        var getRequest = TestAuthHelper.CreateAuthenticatedRequest(HttpMethod.Get, $"/api/guests/{guestId}", adminToken);
+        var getResponse = await _client.SendAsync(getRequest);
         getResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]
     public async Task DeleteGuest_WithInvalidId_ShouldReturnNotFound()
     {
+        // Arrange
+        var token = await TestAuthHelper.GetAuthTokenAsync(_client, UserRole.Admin);
+        var request = TestAuthHelper.CreateAuthenticatedRequest(HttpMethod.Delete, "/api/guests/999", token);
+
         // Act
-        var response = await _client.DeleteAsync("/api/guests/999");
+        var response = await _client.SendAsync(request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -199,15 +248,21 @@ public class GuestsControllerTests : IClassFixture<CustomWebApplicationFactory>
     public async Task UploadPhoto_WithMissingFile_ShouldReturnBadRequest()
     {
         // Arrange
-        var checkIn = await CreateTestCheckInWithGuest();
+        var (checkIn, token) = await CreateTestCheckInWithGuest();
         var guestId = checkIn.Guests.First().Id;
 
         var content = new MultipartFormDataContent();
         content.Add(new StringContent("1"), "photoNumber");
         // No file added
 
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/guests/{guestId}/upload-photo")
+        {
+            Content = content
+        };
+        request.AddAuthorizationHeader(token);
+
         // Act
-        var response = await _client.PostAsync($"/api/guests/{guestId}/upload-photo", content);
+        var response = await _client.SendAsync(request);
 
         // Assert
         // Should fail because no file provided
@@ -217,8 +272,12 @@ public class GuestsControllerTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task GetPhoto_WithInvalidGuestId_ShouldReturnNotFound()
     {
+        // Arrange
+        var token = await TestAuthHelper.GetAuthTokenAsync(_client);
+        var request = TestAuthHelper.CreateAuthenticatedRequest(HttpMethod.Get, "/api/guests/999/photos/1", token);
+
         // Act
-        var response = await _client.GetAsync("/api/guests/999/photos/1");
+        var response = await _client.SendAsync(request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -228,11 +287,13 @@ public class GuestsControllerTests : IClassFixture<CustomWebApplicationFactory>
     public async Task ProcessOcr_WithoutUploadedPhoto_ShouldReturnBadRequest()
     {
         // Arrange
-        var checkIn = await CreateTestCheckInWithGuest();
+        var (checkIn, token) = await CreateTestCheckInWithGuest();
         var guestId = checkIn.Guests.First().Id;
 
+        var request = TestAuthHelper.CreateAuthenticatedRequest(HttpMethod.Post, $"/api/guests/{guestId}/process-ocr?photoNumber=1", token);
+
         // Act - Try to process OCR without uploading a photo first
-        var response = await _client.PostAsync($"/api/guests/{guestId}/process-ocr?photoNumber=1", null);
+        var response = await _client.SendAsync(request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);

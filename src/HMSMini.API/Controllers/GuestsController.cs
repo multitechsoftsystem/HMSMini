@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using HMSMini.API.Models.DTOs.Guest;
 using HMSMini.API.Services.Interfaces;
@@ -9,6 +10,7 @@ namespace HMSMini.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class GuestsController : ControllerBase
 {
     private readonly IGuestService _guestService;
@@ -55,6 +57,7 @@ public class GuestsController : ControllerBase
     /// Update guest information
     /// </summary>
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin,Manager,Receptionist")]
     [ProducesResponseType(typeof(GuestDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<GuestDto>> Update(int id, [FromBody] CreateGuestDto dto)
@@ -67,6 +70,7 @@ public class GuestsController : ControllerBase
     /// Delete a guest
     /// </summary>
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(int id)
@@ -82,6 +86,7 @@ public class GuestsController : ControllerBase
     /// <param name="photoNumber">Photo number (1 or 2)</param>
     /// <param name="file">The image file</param>
     [HttpPost("{id}/upload-photo")]
+    [Authorize(Roles = "Admin,Manager,Receptionist")]
     [ProducesResponseType(typeof(GuestDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -111,6 +116,7 @@ public class GuestsController : ControllerBase
     /// <param name="id">Guest ID</param>
     /// <param name="photoNumber">Photo number to process (1 or 2)</param>
     [HttpPost("{id}/process-ocr")]
+    [Authorize(Roles = "Admin,Manager,Receptionist")]
     [ProducesResponseType(typeof(GuestInfoDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

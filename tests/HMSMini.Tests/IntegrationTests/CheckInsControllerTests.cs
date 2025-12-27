@@ -19,8 +19,12 @@ public class CheckInsControllerTests : IClassFixture<CustomWebApplicationFactory
     [Fact]
     public async Task GetAllCheckIns_ShouldReturnOk_WithListOfCheckIns()
     {
+        // Arrange
+        var token = await TestAuthHelper.GetAuthTokenAsync(_client);
+        var request = TestAuthHelper.CreateAuthenticatedRequest(HttpMethod.Get, "/api/checkins", token);
+
         // Act
-        var response = await _client.GetAsync("/api/checkins");
+        var response = await _client.SendAsync(request);
         var checkIns = await response.Content.ReadFromJsonAsync<List<CheckInDto>>();
 
         // Assert
@@ -33,6 +37,7 @@ public class CheckInsControllerTests : IClassFixture<CustomWebApplicationFactory
     public async Task CreateCheckIn_WithValidData_ShouldReturnOk()
     {
         // Arrange
+        var token = await TestAuthHelper.GetAuthTokenAsync(_client, UserRole.Receptionist);
         var actualCheckInDate = DateTime.UtcNow.AddMinutes(-30);
         var checkInDto = new CreateCheckInDto
         {
@@ -57,8 +62,14 @@ public class CheckInsControllerTests : IClassFixture<CustomWebApplicationFactory
             }
         };
 
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/checkins")
+        {
+            Content = JsonContent.Create(checkInDto)
+        };
+        request.AddAuthorizationHeader(token);
+
         // Act
-        var response = await _client.PostAsJsonAsync("/api/checkins", checkInDto);
+        var response = await _client.SendAsync(request);
         var createdCheckIn = await response.Content.ReadFromJsonAsync<CheckInWithGuestsDto>();
 
         // Assert
@@ -79,6 +90,7 @@ public class CheckInsControllerTests : IClassFixture<CustomWebApplicationFactory
     public async Task CreateCheckIn_WithMultipleGuests_ShouldCreateAllGuests()
     {
         // Arrange
+        var token = await TestAuthHelper.GetAuthTokenAsync(_client, UserRole.Receptionist);
         var checkInDto = new CreateCheckInDto
         {
             RoomNumber = "102",
@@ -93,8 +105,14 @@ public class CheckInsControllerTests : IClassFixture<CustomWebApplicationFactory
             }
         };
 
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/checkins")
+        {
+            Content = JsonContent.Create(checkInDto)
+        };
+        request.AddAuthorizationHeader(token);
+
         // Act
-        var response = await _client.PostAsJsonAsync("/api/checkins", checkInDto);
+        var response = await _client.SendAsync(request);
         var createdCheckIn = await response.Content.ReadFromJsonAsync<CheckInWithGuestsDto>();
 
         // Assert
@@ -112,6 +130,7 @@ public class CheckInsControllerTests : IClassFixture<CustomWebApplicationFactory
     public async Task CreateCheckIn_WithInvalidDates_ShouldReturnBadRequest()
     {
         // Arrange
+        var token = await TestAuthHelper.GetAuthTokenAsync(_client, UserRole.Receptionist);
         var checkInDto = new CreateCheckInDto
         {
             RoomNumber = "103",
@@ -123,8 +142,14 @@ public class CheckInsControllerTests : IClassFixture<CustomWebApplicationFactory
             }
         };
 
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/checkins")
+        {
+            Content = JsonContent.Create(checkInDto)
+        };
+        request.AddAuthorizationHeader(token);
+
         // Act
-        var response = await _client.PostAsJsonAsync("/api/checkins", checkInDto);
+        var response = await _client.SendAsync(request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -134,6 +159,7 @@ public class CheckInsControllerTests : IClassFixture<CustomWebApplicationFactory
     public async Task CreateCheckIn_WithNoGuests_ShouldReturnBadRequest()
     {
         // Arrange
+        var token = await TestAuthHelper.GetAuthTokenAsync(_client, UserRole.Receptionist);
         var checkInDto = new CreateCheckInDto
         {
             RoomNumber = "201",
@@ -142,8 +168,14 @@ public class CheckInsControllerTests : IClassFixture<CustomWebApplicationFactory
             Guests = new List<CreateGuestDto>() // Empty guest list
         };
 
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/checkins")
+        {
+            Content = JsonContent.Create(checkInDto)
+        };
+        request.AddAuthorizationHeader(token);
+
         // Act
-        var response = await _client.PostAsJsonAsync("/api/checkins", checkInDto);
+        var response = await _client.SendAsync(request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -153,6 +185,7 @@ public class CheckInsControllerTests : IClassFixture<CustomWebApplicationFactory
     public async Task CreateCheckIn_WithTooManyGuests_ShouldReturnBadRequest()
     {
         // Arrange
+        var token = await TestAuthHelper.GetAuthTokenAsync(_client, UserRole.Receptionist);
         var checkInDto = new CreateCheckInDto
         {
             RoomNumber = "302",
@@ -167,8 +200,14 @@ public class CheckInsControllerTests : IClassFixture<CustomWebApplicationFactory
             }
         };
 
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/checkins")
+        {
+            Content = JsonContent.Create(checkInDto)
+        };
+        request.AddAuthorizationHeader(token);
+
         // Act
-        var response = await _client.PostAsJsonAsync("/api/checkins", checkInDto);
+        var response = await _client.SendAsync(request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -177,7 +216,10 @@ public class CheckInsControllerTests : IClassFixture<CustomWebApplicationFactory
     [Fact]
     public async Task GetCheckInById_WithValidId_ShouldReturnOk()
     {
-        // Arrange - Create a check-in first
+        // Arrange
+        var token = await TestAuthHelper.GetAuthTokenAsync(_client, UserRole.Receptionist);
+
+        // Create a check-in first
         var checkInDto = new CreateCheckInDto
         {
             RoomNumber = "202",
@@ -188,11 +230,18 @@ public class CheckInsControllerTests : IClassFixture<CustomWebApplicationFactory
                 new CreateGuestDto { GuestName = "Test Guest" }
             }
         };
-        var createResponse = await _client.PostAsJsonAsync("/api/checkins", checkInDto);
+        var createRequest = new HttpRequestMessage(HttpMethod.Post, "/api/checkins")
+        {
+            Content = JsonContent.Create(checkInDto)
+        };
+        createRequest.AddAuthorizationHeader(token);
+        var createResponse = await _client.SendAsync(createRequest);
         var createdCheckIn = await createResponse.Content.ReadFromJsonAsync<CheckInWithGuestsDto>();
 
+        var request = TestAuthHelper.CreateAuthenticatedRequest(HttpMethod.Get, $"/api/checkins/{createdCheckIn!.Id}", token);
+
         // Act
-        var response = await _client.GetAsync($"/api/checkins/{createdCheckIn!.Id}");
+        var response = await _client.SendAsync(request);
         var checkIn = await response.Content.ReadFromJsonAsync<CheckInWithGuestsDto>();
 
         // Assert
@@ -205,8 +254,12 @@ public class CheckInsControllerTests : IClassFixture<CustomWebApplicationFactory
     [Fact]
     public async Task GetCheckInById_WithInvalidId_ShouldReturnNotFound()
     {
+        // Arrange
+        var token = await TestAuthHelper.GetAuthTokenAsync(_client);
+        var request = TestAuthHelper.CreateAuthenticatedRequest(HttpMethod.Get, "/api/checkins/999", token);
+
         // Act
-        var response = await _client.GetAsync("/api/checkins/999");
+        var response = await _client.SendAsync(request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -215,7 +268,10 @@ public class CheckInsControllerTests : IClassFixture<CustomWebApplicationFactory
     [Fact]
     public async Task GetActiveCheckIns_ShouldReturnOnlyActiveCheckIns()
     {
-        // Arrange - Create an active check-in
+        // Arrange
+        var token = await TestAuthHelper.GetAuthTokenAsync(_client, UserRole.Receptionist);
+
+        // Create an active check-in
         var checkInDto = new CreateCheckInDto
         {
             RoomNumber = "203",
@@ -226,10 +282,17 @@ public class CheckInsControllerTests : IClassFixture<CustomWebApplicationFactory
                 new CreateGuestDto { GuestName = "Active Guest" }
             }
         };
-        await _client.PostAsJsonAsync("/api/checkins", checkInDto);
+        var createRequest = new HttpRequestMessage(HttpMethod.Post, "/api/checkins")
+        {
+            Content = JsonContent.Create(checkInDto)
+        };
+        createRequest.AddAuthorizationHeader(token);
+        await _client.SendAsync(createRequest);
+
+        var request = TestAuthHelper.CreateAuthenticatedRequest(HttpMethod.Get, "/api/checkins/active", token);
 
         // Act
-        var response = await _client.GetAsync("/api/checkins/active");
+        var response = await _client.SendAsync(request);
         var activeCheckIns = await response.Content.ReadFromJsonAsync<List<CheckInDto>>();
 
         // Assert
@@ -242,7 +305,10 @@ public class CheckInsControllerTests : IClassFixture<CustomWebApplicationFactory
     [Fact]
     public async Task CheckOut_WithValidId_ShouldReturnNoContent()
     {
-        // Arrange - Create a check-in first
+        // Arrange
+        var token = await TestAuthHelper.GetAuthTokenAsync(_client, UserRole.Receptionist);
+
+        // Create a check-in first
         var checkInDto = new CreateCheckInDto
         {
             RoomNumber = "204",
@@ -253,17 +319,25 @@ public class CheckInsControllerTests : IClassFixture<CustomWebApplicationFactory
                 new CreateGuestDto { GuestName = "Checkout Test Guest" }
             }
         };
-        var createResponse = await _client.PostAsJsonAsync("/api/checkins", checkInDto);
+        var createRequest = new HttpRequestMessage(HttpMethod.Post, "/api/checkins")
+        {
+            Content = JsonContent.Create(checkInDto)
+        };
+        createRequest.AddAuthorizationHeader(token);
+        var createResponse = await _client.SendAsync(createRequest);
         var createdCheckIn = await createResponse.Content.ReadFromJsonAsync<CheckInWithGuestsDto>();
 
+        var request = TestAuthHelper.CreateAuthenticatedRequest(HttpMethod.Post, $"/api/checkins/{createdCheckIn!.Id}/checkout", token);
+
         // Act
-        var response = await _client.PostAsync($"/api/checkins/{createdCheckIn!.Id}/checkout", null);
+        var response = await _client.SendAsync(request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         // Verify check-in is marked as checked out
-        var getResponse = await _client.GetAsync($"/api/checkins/{createdCheckIn.Id}");
+        var getRequest = TestAuthHelper.CreateAuthenticatedRequest(HttpMethod.Get, $"/api/checkins/{createdCheckIn.Id}", token);
+        var getResponse = await _client.SendAsync(getRequest);
         var checkedOutCheckIn = await getResponse.Content.ReadFromJsonAsync<CheckInWithGuestsDto>();
         checkedOutCheckIn!.Status.Should().Be(CheckInStatus.CheckedOut);
         checkedOutCheckIn.ActualCheckOutDate.Should().NotBeNull();
@@ -272,8 +346,12 @@ public class CheckInsControllerTests : IClassFixture<CustomWebApplicationFactory
     [Fact]
     public async Task CheckOut_WithInvalidId_ShouldReturnNotFound()
     {
+        // Arrange
+        var token = await TestAuthHelper.GetAuthTokenAsync(_client, UserRole.Receptionist);
+        var request = TestAuthHelper.CreateAuthenticatedRequest(HttpMethod.Post, "/api/checkins/999/checkout", token);
+
         // Act
-        var response = await _client.PostAsync("/api/checkins/999/checkout", null);
+        var response = await _client.SendAsync(request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -282,7 +360,11 @@ public class CheckInsControllerTests : IClassFixture<CustomWebApplicationFactory
     [Fact]
     public async Task DeleteCheckIn_WithValidId_ShouldReturnNoContent()
     {
-        // Arrange - Create a check-in first
+        // Arrange
+        var receptionistToken = await TestAuthHelper.GetAuthTokenAsync(_client, UserRole.Receptionist);
+        var adminToken = await TestAuthHelper.GetAuthTokenAsync(_client, UserRole.Admin);
+
+        // Create a check-in first
         var checkInDto = new CreateCheckInDto
         {
             RoomNumber = "301",
@@ -293,25 +375,38 @@ public class CheckInsControllerTests : IClassFixture<CustomWebApplicationFactory
                 new CreateGuestDto { GuestName = "Delete Test Guest" }
             }
         };
-        var createResponse = await _client.PostAsJsonAsync("/api/checkins", checkInDto);
+        var createRequest = new HttpRequestMessage(HttpMethod.Post, "/api/checkins")
+        {
+            Content = JsonContent.Create(checkInDto)
+        };
+        createRequest.AddAuthorizationHeader(receptionistToken);
+        var createResponse = await _client.SendAsync(createRequest);
         var createdCheckIn = await createResponse.Content.ReadFromJsonAsync<CheckInWithGuestsDto>();
 
+        // Delete with admin token
+        var request = TestAuthHelper.CreateAuthenticatedRequest(HttpMethod.Delete, $"/api/checkins/{createdCheckIn!.Id}", adminToken);
+
         // Act
-        var response = await _client.DeleteAsync($"/api/checkins/{createdCheckIn!.Id}");
+        var response = await _client.SendAsync(request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         // Verify check-in is deleted
-        var getResponse = await _client.GetAsync($"/api/checkins/{createdCheckIn.Id}");
+        var getRequest = TestAuthHelper.CreateAuthenticatedRequest(HttpMethod.Get, $"/api/checkins/{createdCheckIn.Id}", adminToken);
+        var getResponse = await _client.SendAsync(getRequest);
         getResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]
     public async Task DeleteCheckIn_WithInvalidId_ShouldReturnNotFound()
     {
+        // Arrange
+        var token = await TestAuthHelper.GetAuthTokenAsync(_client, UserRole.Admin);
+        var request = TestAuthHelper.CreateAuthenticatedRequest(HttpMethod.Delete, "/api/checkins/999", token);
+
         // Act
-        var response = await _client.DeleteAsync("/api/checkins/999");
+        var response = await _client.SendAsync(request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);

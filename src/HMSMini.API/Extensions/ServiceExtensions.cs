@@ -16,6 +16,7 @@ public static class ServiceExtensions
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
         // Register services
+        services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IRoomTypeService, RoomTypeService>();
         services.AddScoped<IRoomService, RoomService>();
         services.AddScoped<ICheckInService, CheckInService>();

@@ -18,8 +18,12 @@ public class RoomsControllerTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task GetAllRooms_ShouldReturnOk_WithListOfRooms()
     {
+        // Arrange
+        var token = await TestAuthHelper.GetAuthTokenAsync(_client);
+        var request = TestAuthHelper.CreateAuthenticatedRequest(HttpMethod.Get, "/api/rooms", token);
+
         // Act
-        var response = await _client.GetAsync("/api/rooms");
+        var response = await _client.SendAsync(request);
         var rooms = await response.Content.ReadFromJsonAsync<List<RoomDto>>();
 
         // Assert
@@ -36,12 +40,19 @@ public class RoomsControllerTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task GetRoomById_WithValidId_ShouldReturnOk()
     {
-        // Arrange - Get first room from seed data
-        var allRooms = await _client.GetFromJsonAsync<List<RoomDto>>("/api/rooms");
+        // Arrange
+        var token = await TestAuthHelper.GetAuthTokenAsync(_client);
+
+        // Get first room from seed data
+        var getAllRequest = TestAuthHelper.CreateAuthenticatedRequest(HttpMethod.Get, "/api/rooms", token);
+        var getAllResponse = await _client.SendAsync(getAllRequest);
+        var allRooms = await getAllResponse.Content.ReadFromJsonAsync<List<RoomDto>>();
         var firstRoomId = allRooms!.First().RoomId;
 
+        var request = TestAuthHelper.CreateAuthenticatedRequest(HttpMethod.Get, $"/api/rooms/{firstRoomId}", token);
+
         // Act
-        var response = await _client.GetAsync($"/api/rooms/{firstRoomId}");
+        var response = await _client.SendAsync(request);
         var room = await response.Content.ReadFromJsonAsync<RoomDto>();
 
         // Assert
@@ -53,8 +64,12 @@ public class RoomsControllerTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task GetRoomById_WithInvalidId_ShouldReturnNotFound()
     {
+        // Arrange
+        var token = await TestAuthHelper.GetAuthTokenAsync(_client);
+        var request = TestAuthHelper.CreateAuthenticatedRequest(HttpMethod.Get, "/api/rooms/999", token);
+
         // Act
-        var response = await _client.GetAsync("/api/rooms/999");
+        var response = await _client.SendAsync(request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
@@ -64,11 +79,13 @@ public class RoomsControllerTests : IClassFixture<CustomWebApplicationFactory>
     public async Task GetAvailableRooms_ShouldReturnOnlyAvailableRooms()
     {
         // Arrange
+        var token = await TestAuthHelper.GetAuthTokenAsync(_client);
         var checkInDate = DateTime.Today.AddDays(1).ToString("yyyy-MM-dd");
         var checkOutDate = DateTime.Today.AddDays(3).ToString("yyyy-MM-dd");
+        var request = TestAuthHelper.CreateAuthenticatedRequest(HttpMethod.Get, $"/api/rooms/available?checkIn={checkInDate}&checkOut={checkOutDate}", token);
 
         // Act
-        var response = await _client.GetAsync($"/api/rooms/available?checkIn={checkInDate}&checkOut={checkOutDate}");
+        var response = await _client.SendAsync(request);
         var availableRooms = await response.Content.ReadFromJsonAsync<List<RoomDto>>();
 
         // Assert
@@ -84,15 +101,22 @@ public class RoomsControllerTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task CreateRoom_WithValidData_ShouldReturnCreated()
     {
-        // Arrange
+        // Arrange - Use Manager role which has permission to create rooms
+        var token = await TestAuthHelper.GetAuthTokenAsync(_client, UserRole.Manager);
         var newRoom = new CreateRoomDto
         {
             RoomNumber = "999",
             RoomTypeId = 1 // Assuming seed data has at least one room type
         };
 
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/rooms")
+        {
+            Content = JsonContent.Create(newRoom)
+        };
+        request.AddAuthorizationHeader(token);
+
         // Act
-        var response = await _client.PostAsJsonAsync("/api/rooms", newRoom);
+        var response = await _client.SendAsync(request);
         var createdRoom = await response.Content.ReadFromJsonAsync<RoomDto>();
 
         // Assert
@@ -105,15 +129,22 @@ public class RoomsControllerTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task CreateRoom_WithDuplicateRoomNumber_ShouldReturnBadRequest()
     {
-        // Arrange - Use an existing room number from seed data
+        // Arrange - Use Manager role
+        var token = await TestAuthHelper.GetAuthTokenAsync(_client, UserRole.Manager);
         var duplicateRoom = new CreateRoomDto
         {
             RoomNumber = "101", // From seed data
             RoomTypeId = 1
         };
 
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/rooms")
+        {
+            Content = JsonContent.Create(duplicateRoom)
+        };
+        request.AddAuthorizationHeader(token);
+
         // Act
-        var response = await _client.PostAsJsonAsync("/api/rooms", duplicateRoom);
+        var response = await _client.SendAsync(request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -122,8 +153,13 @@ public class RoomsControllerTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task UpdateRoomStatus_WithValidData_ShouldReturnOk()
     {
-        // Arrange
-        var allRooms = await _client.GetFromJsonAsync<List<RoomDto>>("/api/rooms");
+        // Arrange - Use Manager role
+        var token = await TestAuthHelper.GetAuthTokenAsync(_client, UserRole.Manager);
+
+        // Get first available room
+        var getAllRequest = TestAuthHelper.CreateAuthenticatedRequest(HttpMethod.Get, "/api/rooms", token);
+        var getAllResponse = await _client.SendAsync(getAllRequest);
+        var allRooms = await getAllResponse.Content.ReadFromJsonAsync<List<RoomDto>>();
         var roomToUpdate = allRooms!.First(r => r.RoomStatus == RoomStatus.Available);
 
         var updateDto = new UpdateRoomStatusDto
@@ -133,8 +169,14 @@ public class RoomsControllerTests : IClassFixture<CustomWebApplicationFactory>
             RoomStatusToDate = DateTime.Today.AddDays(2)
         };
 
+        var request = new HttpRequestMessage(HttpMethod.Put, $"/api/rooms/{roomToUpdate.RoomId}/status")
+        {
+            Content = JsonContent.Create(updateDto)
+        };
+        request.AddAuthorizationHeader(token);
+
         // Act
-        var response = await _client.PutAsJsonAsync($"/api/rooms/{roomToUpdate.RoomId}/status", updateDto);
+        var response = await _client.SendAsync(request);
         var updatedRoom = await response.Content.ReadFromJsonAsync<RoomDto>();
 
         // Assert
@@ -147,31 +189,48 @@ public class RoomsControllerTests : IClassFixture<CustomWebApplicationFactory>
     [Fact]
     public async Task DeleteRoom_WithValidId_ShouldReturnNoContent()
     {
-        // Arrange - Create a room to delete
+        // Arrange - Use Admin role for delete
+        var adminToken = await TestAuthHelper.GetAuthTokenAsync(_client, UserRole.Admin);
+        var managerToken = await TestAuthHelper.GetAuthTokenAsync(_client, UserRole.Manager);
+
+        // Create a room to delete
         var newRoom = new CreateRoomDto
         {
             RoomNumber = "998",
             RoomTypeId = 1
         };
-        var createResponse = await _client.PostAsJsonAsync("/api/rooms", newRoom);
+        var createRequest = new HttpRequestMessage(HttpMethod.Post, "/api/rooms")
+        {
+            Content = JsonContent.Create(newRoom)
+        };
+        createRequest.AddAuthorizationHeader(managerToken);
+        var createResponse = await _client.SendAsync(createRequest);
         var createdRoom = await createResponse.Content.ReadFromJsonAsync<RoomDto>();
 
+        // Delete with admin token
+        var deleteRequest = TestAuthHelper.CreateAuthenticatedRequest(HttpMethod.Delete, $"/api/rooms/{createdRoom!.RoomId}", adminToken);
+
         // Act
-        var response = await _client.DeleteAsync($"/api/rooms/{createdRoom!.RoomId}");
+        var response = await _client.SendAsync(deleteRequest);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         // Verify room is deleted
-        var getResponse = await _client.GetAsync($"/api/rooms/{createdRoom.RoomId}");
+        var getRequest = TestAuthHelper.CreateAuthenticatedRequest(HttpMethod.Get, $"/api/rooms/{createdRoom.RoomId}", adminToken);
+        var getResponse = await _client.SendAsync(getRequest);
         getResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]
     public async Task DeleteRoom_WithInvalidId_ShouldReturnNotFound()
     {
+        // Arrange - Use Admin role
+        var token = await TestAuthHelper.GetAuthTokenAsync(_client, UserRole.Admin);
+        var request = TestAuthHelper.CreateAuthenticatedRequest(HttpMethod.Delete, "/api/rooms/999", token);
+
         // Act
-        var response = await _client.DeleteAsync("/api/rooms/999");
+        var response = await _client.SendAsync(request);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);

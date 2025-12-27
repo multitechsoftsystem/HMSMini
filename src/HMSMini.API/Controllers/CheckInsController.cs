@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using HMSMini.API.Models.DTOs.CheckIn;
 using HMSMini.API.Services.Interfaces;
@@ -9,6 +10,7 @@ namespace HMSMini.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class CheckInsController : ControllerBase
 {
     private readonly ICheckInService _checkInService;
@@ -58,6 +60,7 @@ public class CheckInsController : ControllerBase
     /// Create a new check-in with guests
     /// </summary>
     [HttpPost]
+    [Authorize(Roles = "Admin,Manager,Receptionist")]
     [ProducesResponseType(typeof(CheckInWithGuestsDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<CheckInWithGuestsDto>> Create([FromBody] CreateCheckInDto dto)
@@ -70,6 +73,7 @@ public class CheckInsController : ControllerBase
     /// Check out a guest
     /// </summary>
     [HttpPost("{id}/checkout")]
+    [Authorize(Roles = "Admin,Manager,Receptionist")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -83,6 +87,7 @@ public class CheckInsController : ControllerBase
     /// Delete a check-in
     /// </summary>
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(int id)

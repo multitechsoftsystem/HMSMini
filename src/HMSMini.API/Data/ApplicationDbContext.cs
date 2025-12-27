@@ -19,6 +19,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<RoomNo> Rooms { get; set; } = null!;
     public DbSet<CheckIn> CheckIns { get; set; } = null!;
     public DbSet<Guest> Guests { get; set; } = null!;
+    public DbSet<User> Users { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -29,6 +30,7 @@ public class ApplicationDbContext : DbContext
         modelBuilder.ApplyConfiguration(new RoomNoConfiguration());
         modelBuilder.ApplyConfiguration(new CheckInConfiguration());
         modelBuilder.ApplyConfiguration(new GuestConfiguration());
+        modelBuilder.ApplyConfiguration(new UserConfiguration());
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

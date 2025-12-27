@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using HMSMini.API.Models.DTOs.Room;
 using HMSMini.API.Services.Interfaces;
@@ -9,6 +10,7 @@ namespace HMSMini.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class RoomsController : ControllerBase
 {
     private readonly IRoomService _roomService;
@@ -58,6 +60,7 @@ public class RoomsController : ControllerBase
     /// Create a new room
     /// </summary>
     [HttpPost]
+    [Authorize(Roles = "Admin,Manager")]
     [ProducesResponseType(typeof(RoomDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<RoomDto>> Create([FromBody] CreateRoomDto dto)
@@ -70,6 +73,7 @@ public class RoomsController : ControllerBase
     /// Update room status
     /// </summary>
     [HttpPut("{id}/status")]
+    [Authorize(Roles = "Admin,Manager")]
     [ProducesResponseType(typeof(RoomDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<RoomDto>> UpdateStatus(int id, [FromBody] UpdateRoomStatusDto dto)
@@ -82,6 +86,7 @@ public class RoomsController : ControllerBase
     /// Delete a room
     /// </summary>
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
