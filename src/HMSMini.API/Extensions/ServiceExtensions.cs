@@ -20,6 +20,8 @@ public static class ServiceExtensions
         services.AddScoped<IRoomService, RoomService>();
         services.AddScoped<ICheckInService, CheckInService>();
         services.AddScoped<IGuestService, GuestService>();
+        services.AddScoped<IOcrService, OcrService>();
+        services.AddScoped<IImageStorageService, ImageStorageService>();
 
         return services;
     }

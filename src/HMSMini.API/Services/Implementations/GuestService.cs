@@ -82,6 +82,26 @@ public class GuestService : IGuestService
         return await GetByIdAsync(id);
     }
 
+    public async Task<GuestDto> UpdatePhotoPathAsync(int id, int photoNumber, string photoPath)
+    {
+        var guest = await _context.Guests.FindAsync(id);
+        if (guest == null)
+            throw new NotFoundException(nameof(Guest), id);
+
+        if (photoNumber == 1)
+            guest.Photo1Path = photoPath;
+        else if (photoNumber == 2)
+            guest.Photo2Path = photoPath;
+        else
+            throw new BusinessRuleException("Photo number must be 1 or 2");
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Updated photo {PhotoNumber} path for guest ID {Id}", photoNumber, id);
+
+        return await GetByIdAsync(id);
+    }
+
     public async Task DeleteAsync(int id)
     {
         var guest = await _context.Guests.FindAsync(id);
