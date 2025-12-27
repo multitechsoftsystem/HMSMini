@@ -8,10 +8,6 @@ namespace HMSMini.API.Models.DTOs.Guest;
 public class CreateGuestDto
 {
     [Required]
-    [Range(1, 3)]
-    public int GuestNumber { get; set; }
-
-    [Required]
     [StringLength(200)]
     public string GuestName { get; set; } = string.Empty;
 

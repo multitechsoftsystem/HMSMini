@@ -7,9 +7,6 @@ public class CreateGuestDtoValidator : AbstractValidator<CreateGuestDto>
 {
     public CreateGuestDtoValidator()
     {
-        RuleFor(x => x.GuestNumber)
-            .InclusiveBetween(1, 3).WithMessage("Guest number must be between 1 and 3.");
-
         RuleFor(x => x.GuestName)
             .NotEmpty().WithMessage("Guest name is required.")
             .MaximumLength(200).WithMessage("Guest name cannot exceed 200 characters.");
