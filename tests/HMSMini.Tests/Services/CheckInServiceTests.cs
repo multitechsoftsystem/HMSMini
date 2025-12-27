@@ -64,11 +64,15 @@ public class CheckInServiceTests : IDisposable
     public async Task CreateCheckInAsync_WithValidData_ShouldCreateCheckInAndGuests()
     {
         // Arrange
+        var actualCheckInDate = DateTime.UtcNow.AddHours(-1);
         var dto = new CreateCheckInDto
         {
             RoomNumber = "101",
             CheckInDate = DateTime.Today,
             CheckOutDate = DateTime.Today.AddDays(2),
+            ActualCheckInDate = actualCheckInDate,
+            RegistrationNo = "REG-2024-001",
+            Remarks = "VIP guest",
             Guests = new List<CreateGuestDto>
             {
                 new CreateGuestDto
@@ -78,7 +82,8 @@ public class CheckInServiceTests : IDisposable
                     City = "Mumbai",
                     State = "Maharashtra",
                     Country = "India",
-                    MobileNo = "9876543210"
+                    MobileNo = "9876543210",
+                    PanOrAadharNo = "ABCDE1234F"
                 }
             }
         };
@@ -100,9 +105,13 @@ public class CheckInServiceTests : IDisposable
         result.RoomNumber.Should().Be("101");
         result.Pax.Should().Be(1);
         result.Status.Should().Be(CheckInStatus.Active);
+        result.ActualCheckInDate.Should().Be(actualCheckInDate);
+        result.RegistrationNo.Should().Be("REG-2024-001");
+        result.Remarks.Should().Be("VIP guest");
         result.Guests.Should().HaveCount(1);
         result.Guests.First().GuestName.Should().Be("John Doe");
         result.Guests.First().GuestNumber.Should().Be(1);
+        result.Guests.First().PanOrAadharNo.Should().Be("ABCDE1234F");
 
         // Verify room status was updated
         var room = await _context.Rooms.FindAsync(1);
@@ -119,11 +128,12 @@ public class CheckInServiceTests : IDisposable
             RoomNumber = "101",
             CheckInDate = DateTime.Today,
             CheckOutDate = DateTime.Today.AddDays(2),
+            RegistrationNo = "REG-2024-002",
             Guests = new List<CreateGuestDto>
             {
-                new CreateGuestDto { GuestName = "Guest 1", MobileNo = "1111111111" },
-                new CreateGuestDto { GuestName = "Guest 2", MobileNo = "2222222222" },
-                new CreateGuestDto { GuestName = "Guest 3", MobileNo = "3333333333" }
+                new CreateGuestDto { GuestName = "Guest 1", MobileNo = "1111111111", PanOrAadharNo = "AAAAA1111A" },
+                new CreateGuestDto { GuestName = "Guest 2", MobileNo = "2222222222", PanOrAadharNo = "BBBBB2222B" },
+                new CreateGuestDto { GuestName = "Guest 3", MobileNo = "3333333333", PanOrAadharNo = "CCCCC3333C" }
             }
         };
 
@@ -136,10 +146,11 @@ public class CheckInServiceTests : IDisposable
 
         // Assert
         result.Guests.Should().HaveCount(3);
-        result.Guests.Should().Contain(g => g.GuestNumber == 1 && g.GuestName == "Guest 1");
-        result.Guests.Should().Contain(g => g.GuestNumber == 2 && g.GuestName == "Guest 2");
-        result.Guests.Should().Contain(g => g.GuestNumber == 3 && g.GuestName == "Guest 3");
+        result.Guests.Should().Contain(g => g.GuestNumber == 1 && g.GuestName == "Guest 1" && g.PanOrAadharNo == "AAAAA1111A");
+        result.Guests.Should().Contain(g => g.GuestNumber == 2 && g.GuestName == "Guest 2" && g.PanOrAadharNo == "BBBBB2222B");
+        result.Guests.Should().Contain(g => g.GuestNumber == 3 && g.GuestName == "Guest 3" && g.PanOrAadharNo == "CCCCC3333C");
         result.Pax.Should().Be(3);
+        result.RegistrationNo.Should().Be("REG-2024-002");
     }
 
     [Fact]
@@ -297,19 +308,23 @@ public class CheckInServiceTests : IDisposable
     public async Task GetByIdAsync_WithValidId_ShouldReturnCheckInWithGuests()
     {
         // Arrange
+        var actualCheckInDate = DateTime.UtcNow.AddHours(-2);
         var checkIn = new CheckIn
         {
             Id = 1,
             RoomId = 1,
             CheckInDate = DateTime.Today,
             CheckOutDate = DateTime.Today.AddDays(2),
+            ActualCheckInDate = actualCheckInDate,
+            RegistrationNo = "REG-2024-003",
+            Remarks = "Test remarks",
             Pax = 2,
             Status = CheckInStatus.Active,
             CreatedAt = DateTime.UtcNow,
             Guests = new List<Guest>
             {
-                new Guest { Id = 1, CheckInId = 1, GuestNumber = 1, GuestName = "Guest 1" },
-                new Guest { Id = 2, CheckInId = 1, GuestNumber = 2, GuestName = "Guest 2" }
+                new Guest { Id = 1, CheckInId = 1, GuestNumber = 1, GuestName = "Guest 1", PanOrAadharNo = "AAAAA1111A" },
+                new Guest { Id = 2, CheckInId = 1, GuestNumber = 2, GuestName = "Guest 2", PanOrAadharNo = "BBBBB2222B" }
             }
         };
         _context.CheckIns.Add(checkIn);
@@ -321,7 +336,12 @@ public class CheckInServiceTests : IDisposable
         // Assert
         result.Should().NotBeNull();
         result.Id.Should().Be(1);
+        result.ActualCheckInDate.Should().Be(actualCheckInDate);
+        result.RegistrationNo.Should().Be("REG-2024-003");
+        result.Remarks.Should().Be("Test remarks");
         result.Guests.Should().HaveCount(2);
+        result.Guests.Should().Contain(g => g.GuestNumber == 1 && g.PanOrAadharNo == "AAAAA1111A");
+        result.Guests.Should().Contain(g => g.GuestNumber == 2 && g.PanOrAadharNo == "BBBBB2222B");
     }
 
     [Fact]

@@ -33,11 +33,15 @@ public class CheckInsControllerTests : IClassFixture<CustomWebApplicationFactory
     public async Task CreateCheckIn_WithValidData_ShouldReturnOk()
     {
         // Arrange
+        var actualCheckInDate = DateTime.UtcNow.AddMinutes(-30);
         var checkInDto = new CreateCheckInDto
         {
             RoomNumber = "101",
             CheckInDate = DateTime.Today,
             CheckOutDate = DateTime.Today.AddDays(2),
+            ActualCheckInDate = actualCheckInDate,
+            RegistrationNo = "REG-INT-001",
+            Remarks = "Integration test check-in",
             Guests = new List<CreateGuestDto>
             {
                 new CreateGuestDto
@@ -47,7 +51,8 @@ public class CheckInsControllerTests : IClassFixture<CustomWebApplicationFactory
                     City = "Mumbai",
                     State = "Maharashtra",
                     Country = "India",
-                    MobileNo = "9876543210"
+                    MobileNo = "9876543210",
+                    PanOrAadharNo = "ABCDE1234F"
                 }
             }
         };
@@ -61,9 +66,13 @@ public class CheckInsControllerTests : IClassFixture<CustomWebApplicationFactory
         createdCheckIn.Should().NotBeNull();
         createdCheckIn!.RoomNumber.Should().Be("101");
         createdCheckIn.Status.Should().Be(CheckInStatus.Active);
+        createdCheckIn.ActualCheckInDate.Should().BeCloseTo(actualCheckInDate, TimeSpan.FromSeconds(1));
+        createdCheckIn.RegistrationNo.Should().Be("REG-INT-001");
+        createdCheckIn.Remarks.Should().Be("Integration test check-in");
         createdCheckIn.Pax.Should().Be(1);
         createdCheckIn.Guests.Should().HaveCount(1);
         createdCheckIn.Guests.First().GuestName.Should().Be("Integration Test Guest");
+        createdCheckIn.Guests.First().PanOrAadharNo.Should().Be("ABCDE1234F");
     }
 
     [Fact]
@@ -75,11 +84,12 @@ public class CheckInsControllerTests : IClassFixture<CustomWebApplicationFactory
             RoomNumber = "102",
             CheckInDate = DateTime.Today,
             CheckOutDate = DateTime.Today.AddDays(3),
+            RegistrationNo = "REG-INT-002",
             Guests = new List<CreateGuestDto>
             {
-                new CreateGuestDto { GuestName = "Guest 1", MobileNo = "1111111111" },
-                new CreateGuestDto { GuestName = "Guest 2", MobileNo = "2222222222" },
-                new CreateGuestDto { GuestName = "Guest 3", MobileNo = "3333333333" }
+                new CreateGuestDto { GuestName = "Guest 1", MobileNo = "1111111111", PanOrAadharNo = "AAAAA1111A" },
+                new CreateGuestDto { GuestName = "Guest 2", MobileNo = "2222222222", PanOrAadharNo = "BBBBB2222B" },
+                new CreateGuestDto { GuestName = "Guest 3", MobileNo = "3333333333", PanOrAadharNo = "CCCCC3333C" }
             }
         };
 
@@ -91,10 +101,11 @@ public class CheckInsControllerTests : IClassFixture<CustomWebApplicationFactory
         response.StatusCode.Should().Be(HttpStatusCode.Created);
         createdCheckIn.Should().NotBeNull();
         createdCheckIn!.Pax.Should().Be(3);
+        createdCheckIn.RegistrationNo.Should().Be("REG-INT-002");
         createdCheckIn.Guests.Should().HaveCount(3);
-        createdCheckIn.Guests.Should().Contain(g => g.GuestNumber == 1 && g.GuestName == "Guest 1");
-        createdCheckIn.Guests.Should().Contain(g => g.GuestNumber == 2 && g.GuestName == "Guest 2");
-        createdCheckIn.Guests.Should().Contain(g => g.GuestNumber == 3 && g.GuestName == "Guest 3");
+        createdCheckIn.Guests.Should().Contain(g => g.GuestNumber == 1 && g.GuestName == "Guest 1" && g.PanOrAadharNo == "AAAAA1111A");
+        createdCheckIn.Guests.Should().Contain(g => g.GuestNumber == 2 && g.GuestName == "Guest 2" && g.PanOrAadharNo == "BBBBB2222B");
+        createdCheckIn.Guests.Should().Contain(g => g.GuestNumber == 3 && g.GuestName == "Guest 3" && g.PanOrAadharNo == "CCCCC3333C");
     }
 
     [Fact]

@@ -43,7 +43,8 @@ public class GuestsControllerTests : IClassFixture<CustomWebApplicationFactory>
                     City = "Mumbai",
                     State = "Maharashtra",
                     Country = "India",
-                    MobileNo = "9876543210"
+                    MobileNo = "9876543210",
+                    PanOrAadharNo = "TESTPAN123X"
                 }
             }
         };
@@ -133,7 +134,8 @@ public class GuestsControllerTests : IClassFixture<CustomWebApplicationFactory>
             City = "Delhi",
             State = "Delhi",
             Country = "India",
-            MobileNo = "1234567890"
+            MobileNo = "1234567890",
+            PanOrAadharNo = "UPDATED1234Y"
         };
 
         // Act
@@ -146,6 +148,7 @@ public class GuestsControllerTests : IClassFixture<CustomWebApplicationFactory>
         updatedGuest!.GuestName.Should().Be("Updated Guest Name");
         updatedGuest.City.Should().Be("Delhi");
         updatedGuest.MobileNo.Should().Be("1234567890");
+        updatedGuest.PanOrAadharNo.Should().Be("UPDATED1234Y");
     }
 
     [Fact]

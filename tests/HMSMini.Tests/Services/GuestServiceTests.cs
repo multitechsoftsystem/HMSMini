@@ -44,6 +44,7 @@ public class GuestServiceTests : IDisposable
                 State = "Maharashtra",
                 Country = "India",
                 MobileNo = "9876543210",
+                PanOrAadharNo = "ABCDE1234F",
                 Photo1Path = null,
                 Photo2Path = null
             },
@@ -57,7 +58,8 @@ public class GuestServiceTests : IDisposable
                 City = "Mumbai",
                 State = "Maharashtra",
                 Country = "India",
-                MobileNo = "9876543211"
+                MobileNo = "9876543211",
+                PanOrAadharNo = "FGHIJ5678K"
             }
         };
 
@@ -77,6 +79,7 @@ public class GuestServiceTests : IDisposable
         result.GuestName.Should().Be("John Doe");
         result.GuestNumber.Should().Be(1);
         result.CheckInId.Should().Be(1);
+        result.PanOrAadharNo.Should().Be("ABCDE1234F");
     }
 
     [Fact]
@@ -123,7 +126,8 @@ public class GuestServiceTests : IDisposable
             City = "Delhi",
             State = "Delhi",
             Country = "India",
-            MobileNo = "1234567890"
+            MobileNo = "1234567890",
+            PanOrAadharNo = "NEWPAN1234A"
         };
 
         // Act
@@ -135,11 +139,13 @@ public class GuestServiceTests : IDisposable
         result.City.Should().Be("Delhi");
         result.State.Should().Be("Delhi");
         result.MobileNo.Should().Be("1234567890");
+        result.PanOrAadharNo.Should().Be("NEWPAN1234A");
 
         // Verify in database
         var guestInDb = await _context.Guests.FindAsync(1);
         guestInDb.Should().NotBeNull();
         guestInDb!.GuestName.Should().Be("Updated Name");
+        guestInDb.PanOrAadharNo.Should().Be("NEWPAN1234A");
     }
 
     [Fact]
