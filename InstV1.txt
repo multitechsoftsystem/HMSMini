@@ -1,0 +1,62 @@
+Write Plan for .NET core API in C#.
+Create a .NET Core Web API project with the following requirements:
+1. Use Entity Framework Core
+2. Add a User model with properties
+3. Create a UserController with CRUD operations
+4. Add Swagger for API documentation
+5. Include proper error handling
+6. Use dependency injection
+
+Table MRoomTypes
+RoomType
+RoomDescription
+
+Table RoomNo
+RoomNo 
+RoomType
+RoomStatus
+RoomStatusFromDate
+RoomStatusToDate
+
+
+Table CheckIn
+ID
+GuestName1
+Address1
+City1
+MobileNo1
+State1
+Country1
+
+GuestName2
+Address2
+City2
+MobileNo2
+State2
+Country2
+
+GuestName3
+Address3
+City3
+MobileNo3
+State3
+Country3
+
+CheckIndate
+CheckOutDate
+Pax
+
+Table IDProof
+ID
+GuestName1Photo1
+GuestName1Photo2
+GuestName2Photo1
+GuestName2Photo2
+GuestName3Photo1
+GuestName3Photo2
+
+if Scan Image possible then Scan from scanner and attach image to selected Guest.
+After scan read text from image and fill to GuestName, Address, City, Mobile as much possible to fill. 
+
+
+
