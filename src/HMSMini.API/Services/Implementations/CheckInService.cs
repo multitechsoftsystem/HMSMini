@@ -44,9 +44,12 @@ public class CheckInService : ICheckInService
             RoomTypeName = checkIn.Room.RoomType.RoomType,
             CheckInDate = checkIn.CheckInDate,
             CheckOutDate = checkIn.CheckOutDate,
+            ActualCheckInDate = checkIn.ActualCheckInDate,
             ActualCheckOutDate = checkIn.ActualCheckOutDate,
+            RegistrationNo = checkIn.RegistrationNo,
             Pax = checkIn.Pax,
             Status = checkIn.Status,
+            Remarks = checkIn.Remarks,
             Guests = checkIn.Guests.Select(g => new GuestDto
             {
                 Id = g.Id,
@@ -58,11 +61,18 @@ public class CheckInService : ICheckInService
                 State = g.State,
                 Country = g.Country,
                 MobileNo = g.MobileNo,
+                PanOrAadharNo = g.PanOrAadharNo,
                 Photo1Path = g.Photo1Path,
-                Photo2Path = g.Photo2Path
+                Photo2Path = g.Photo2Path,
+                CreatedAt = g.CreatedAt,
+                UpdatedAt = g.UpdatedAt,
+                CreatedBy = g.CreatedBy,
+                UpdatedBy = g.UpdatedBy
             }).ToList(),
             CreatedAt = checkIn.CreatedAt,
-            UpdatedAt = checkIn.UpdatedAt
+            UpdatedAt = checkIn.UpdatedAt,
+            CreatedBy = checkIn.CreatedBy,
+            UpdatedBy = checkIn.UpdatedBy
         };
     }
 
@@ -77,11 +87,16 @@ public class CheckInService : ICheckInService
                 RoomNumber = c.Room.RoomNumber,
                 CheckInDate = c.CheckInDate,
                 CheckOutDate = c.CheckOutDate,
+                ActualCheckInDate = c.ActualCheckInDate,
                 ActualCheckOutDate = c.ActualCheckOutDate,
+                RegistrationNo = c.RegistrationNo,
                 Pax = c.Pax,
                 Status = c.Status,
+                Remarks = c.Remarks,
                 CreatedAt = c.CreatedAt,
-                UpdatedAt = c.UpdatedAt
+                UpdatedAt = c.UpdatedAt,
+                CreatedBy = c.CreatedBy,
+                UpdatedBy = c.UpdatedBy
             })
             .OrderByDescending(c => c.CheckInDate)
             .ToListAsync();
@@ -99,11 +114,16 @@ public class CheckInService : ICheckInService
                 RoomNumber = c.Room.RoomNumber,
                 CheckInDate = c.CheckInDate,
                 CheckOutDate = c.CheckOutDate,
+                ActualCheckInDate = c.ActualCheckInDate,
                 ActualCheckOutDate = c.ActualCheckOutDate,
+                RegistrationNo = c.RegistrationNo,
                 Pax = c.Pax,
                 Status = c.Status,
+                Remarks = c.Remarks,
                 CreatedAt = c.CreatedAt,
-                UpdatedAt = c.UpdatedAt
+                UpdatedAt = c.UpdatedAt,
+                CreatedBy = c.CreatedBy,
+                UpdatedBy = c.UpdatedBy
             })
             .OrderByDescending(c => c.CheckInDate)
             .ToListAsync();
@@ -136,8 +156,11 @@ public class CheckInService : ICheckInService
                 RoomId = roomId,
                 CheckInDate = dto.CheckInDate,
                 CheckOutDate = dto.CheckOutDate,
+                ActualCheckInDate = dto.ActualCheckInDate ?? DateTime.UtcNow,
+                RegistrationNo = dto.RegistrationNo,
                 Pax = dto.Guests.Count,
                 Status = CheckInStatus.Active,
+                Remarks = dto.Remarks,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -157,7 +180,9 @@ public class CheckInService : ICheckInService
                     City = guestDto.City,
                     State = guestDto.State,
                     Country = guestDto.Country,
-                    MobileNo = guestDto.MobileNo
+                    MobileNo = guestDto.MobileNo,
+                    PanOrAadharNo = guestDto.PanOrAadharNo,
+                    CreatedAt = DateTime.UtcNow
                 };
                 _context.Guests.Add(guest);
             }

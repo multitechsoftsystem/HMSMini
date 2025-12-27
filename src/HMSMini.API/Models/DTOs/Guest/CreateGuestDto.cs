@@ -25,4 +25,7 @@ public class CreateGuestDto
 
     [StringLength(20)]
     public string? MobileNo { get; set; }
+
+    [StringLength(20)]
+    public string? PanOrAadharNo { get; set; }
 }

@@ -35,9 +35,20 @@ public class CheckIn
     public DateTime CheckOutDate { get; set; }
 
     /// <summary>
+    /// Actual check-in date and time (when guest actually checked in)
+    /// </summary>
+    public DateTime? ActualCheckInDate { get; set; }
+
+    /// <summary>
     /// Actual check-out date (null until guest checks out)
     /// </summary>
     public DateTime? ActualCheckOutDate { get; set; }
+
+    /// <summary>
+    /// Registration number for this check-in
+    /// </summary>
+    [StringLength(50)]
+    public string? RegistrationNo { get; set; }
 
     /// <summary>
     /// Number of guests (Pax)
@@ -53,6 +64,12 @@ public class CheckIn
     public CheckInStatus Status { get; set; } = CheckInStatus.Active;
 
     /// <summary>
+    /// Additional remarks or notes
+    /// </summary>
+    [StringLength(1000)]
+    public string? Remarks { get; set; }
+
+    /// <summary>
     /// Record creation timestamp
     /// </summary>
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
@@ -61,6 +78,29 @@ public class CheckIn
     /// Last update timestamp
     /// </summary>
     public DateTime? UpdatedAt { get; set; }
+
+    /// <summary>
+    /// User who created the record
+    /// </summary>
+    [StringLength(100)]
+    public string? CreatedBy { get; set; }
+
+    /// <summary>
+    /// User who last updated the record
+    /// </summary>
+    [StringLength(100)]
+    public string? UpdatedBy { get; set; }
+
+    /// <summary>
+    /// Soft delete timestamp
+    /// </summary>
+    public DateTime? DeletedAt { get; set; }
+
+    /// <summary>
+    /// User who deleted the record
+    /// </summary>
+    [StringLength(100)]
+    public string? DeletedBy { get; set; }
 
     // Navigation properties
     [ForeignKey(nameof(RoomId))]

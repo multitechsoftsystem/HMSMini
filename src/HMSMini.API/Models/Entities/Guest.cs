@@ -66,6 +66,12 @@ public class Guest
     public string? MobileNo { get; set; }
 
     /// <summary>
+    /// PAN or Aadhaar number for identification
+    /// </summary>
+    [StringLength(20)]
+    public string? PanOrAadharNo { get; set; }
+
+    /// <summary>
     /// File path for first ID proof photo
     /// </summary>
     [StringLength(500)]
@@ -76,6 +82,39 @@ public class Guest
     /// </summary>
     [StringLength(500)]
     public string? Photo2Path { get; set; }
+
+    /// <summary>
+    /// Record creation timestamp
+    /// </summary>
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Last update timestamp
+    /// </summary>
+    public DateTime? UpdatedAt { get; set; }
+
+    /// <summary>
+    /// User who created the record
+    /// </summary>
+    [StringLength(100)]
+    public string? CreatedBy { get; set; }
+
+    /// <summary>
+    /// User who last updated the record
+    /// </summary>
+    [StringLength(100)]
+    public string? UpdatedBy { get; set; }
+
+    /// <summary>
+    /// Soft delete timestamp
+    /// </summary>
+    public DateTime? DeletedAt { get; set; }
+
+    /// <summary>
+    /// User who deleted the record
+    /// </summary>
+    [StringLength(100)]
+    public string? DeletedBy { get; set; }
 
     // Navigation property
     [ForeignKey(nameof(CheckInId))]

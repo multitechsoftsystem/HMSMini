@@ -1,0 +1,4 @@
+In CheckIn Add Column ActualCheckInDate,RegistrationNo,Remarks
+In Guest Add Column PanOrAadharNo
+Add UserName and Audit of created or Updated or Deleted 
+then resume.

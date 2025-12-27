@@ -35,8 +35,13 @@ public class GuestService : IGuestService
             State = guest.State,
             Country = guest.Country,
             MobileNo = guest.MobileNo,
+            PanOrAadharNo = guest.PanOrAadharNo,
             Photo1Path = guest.Photo1Path,
-            Photo2Path = guest.Photo2Path
+            Photo2Path = guest.Photo2Path,
+            CreatedAt = guest.CreatedAt,
+            UpdatedAt = guest.UpdatedAt,
+            CreatedBy = guest.CreatedBy,
+            UpdatedBy = guest.UpdatedBy
         };
     }
 
@@ -55,8 +60,13 @@ public class GuestService : IGuestService
                 State = g.State,
                 Country = g.Country,
                 MobileNo = g.MobileNo,
+                PanOrAadharNo = g.PanOrAadharNo,
                 Photo1Path = g.Photo1Path,
-                Photo2Path = g.Photo2Path
+                Photo2Path = g.Photo2Path,
+                CreatedAt = g.CreatedAt,
+                UpdatedAt = g.UpdatedAt,
+                CreatedBy = g.CreatedBy,
+                UpdatedBy = g.UpdatedBy
             })
             .OrderBy(g => g.GuestNumber)
             .ToListAsync();
@@ -74,6 +84,8 @@ public class GuestService : IGuestService
         guest.State = dto.State;
         guest.Country = dto.Country;
         guest.MobileNo = dto.MobileNo;
+        guest.PanOrAadharNo = dto.PanOrAadharNo;
+        guest.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
 

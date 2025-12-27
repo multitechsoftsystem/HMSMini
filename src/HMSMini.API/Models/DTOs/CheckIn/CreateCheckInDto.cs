@@ -17,6 +17,14 @@ public class CreateCheckInDto
     [Required]
     public DateTime CheckOutDate { get; set; }
 
+    public DateTime? ActualCheckInDate { get; set; }
+
+    [StringLength(50)]
+    public string? RegistrationNo { get; set; }
+
+    [StringLength(1000)]
+    public string? Remarks { get; set; }
+
     [Required]
     [MinLength(1)]
     [MaxLength(3)]

@@ -14,10 +14,15 @@ public class CheckInWithGuestsDto
     public string RoomTypeName { get; set; } = string.Empty;
     public DateTime CheckInDate { get; set; }
     public DateTime CheckOutDate { get; set; }
+    public DateTime? ActualCheckInDate { get; set; }
     public DateTime? ActualCheckOutDate { get; set; }
+    public string? RegistrationNo { get; set; }
     public int Pax { get; set; }
     public CheckInStatus Status { get; set; }
+    public string? Remarks { get; set; }
     public List<GuestDto> Guests { get; set; } = new();
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
+    public string? CreatedBy { get; set; }
+    public string? UpdatedBy { get; set; }
 }
