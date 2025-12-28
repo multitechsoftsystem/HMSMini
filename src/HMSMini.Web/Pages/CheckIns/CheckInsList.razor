@@ -1,0 +1,224 @@
+@page "/checkins"
+@inject IApiClientService ApiClient
+@inject NavigationManager Navigation
+@using HMSMini.Web.Services
+@using HMSMini.Web.Models
+
+<PageTitle>Check-Ins - HMS Mini</PageTitle>
+
+<div class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Check-Ins</h2>
+        <button class="btn btn-primary" @onclick="ShowCreateModal">
+            <i class="bi bi-plus-circle"></i> New Check-In
+        </button>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Active Check-Ins</h5>
+        </div>
+        <div class="card-body">
+            @if (loading)
+            {
+                <div class="text-center">
+                    <div class="spinner-border"></div>
+                </div>
+            }
+            else if (checkIns.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Room</th>
+                                <th>Check-In Date</th>
+                                <th>Check-Out Date</th>
+                                <th>Guests</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var checkIn in checkIns)
+                            {
+                                <tr>
+                                    <td>@checkIn.RoomNumber</td>
+                                    <td>@checkIn.CheckInDate.ToShortDateString()</td>
+                                    <td>@checkIn.CheckOutDate.ToShortDateString()</td>
+                                    <td>@checkIn.Pax</td>
+                                    <td>
+                                        <span class="badge bg-@(checkIn.Status == 0 ? "success" : "secondary")">
+                                            @checkIn.StatusName
+                                        </span>
+                                    </td>
+                                    <td>
+                                        @if (checkIn.Status == 0)
+                                        {
+                                            <button class="btn btn-sm btn-warning" @onclick="() => CheckOut(checkIn.Id)">
+                                                Check Out
+                                            </button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <p class="text-muted">No active check-ins</p>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Create Check-In Modal -->
+@if (showCreateModal)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">New Check-In</h5>
+                    <button type="button" class="btn-close" @onclick="HideCreateModal"></button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="newCheckIn" OnValidSubmit="CreateCheckIn">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label>Room Number</label>
+                                <InputText @bind-Value="newCheckIn.RoomNumber" class="form-control" />
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label>Check-Out Date</label>
+                                <InputDate @bind-Value="newCheckIn.CheckOutDate" class="form-control" />
+                            </div>
+                        </div>
+
+                        <h6 class="mt-3">Guest Information</h6>
+                        @for (int i = 0; i < newCheckIn.Guests.Count; i++)
+                        {
+                            var index = i;
+                            <div class="border rounded p-3 mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <strong>Guest @(index + 1)</strong>
+                                    @if (newCheckIn.Guests.Count > 1)
+                                    {
+                                        <button type="button" class="btn btn-sm btn-danger"
+                                                @onclick="() => RemoveGuest(index)">Remove</button>
+                                    }
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-2">
+                                        <label>Name</label>
+                                        <InputText @bind-Value="newCheckIn.Guests[index].GuestName" class="form-control" />
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <label>Mobile</label>
+                                        <InputText @bind-Value="newCheckIn.Guests[index].MobileNo" class="form-control" />
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-2">
+                                        <label>City</label>
+                                        <InputText @bind-Value="newCheckIn.Guests[index].City" class="form-control" />
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <label>PAN/Aadhar No</label>
+                                        <InputText @bind-Value="newCheckIn.Guests[index].PanOrAadharNo" class="form-control" />
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
+                        @if (newCheckIn.Guests.Count < 3)
+                        {
+                            <button type="button" class="btn btn-secondary btn-sm mb-3" @onclick="AddGuest">
+                                <i class="bi bi-plus"></i> Add Guest
+                            </button>
+                        }
+
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" @onclick="HideCreateModal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Create Check-In</button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<CheckInDto> checkIns = new();
+    private CreateCheckInDto newCheckIn = new();
+    private bool loading = true;
+    private bool showCreateModal = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCheckIns();
+    }
+
+    private async Task LoadCheckIns()
+    {
+        loading = true;
+        checkIns = await ApiClient.GetActiveCheckInsAsync();
+        loading = false;
+    }
+
+    private void ShowCreateModal()
+    {
+        newCheckIn = new CreateCheckInDto
+        {
+            CheckInDate = DateTime.Today,
+            CheckOutDate = DateTime.Today.AddDays(2),
+            Guests = new List<CreateGuestDto> { new CreateGuestDto() }
+        };
+        showCreateModal = true;
+    }
+
+    private void HideCreateModal()
+    {
+        showCreateModal = false;
+    }
+
+    private void AddGuest()
+    {
+        if (newCheckIn.Guests.Count < 3)
+        {
+            newCheckIn.Guests.Add(new CreateGuestDto());
+        }
+    }
+
+    private void RemoveGuest(int index)
+    {
+        if (newCheckIn.Guests.Count > 1)
+        {
+            newCheckIn.Guests.RemoveAt(index);
+        }
+    }
+
+    private async Task CreateCheckIn()
+    {
+        var result = await ApiClient.CreateCheckInAsync(newCheckIn);
+        if (result != null)
+        {
+            await LoadCheckIns();
+            HideCreateModal();
+        }
+    }
+
+    private async Task CheckOut(int id)
+    {
+        if (await ApiClient.CheckOutAsync(id))
+        {
+            await LoadCheckIns();
+        }
+    }
+}

@@ -1,0 +1,231 @@
+@page "/"
+@inject IApiClientService ApiClient
+@inject IAuthenticationService AuthService
+@inject NavigationManager Navigation
+@using HMSMini.Web.Services
+@using HMSMini.Web.Models
+
+<PageTitle>Dashboard - HMS Mini</PageTitle>
+
+@if (!isAuthenticated)
+{
+    <p>Redirecting to login...</p>
+}
+else
+{
+    <div class="dashboard">
+        <h2 class="mb-4">Dashboard</h2>
+
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="stat-card bg-primary text-white">
+                    <div class="stat-icon"><i class="bi bi-door-open"></i></div>
+                    <div class="stat-number">@totalRooms</div>
+                    <div class="stat-label">Total Rooms</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card bg-success text-white">
+                    <div class="stat-icon"><i class="bi bi-check-circle"></i></div>
+                    <div class="stat-number">@activeCheckIns</div>
+                    <div class="stat-label">Active Check-Ins</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card bg-info text-white">
+                    <div class="stat-icon"><i class="bi bi-calendar-check"></i></div>
+                    <div class="stat-number">@upcomingReservations</div>
+                    <div class="stat-label">Upcoming Reservations</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stat-card bg-warning text-white">
+                    <div class="stat-icon"><i class="bi bi-percent"></i></div>
+                    <div class="stat-number">@occupancyRate%</div>
+                    <div class="stat-label">Occupancy Rate</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upcoming Check-Ins -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Today's Arrivals</h5>
+                <a href="/reservations" class="btn btn-sm btn-primary">View All</a>
+            </div>
+            <div class="card-body">
+                @if (todayArrivals.Any())
+                {
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Reservation #</th>
+                                    <th>Guest Name</th>
+                                    <th>Room</th>
+                                    <th>Guests</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var reservation in todayArrivals.Take(5))
+                                {
+                                    <tr>
+                                        <td>@reservation.ReservationNumber</td>
+                                        <td>@reservation.GuestName</td>
+                                        <td>@reservation.RoomNumber</td>
+                                        <td>@reservation.NumberOfGuests</td>
+                                        <td>
+                                            <span class="badge bg-@GetStatusColor(reservation.Status)">
+                                                @reservation.StatusName
+                                            </span>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted">No arrivals today</p>
+                }
+            </div>
+        </div>
+
+        <!-- Active Check-Ins -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Current Guests</h5>
+                <a href="/checkins" class="btn btn-sm btn-primary">View All</a>
+            </div>
+            <div class="card-body">
+                @if (currentGuests.Any())
+                {
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Room</th>
+                                    <th>Check-In Date</th>
+                                    <th>Check-Out Date</th>
+                                    <th>Guests</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var checkIn in currentGuests.Take(5))
+                                {
+                                    <tr>
+                                        <td>@checkIn.RoomNumber</td>
+                                        <td>@checkIn.CheckInDate.ToShortDateString()</td>
+                                        <td>@checkIn.CheckOutDate.ToShortDateString()</td>
+                                        <td>@checkIn.Pax</td>
+                                        <td>
+                                            <span class="badge bg-success">Active</span>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted">No active check-ins</p>
+                }
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .dashboard {
+            padding: 20px;
+        }
+
+        .stat-card {
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .stat-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+    </style>
+}
+
+@code {
+    private bool isAuthenticated = false;
+    private int totalRooms = 0;
+    private int activeCheckIns = 0;
+    private int upcomingReservations = 0;
+    private int occupancyRate = 0;
+
+    private List<ReservationDto> todayArrivals = new();
+    private List<CheckInDto> currentGuests = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        isAuthenticated = await AuthService.IsAuthenticatedAsync();
+
+        if (!isAuthenticated)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        await LoadDashboardData();
+    }
+
+    private async Task LoadDashboardData()
+    {
+        // Load all data
+        var rooms = await ApiClient.GetRoomsAsync();
+        var checkIns = await ApiClient.GetActiveCheckInsAsync();
+        var reservations = await ApiClient.GetUpcomingReservationsAsync();
+
+        totalRooms = rooms.Count;
+        activeCheckIns = checkIns.Count;
+        upcomingReservations = reservations.Count;
+
+        // Calculate occupancy rate
+        if (totalRooms > 0)
+        {
+            occupancyRate = (int)((activeCheckIns / (double)totalRooms) * 100);
+        }
+
+        // Today's arrivals
+        todayArrivals = reservations
+            .Where(r => r.CheckInDate.Date == DateTime.Today)
+            .ToList();
+
+        currentGuests = checkIns;
+    }
+
+    private string GetStatusColor(int status)
+    {
+        return status switch
+        {
+            0 => "warning",  // Pending
+            1 => "info",     // Confirmed
+            2 => "success",  // CheckedIn
+            3 => "danger",   // Cancelled
+            4 => "secondary", // NoShow
+            _ => "secondary"
+        };
+    }
+}

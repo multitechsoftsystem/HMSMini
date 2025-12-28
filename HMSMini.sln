@@ -11,6 +11,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HMSMini.Tests", "tests\HMSMini.Tests\HMSMini.Tests.csproj", "{58B90B5A-2FE2-44FA-9915-1B521557E60E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HMSMini.Web", "src\HMSMini.Web\HMSMini.Web.csproj", "{855229FD-BE91-48D0-923C-3BE55A109BEF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -45,6 +47,18 @@ Global
 		{58B90B5A-2FE2-44FA-9915-1B521557E60E}.Release|x64.Build.0 = Release|Any CPU
 		{58B90B5A-2FE2-44FA-9915-1B521557E60E}.Release|x86.ActiveCfg = Release|Any CPU
 		{58B90B5A-2FE2-44FA-9915-1B521557E60E}.Release|x86.Build.0 = Release|Any CPU
+		{855229FD-BE91-48D0-923C-3BE55A109BEF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{855229FD-BE91-48D0-923C-3BE55A109BEF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{855229FD-BE91-48D0-923C-3BE55A109BEF}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{855229FD-BE91-48D0-923C-3BE55A109BEF}.Debug|x64.Build.0 = Debug|Any CPU
+		{855229FD-BE91-48D0-923C-3BE55A109BEF}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{855229FD-BE91-48D0-923C-3BE55A109BEF}.Debug|x86.Build.0 = Debug|Any CPU
+		{855229FD-BE91-48D0-923C-3BE55A109BEF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{855229FD-BE91-48D0-923C-3BE55A109BEF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{855229FD-BE91-48D0-923C-3BE55A109BEF}.Release|x64.ActiveCfg = Release|Any CPU
+		{855229FD-BE91-48D0-923C-3BE55A109BEF}.Release|x64.Build.0 = Release|Any CPU
+		{855229FD-BE91-48D0-923C-3BE55A109BEF}.Release|x86.ActiveCfg = Release|Any CPU
+		{855229FD-BE91-48D0-923C-3BE55A109BEF}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -52,5 +66,6 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{CF3FD10C-0A46-4F7D-B416-B0C589CAB950} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{58B90B5A-2FE2-44FA-9915-1B521557E60E} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{855229FD-BE91-48D0-923C-3BE55A109BEF} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal

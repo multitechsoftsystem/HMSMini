@@ -1,0 +1,224 @@
+@page "/reservations"
+@inject IApiClientService ApiClient
+@inject NavigationManager Navigation
+@using HMSMini.Web.Services
+@using HMSMini.Web.Models
+
+<PageTitle>Reservations - HMS Mini</PageTitle>
+
+<div class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Reservations</h2>
+        <button class="btn btn-primary" @onclick="ShowCreateModal">
+            <i class="bi bi-plus-circle"></i> New Reservation
+        </button>
+    </div>
+
+    <!-- Upcoming Reservations -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Upcoming Reservations</h5>
+        </div>
+        <div class="card-body">
+            @if (loading)
+            {
+                <div class="text-center">
+                    <div class="spinner-border"></div>
+                </div>
+            }
+            else if (reservations.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Reservation #</th>
+                                <th>Guest Name</th>
+                                <th>Room</th>
+                                <th>Check-In</th>
+                                <th>Check-Out</th>
+                                <th>Guests</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var reservation in reservations)
+                            {
+                                <tr>
+                                    <td>@reservation.ReservationNumber</td>
+                                    <td>
+                                        <div><strong>@reservation.GuestName</strong></div>
+                                        @if (!string.IsNullOrEmpty(reservation.GuestEmail))
+                                        {
+                                            <small class="text-muted">@reservation.GuestEmail</small>
+                                        }
+                                    </td>
+                                    <td>@reservation.RoomNumber (@reservation.RoomTypeName)</td>
+                                    <td>@reservation.CheckInDate.ToShortDateString()</td>
+                                    <td>@reservation.CheckOutDate.ToShortDateString()</td>
+                                    <td>@reservation.NumberOfGuests</td>
+                                    <td>
+                                        <span class="badge bg-@GetStatusColor(reservation.Status)">
+                                            @reservation.StatusName
+                                        </span>
+                                    </td>
+                                    <td>
+                                        @if (reservation.Status == 0)
+                                        {
+                                            <button class="btn btn-sm btn-success" @onclick="() => ConfirmReservation(reservation.Id)">
+                                                Confirm
+                                            </button>
+                                        }
+                                        @if (reservation.Status <= 1)
+                                        {
+                                            <button class="btn btn-sm btn-danger" @onclick="() => CancelReservation(reservation.Id)">
+                                                Cancel
+                                            </button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <p class="text-muted">No upcoming reservations</p>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Create Reservation Modal -->
+@if (showCreateModal)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">New Reservation</h5>
+                    <button type="button" class="btn-close" @onclick="HideCreateModal"></button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="newReservation" OnValidSubmit="CreateReservation">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label>Room Number</label>
+                                <InputText @bind-Value="newReservation.RoomNumber" class="form-control" />
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label>Number of Guests</label>
+                                <InputNumber @bind-Value="newReservation.NumberOfGuests" class="form-control" />
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label>Check-In Date</label>
+                                <InputDate @bind-Value="newReservation.CheckInDate" class="form-control" />
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label>Check-Out Date</label>
+                                <InputDate @bind-Value="newReservation.CheckOutDate" class="form-control" />
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label>Guest Name</label>
+                            <InputText @bind-Value="newReservation.GuestName" class="form-control" />
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label>Email</label>
+                                <InputText @bind-Value="newReservation.GuestEmail" type="email" class="form-control" />
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label>Mobile</label>
+                                <InputText @bind-Value="newReservation.GuestMobile" class="form-control" />
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label>Special Requests</label>
+                            <InputTextArea @bind-Value="newReservation.SpecialRequests" class="form-control" rows="3" />
+                        </div>
+
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" @onclick="HideCreateModal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Create Reservation</button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<ReservationDto> reservations = new();
+    private CreateReservationDto newReservation = new();
+    private bool loading = true;
+    private bool showCreateModal = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReservations();
+    }
+
+    private async Task LoadReservations()
+    {
+        loading = true;
+        reservations = await ApiClient.GetUpcomingReservationsAsync();
+        loading = false;
+    }
+
+    private void ShowCreateModal()
+    {
+        newReservation = new CreateReservationDto();
+        showCreateModal = true;
+    }
+
+    private void HideCreateModal()
+    {
+        showCreateModal = false;
+    }
+
+    private async Task CreateReservation()
+    {
+        var result = await ApiClient.CreateReservationAsync(newReservation);
+        if (result != null)
+        {
+            await LoadReservations();
+            HideCreateModal();
+        }
+    }
+
+    private async Task ConfirmReservation(int id)
+    {
+        await ApiClient.ConfirmReservationAsync(id);
+        await LoadReservations();
+    }
+
+    private async Task CancelReservation(int id)
+    {
+        await ApiClient.CancelReservationAsync(id);
+        await LoadReservations();
+    }
+
+    private string GetStatusColor(int status)
+    {
+        return status switch
+        {
+            0 => "warning",
+            1 => "info",
+            2 => "success",
+            3 => "danger",
+            4 => "secondary",
+            _ => "secondary"
+        };
+    }
+}

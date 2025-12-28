@@ -1,0 +1,90 @@
+@page "/rooms"
+@inject IApiClientService ApiClient
+@using HMSMini.Web.Services
+@using HMSMini.Web.Models
+
+<PageTitle>Rooms - HMS Mini</PageTitle>
+
+<div class="container-fluid p-4">
+    <h2 class="mb-4">Rooms</h2>
+
+    <div class="card">
+        <div class="card-body">
+            @if (loading)
+            {
+                <div class="text-center">
+                    <div class="spinner-border"></div>
+                </div>
+            }
+            else if (rooms.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Room Number</th>
+                                <th>Room Type</th>
+                                <th>Status</th>
+                                <th>Status Dates</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var room in rooms)
+                            {
+                                <tr>
+                                    <td><strong>@room.RoomNumber</strong></td>
+                                    <td>@room.RoomTypeName</td>
+                                    <td>
+                                        <span class="badge bg-@GetStatusColor(room.RoomStatus)">
+                                            @room.RoomStatusName
+                                        </span>
+                                    </td>
+                                    <td>
+                                        @if (room.RoomStatusFromDate.HasValue && room.RoomStatusToDate.HasValue)
+                                        {
+                                            <text>@room.RoomStatusFromDate.Value.ToShortDateString() - @room.RoomStatusToDate.Value.ToShortDateString()</text>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <p class="text-muted">No rooms available</p>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<RoomDto> rooms = new();
+    private bool loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRooms();
+    }
+
+    private async Task LoadRooms()
+    {
+        loading = true;
+        rooms = await ApiClient.GetRoomsAsync();
+        loading = false;
+    }
+
+    private string GetStatusColor(int status)
+    {
+        return status switch
+        {
+            0 => "success",      // Available
+            1 => "danger",       // Occupied
+            2 => "warning",      // Dirty
+            3 => "secondary",    // Maintenance
+            4 => "dark",         // Blocked
+            _ => "secondary"
+        };
+    }
+}

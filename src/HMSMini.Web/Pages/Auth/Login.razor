@@ -1,0 +1,163 @@
+@page "/login"
+@inject IAuthenticationService AuthService
+@inject NavigationManager Navigation
+@using HMSMini.Web.Models
+@using HMSMini.Web.Services
+
+<PageTitle>Login - HMS Mini</PageTitle>
+
+<div class="login-container">
+    <div class="login-card">
+        <h2 class="text-center mb-4">HMS Mini</h2>
+        <h5 class="text-center text-muted mb-4">Hotel Management System</h5>
+
+        @if (isRegisterMode)
+        {
+            <h4>Create Account</h4>
+            <EditForm Model="@registerRequest" OnValidSubmit="@HandleRegister">
+                <div class="mb-3">
+                    <label>Username</label>
+                    <InputText @bind-Value="registerRequest.Username" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label>Email</label>
+                    <InputText @bind-Value="registerRequest.Email" type="email" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label>Full Name</label>
+                    <InputText @bind-Value="registerRequest.FullName" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label>Password</label>
+                    <InputText @bind-Value="registerRequest.Password" type="password" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label>Role</label>
+                    <select @bind="registerRequest.Role" class="form-control">
+                        <option value="2">Receptionist</option>
+                        <option value="1">Manager</option>
+                        <option value="0">Admin</option>
+                    </select>
+                </div>
+
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="alert alert-danger">@errorMessage</div>
+                }
+
+                <button type="submit" class="btn btn-primary w-100" disabled="@isLoading">
+                    @if (isLoading) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                    Register
+                </button>
+            </EditForm>
+
+            <p class="text-center mt-3">
+                Already have an account?
+                <a href="#" @onclick="@(() => isRegisterMode = false)" @onclick:preventDefault>Login here</a>
+            </p>
+        }
+        else
+        {
+            <h4>Login</h4>
+            <EditForm Model="@loginRequest" OnValidSubmit="@HandleLogin">
+                <div class="mb-3">
+                    <label>Username</label>
+                    <InputText @bind-Value="loginRequest.Username" class="form-control" />
+                </div>
+                <div class="mb-3">
+                    <label>Password</label>
+                    <InputText @bind-Value="loginRequest.Password" type="password" class="form-control" />
+                </div>
+
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="alert alert-danger">@errorMessage</div>
+                }
+
+                <button type="submit" class="btn btn-primary w-100" disabled="@isLoading">
+                    @if (isLoading) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                    Login
+                </button>
+            </EditForm>
+
+            <p class="text-center mt-3">
+                Don't have an account?
+                <a href="#" @onclick="@(() => isRegisterMode = true)" @onclick:preventDefault>Register here</a>
+            </p>
+        }
+    </div>
+</div>
+
+<style>
+    .login-container {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .login-card {
+        background: white;
+        padding: 2rem;
+        border-radius: 10px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        width: 100%;
+        max-width: 400px;
+    }
+</style>
+
+@code {
+    private LoginRequest loginRequest = new();
+    private RegisterRequest registerRequest = new();
+    private bool isRegisterMode = false;
+    private bool isLoading = false;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Redirect to dashboard if already authenticated
+        if (await AuthService.IsAuthenticatedAsync())
+        {
+            Navigation.NavigateTo("/");
+        }
+    }
+
+    private async Task HandleLogin()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        var response = await AuthService.LoginAsync(loginRequest);
+
+        if (response != null)
+        {
+            Navigation.NavigateTo("/");
+        }
+        else
+        {
+            errorMessage = "Invalid username or password";
+        }
+
+        isLoading = false;
+    }
+
+    private async Task HandleRegister()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        var response = await AuthService.RegisterAsync(registerRequest);
+
+        if (response != null)
+        {
+            Navigation.NavigateTo("/");
+        }
+        else
+        {
+            errorMessage = "Registration failed. Username or email might already exist.";
+        }
+
+        isLoading = false;
+    }
+}

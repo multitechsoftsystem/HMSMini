@@ -1,0 +1,59 @@
+﻿@inherits LayoutComponentBase
+@inject IAuthenticationService AuthService
+@inject NavigationManager Navigation
+@using HMSMini.Web.Services
+
+<div class="page">
+    @if (isAuthenticated)
+    {
+        <div class="sidebar">
+            <NavMenu />
+        </div>
+
+        <main>
+            <div class="top-row px-4">
+                <div class="d-flex justify-content-between align-items-center w-100">
+                    <span></span>
+                    <div>
+                        <span class="me-3">@currentUser</span>
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="Logout">
+                            <i class="bi bi-box-arrow-right"></i> Logout
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <article class="content px-4">
+                @Body
+            </article>
+        </main>
+    }
+    else
+    {
+        <article class="content">
+            @Body
+        </article>
+    }
+</div>
+
+@code {
+    private bool isAuthenticated = false;
+    private string currentUser = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        isAuthenticated = await AuthService.IsAuthenticatedAsync();
+
+        if (isAuthenticated)
+        {
+            var user = await AuthService.GetCurrentUserAsync();
+            currentUser = user?.FullName ?? user?.Username ?? "User";
+        }
+    }
+
+    private async Task Logout()
+    {
+        await AuthService.LogoutAsync();
+        Navigation.NavigateTo("/login");
+    }
+}
