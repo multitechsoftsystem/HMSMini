@@ -1,0 +1,230 @@
+### HMS Mini API Testing
+### Base URL
+@baseUrl = http://localhost:5096
+
+### ============================================
+### Authentication
+### ============================================
+
+### 1. Register User
+# @name register
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "email": "test@example.com",
+  "password": "Test123456",
+  "fullName": "Test User",
+  "role": 2
+}
+
+### 2. Login (and save token)
+# @name login
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "password": "Test123456"
+}
+
+### Extract token from login response
+@token = {{login.response.body.token}}
+
+### 3. Get Current User
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{token}}
+
+### ============================================
+### Rooms
+### ============================================
+
+### 4. Get All Rooms
+GET {{baseUrl}}/api/rooms
+Authorization: Bearer {{token}}
+
+### 5. Get Room by ID
+GET {{baseUrl}}/api/rooms/1
+Authorization: Bearer {{token}}
+
+### 6. Get Available Rooms
+GET {{baseUrl}}/api/rooms/available?checkIn=2025-01-15&checkOut=2025-01-17
+Authorization: Bearer {{token}}
+
+### 7. Create Room (requires Manager/Admin)
+POST {{baseUrl}}/api/rooms
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "roomNumber": "401",
+  "roomTypeId": 1
+}
+
+### ============================================
+### Reservations (NEW!)
+### ============================================
+
+### 8. Create Reservation
+# @name createReservation
+POST {{baseUrl}}/api/reservations
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "roomNumber": "101",
+  "checkInDate": "2025-01-15",
+  "checkOutDate": "2025-01-17",
+  "numberOfGuests": 2,
+  "guestName": "John Doe",
+  "guestEmail": "john@example.com",
+  "guestMobile": "1234567890",
+  "specialRequests": "Early check-in if possible"
+}
+
+### Extract reservation details
+@reservationId = {{createReservation.response.body.id}}
+@reservationNumber = {{createReservation.response.body.reservationNumber}}
+
+### 9. Get Reservation by ID
+GET {{baseUrl}}/api/reservations/{{reservationId}}
+Authorization: Bearer {{token}}
+
+### 10. Get Reservation by Number
+GET {{baseUrl}}/api/reservations/number/{{reservationNumber}}
+Authorization: Bearer {{token}}
+
+### 11. Get All Reservations
+GET {{baseUrl}}/api/reservations
+Authorization: Bearer {{token}}
+
+### 12. Get Upcoming Reservations
+GET {{baseUrl}}/api/reservations/upcoming
+Authorization: Bearer {{token}}
+
+### 13. Get Reservations by Status (Pending)
+GET {{baseUrl}}/api/reservations/status/0
+Authorization: Bearer {{token}}
+
+### 14. Confirm Reservation
+POST {{baseUrl}}/api/reservations/{{reservationId}}/confirm
+Authorization: Bearer {{token}}
+
+### 15. Update Reservation
+PUT {{baseUrl}}/api/reservations/{{reservationId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "guestName": "John Smith",
+  "numberOfGuests": 3,
+  "specialRequests": "Late checkout please"
+}
+
+### 16. Cancel Reservation
+POST {{baseUrl}}/api/reservations/{{reservationId}}/cancel
+Authorization: Bearer {{token}}
+
+### ============================================
+### Check-Ins
+### ============================================
+
+### 17. Create Check-In
+# @name createCheckIn
+POST {{baseUrl}}/api/checkins
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "roomNumber": "102",
+  "checkInDate": "2025-12-28",
+  "checkOutDate": "2025-12-30",
+  "guests": [
+    {
+      "guestName": "Jane Smith",
+      "address": "123 Main Street",
+      "city": "Mumbai",
+      "state": "Maharashtra",
+      "country": "India",
+      "mobileNo": "9876543210",
+      "panOrAadharNo": "ABCDE1234F"
+    }
+  ]
+}
+
+### Extract check-in ID
+@checkInId = {{createCheckIn.response.body.id}}
+
+### 18. Get All Check-Ins
+GET {{baseUrl}}/api/checkins
+Authorization: Bearer {{token}}
+
+### 19. Get Active Check-Ins
+GET {{baseUrl}}/api/checkins/active
+Authorization: Bearer {{token}}
+
+### 20. Get Check-In by ID
+GET {{baseUrl}}/api/checkins/{{checkInId}}
+Authorization: Bearer {{token}}
+
+### 21. Check Out
+POST {{baseUrl}}/api/checkins/{{checkInId}}/checkout
+Authorization: Bearer {{token}}
+
+### ============================================
+### Guests
+### ============================================
+
+### 22. Get Guest by ID
+GET {{baseUrl}}/api/guests/1
+Authorization: Bearer {{token}}
+
+### 23. Get Guests by Check-In ID
+GET {{baseUrl}}/api/guests/checkin/{{checkInId}}
+Authorization: Bearer {{token}}
+
+### 24. Update Guest
+PUT {{baseUrl}}/api/guests/1
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "guestName": "Updated Guest Name",
+  "city": "Delhi",
+  "mobileNo": "1234567890"
+}
+
+### ============================================
+### Testing Workflow: Complete Reservation Flow
+### ============================================
+
+### STEP 1: Create a reservation for future date
+# @name workflow1
+POST {{baseUrl}}/api/reservations
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "roomNumber": "103",
+  "checkInDate": "2025-02-01",
+  "checkOutDate": "2025-02-03",
+  "numberOfGuests": 1,
+  "guestName": "Workflow Test Guest",
+  "guestEmail": "workflow@test.com",
+  "guestMobile": "9999999999"
+}
+
+###
+
+### STEP 2: Confirm the reservation
+@workflowReservationId = {{workflow1.response.body.id}}
+
+POST {{baseUrl}}/api/reservations/{{workflowReservationId}}/confirm
+Authorization: Bearer {{token}}
+
+###
+
+### STEP 3: View upcoming reservations (should see our booking)
+GET {{baseUrl}}/api/reservations/upcoming
+Authorization: Bearer {{token}}
