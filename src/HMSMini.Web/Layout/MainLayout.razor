@@ -1,7 +1,6 @@
 ﻿@inherits LayoutComponentBase
 @inject IAuthenticationService AuthService
 @inject NavigationManager Navigation
-@using HMSMini.Web.Services
 
 <div class="page">
     @if (isAuthenticated)
@@ -42,18 +41,33 @@
 
     protected override async Task OnInitializedAsync()
     {
-        isAuthenticated = await AuthService.IsAuthenticatedAsync();
-
-        if (isAuthenticated)
+        try
         {
-            var user = await AuthService.GetCurrentUserAsync();
-            currentUser = user?.FullName ?? user?.Username ?? "User";
+            isAuthenticated = await AuthService.IsAuthenticatedAsync();
+
+            if (isAuthenticated)
+            {
+                var user = await AuthService.GetCurrentUserAsync();
+                currentUser = user?.FullName ?? user?.Username ?? "User";
+            }
+        }
+        catch (Exception)
+        {
+            isAuthenticated = false;
+            currentUser = "";
         }
     }
 
     private async Task Logout()
     {
-        await AuthService.LogoutAsync();
-        Navigation.NavigateTo("/login");
+        try
+        {
+            await AuthService.LogoutAsync();
+            Navigation.NavigateTo("/login");
+        }
+        catch (Exception)
+        {
+            Navigation.NavigateTo("/login");
+        }
     }
 }

@@ -1,5 +1,6 @@
 using HMSMini.API.Models.Entities;
 using HMSMini.API.Models.Enums;
+using BCrypt.Net;
 
 namespace HMSMini.API.Data;
 
@@ -18,6 +19,34 @@ public static class DbInitializer
         {
             return; // Database has been seeded
         }
+
+        // Seed Users
+        var users = new User[]
+        {
+            new User
+            {
+                Username = "admin",
+                Email = "admin@hmsmini.com",
+                FullName = "System Administrator",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123"),
+                Role = UserRole.Manager,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            },
+            new User
+            {
+                Username = "receptionist",
+                Email = "reception@hmsmini.com",
+                FullName = "Front Desk Receptionist",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Reception@123"),
+                Role = UserRole.Receptionist,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            }
+        };
+
+        context.Users.AddRange(users);
+        context.SaveChanges();
 
         // Seed Room Types
         var roomTypes = new MRoomType[]

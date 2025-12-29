@@ -13,29 +13,13 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 builder.Services.AddBlazoredLocalStorage();
 
 // Configure HttpClient for API
-builder.Services.AddScoped(sp =>
+builder.Services.AddScoped(sp => new HttpClient
 {
-    var client = new HttpClient
-    {
-        BaseAddress = new Uri("http://localhost:5096") // API base URL
-    };
-    return client;
+    BaseAddress = new Uri("http://localhost:5096/")
 });
 
 // Register services
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddScoped<IApiClientService, ApiClientService>();
 
-// Initialize authentication on startup
-var host = builder.Build();
-
-var authService = host.Services.GetRequiredService<IAuthenticationService>();
-var httpClient = host.Services.GetRequiredService<HttpClient>();
-var token = await authService.GetTokenAsync();
-
-if (!string.IsNullOrEmpty(token))
-{
-    httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-}
-
-await host.RunAsync();
+await builder.Build().RunAsync();
