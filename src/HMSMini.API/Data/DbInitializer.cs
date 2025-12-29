@@ -101,7 +101,7 @@ public static class DbInitializer
                          RoomStatusFromDate = DateTime.Today,
                          RoomStatusToDate = DateTime.Today.AddDays(2) },
             new RoomNo { RoomNumber = "404", RoomTypeId = roomTypes[3].RoomTypeId, RoomStatus = RoomStatus.Dirty },
-            new RoomNo { RoomNumber = "501", RoomTypeId = roomTypes[2].RoomTypeId, RoomStatus = RoomStatus.Management },
+            new RoomNo { RoomNumber = "501", RoomTypeId = roomTypes[2].RoomTypeId, RoomStatus = RoomStatus.Blocked },
         };
 
         context.Rooms.AddRange(rooms);

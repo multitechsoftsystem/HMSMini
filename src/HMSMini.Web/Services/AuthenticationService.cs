@@ -41,8 +41,6 @@ public class AuthenticationService : IAuthenticationService
                 {
                     await _localStorage.SetItemAsync(TokenKey, authResponse.Token);
                     await _localStorage.SetItemAsync(UserKey, authResponse);
-                    _httpClient.DefaultRequestHeaders.Authorization =
-                        new AuthenticationHeaderValue("Bearer", authResponse.Token);
                 }
                 return authResponse;
             }
@@ -68,8 +66,6 @@ public class AuthenticationService : IAuthenticationService
                 {
                     await _localStorage.SetItemAsync(TokenKey, authResponse.Token);
                     await _localStorage.SetItemAsync(UserKey, authResponse);
-                    _httpClient.DefaultRequestHeaders.Authorization =
-                        new AuthenticationHeaderValue("Bearer", authResponse.Token);
                 }
                 return authResponse;
             }
@@ -86,7 +82,6 @@ public class AuthenticationService : IAuthenticationService
     {
         await _localStorage.RemoveItemAsync(TokenKey);
         await _localStorage.RemoveItemAsync(UserKey);
-        _httpClient.DefaultRequestHeaders.Authorization = null;
     }
 
     public async Task<bool> IsAuthenticatedAsync()

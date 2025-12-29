@@ -3,6 +3,7 @@
 @inject NavigationManager Navigation
 @using HMSMini.Web.Services
 @using HMSMini.Web.Models
+@using Microsoft.AspNetCore.Components.Forms
 
 <PageTitle>Check-Ins - HMS Mini</PageTitle>
 
@@ -55,6 +56,9 @@
                                     <td>
                                         @if (checkIn.Status == 0)
                                         {
+                                            <button class="btn btn-sm btn-info me-1" @onclick="() => ManageGuests(checkIn.Id)">
+                                                <i class="bi bi-person-badge"></i> Guests
+                                            </button>
                                             <button class="btn btn-sm btn-warning" @onclick="() => CheckOut(checkIn.Id)">
                                                 Check Out
                                             </button>
@@ -89,8 +93,14 @@
                     <EditForm Model="newCheckIn" OnValidSubmit="CreateCheckIn">
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label>Room Number</label>
-                                <InputText @bind-Value="newCheckIn.RoomNumber" class="form-control" />
+                                <label>Room Number (Available Rooms Only)</label>
+                                <InputSelect @bind-Value="newCheckIn.RoomNumber" class="form-control">
+                                    <option value="">-- Select Room --</option>
+                                    @foreach (var room in availableRooms)
+                                    {
+                                        <option value="@room.RoomNumber">@room.RoomNumber - @room.RoomTypeName</option>
+                                    }
+                                </InputSelect>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label>Check-Out Date</label>
@@ -171,11 +181,152 @@
     </div>
 }
 
+<!-- Manage Guests Modal -->
+@if (showGuestsModal)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Manage Guests - Room @selectedCheckIn?.RoomNumber</h5>
+                    <button type="button" class="btn-close" @onclick="HideGuestsModal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (loadingGuests)
+                    {
+                        <div class="text-center">
+                            <div class="spinner-border"></div>
+                        </div>
+                    }
+                    else if (managedGuests.Any())
+                    {
+                        @foreach (var guest in managedGuests)
+                        {
+                            <div class="card mb-3">
+                                <div class="card-header">
+                                    <strong>Guest @guest.GuestNumber: @guest.GuestName</strong>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <!-- Guest Information -->
+                                        <div class="col-md-6">
+                                            <h6>Guest Information</h6>
+                                            <div class="mb-2">
+                                                <label class="form-label">Name</label>
+                                                <InputText @bind-Value="guest.GuestName" class="form-control form-control-sm" />
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label">Mobile</label>
+                                                <InputText @bind-Value="guest.MobileNo" class="form-control form-control-sm" />
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label">City</label>
+                                                <InputText @bind-Value="guest.City" class="form-control form-control-sm" />
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label">PAN/Aadhar No</label>
+                                                <InputText @bind-Value="guest.PanOrAadharNo" class="form-control form-control-sm" />
+                                            </div>
+                                            <button class="btn btn-sm btn-primary" @onclick="() => UpdateGuest(guest)">
+                                                <i class="bi bi-save"></i> Save Changes
+                                            </button>
+                                        </div>
+
+                                        <!-- ID Proof Upload and OCR -->
+                                        <div class="col-md-6">
+                                            <h6>ID Proof Documents</h6>
+
+                                            <!-- Photo 1 -->
+                                            <div class="border rounded p-2 mb-2">
+                                                <strong>Photo 1:</strong>
+                                                @if (!string.IsNullOrEmpty(guest.Photo1Path))
+                                                {
+                                                    <span class="badge bg-success ms-2">Uploaded</span>
+                                                }
+                                                <div class="mt-2">
+                                                    <InputFile OnChange="@(e => HandlePhotoUpload(e, guest.Id, 1))"
+                                                               accept="image/*"
+                                                               class="form-control form-control-sm mb-2" />
+                                                    @if (!string.IsNullOrEmpty(guest.Photo1Path))
+                                                    {
+                                                        <button class="btn btn-sm btn-success" @onclick="() => ProcessOcr(guest, 1)">
+                                                            <i class="bi bi-cpu"></i> Process OCR
+                                                        </button>
+                                                    }
+                                                </div>
+                                            </div>
+
+                                            <!-- Photo 2 -->
+                                            <div class="border rounded p-2 mb-2">
+                                                <strong>Photo 2:</strong>
+                                                @if (!string.IsNullOrEmpty(guest.Photo2Path))
+                                                {
+                                                    <span class="badge bg-success ms-2">Uploaded</span>
+                                                }
+                                                <div class="mt-2">
+                                                    <InputFile OnChange="@(e => HandlePhotoUpload(e, guest.Id, 2))"
+                                                               accept="image/*"
+                                                               class="form-control form-control-sm mb-2" />
+                                                    @if (!string.IsNullOrEmpty(guest.Photo2Path))
+                                                    {
+                                                        <button class="btn btn-sm btn-success" @onclick="() => ProcessOcr(guest, 2)">
+                                                            <i class="bi bi-cpu"></i> Process OCR
+                                                        </button>
+                                                    }
+                                                </div>
+                                            </div>
+
+                                            @if (uploadingGuests.Contains(guest.Id))
+                                            {
+                                                <div class="alert alert-info">
+                                                    <i class="bi bi-upload"></i> Uploading...
+                                                </div>
+                                            }
+
+                                            @if (processingOcrGuests.Contains(guest.Id))
+                                            {
+                                                <div class="alert alert-info">
+                                                    <i class="bi bi-cpu"></i> Processing OCR...
+                                                </div>
+                                            }
+
+                                            @if (ocrSuccessGuests.Contains(guest.Id))
+                                            {
+                                                <div class="alert alert-success">
+                                                    <i class="bi bi-check-circle"></i> OCR completed! Information auto-filled above.
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideGuestsModal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private List<CheckInDto> checkIns = new();
     private CreateCheckInDto newCheckIn = new();
+    private List<RoomDto> availableRooms = new();
     private bool loading = true;
     private bool showCreateModal = false;
+
+    // Guest management
+    private bool showGuestsModal = false;
+    private bool loadingGuests = false;
+    private CheckInDto? selectedCheckIn = null;
+    private List<GuestDto> managedGuests = new();
+    private HashSet<int> uploadingGuests = new();
+    private HashSet<int> processingOcrGuests = new();
+    private HashSet<int> ocrSuccessGuests = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -189,8 +340,12 @@
         loading = false;
     }
 
-    private void ShowCreateModal()
+    private async Task ShowCreateModal()
     {
+        // Load available rooms
+        var allRooms = await ApiClient.GetRoomsAsync();
+        availableRooms = allRooms.Where(r => r.RoomStatus == 0).ToList(); // Only available rooms
+
         newCheckIn = new CreateCheckInDto
         {
             CheckInDate = DateTime.Today,
@@ -236,6 +391,122 @@
         if (await ApiClient.CheckOutAsync(id))
         {
             await LoadCheckIns();
+        }
+    }
+
+    private async Task ManageGuests(int checkInId)
+    {
+        selectedCheckIn = checkIns.FirstOrDefault(c => c.Id == checkInId);
+        if (selectedCheckIn == null) return;
+
+        loadingGuests = true;
+        showGuestsModal = true;
+
+        managedGuests = await ApiClient.GetGuestsByCheckInIdAsync(checkInId);
+        loadingGuests = false;
+
+        ocrSuccessGuests.Clear();
+        uploadingGuests.Clear();
+        processingOcrGuests.Clear();
+    }
+
+    private void HideGuestsModal()
+    {
+        showGuestsModal = false;
+        selectedCheckIn = null;
+        managedGuests.Clear();
+    }
+
+    private async Task HandlePhotoUpload(InputFileChangeEventArgs e, int guestId, int photoNumber)
+    {
+        uploadingGuests.Add(guestId);
+        StateHasChanged();
+
+        try
+        {
+            var file = e.File;
+            if (file.Size > 10 * 1024 * 1024) // 10MB limit
+            {
+                return;
+            }
+
+            using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            using var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream);
+            memoryStream.Position = 0;
+
+            var result = await ApiClient.UploadGuestPhotoAsync(guestId, photoNumber, memoryStream, file.Name);
+
+            if (result != null)
+            {
+                // Update the guest in the list
+                var guestIndex = managedGuests.FindIndex(g => g.Id == guestId);
+                if (guestIndex >= 0)
+                {
+                    managedGuests[guestIndex] = result;
+                }
+            }
+        }
+        finally
+        {
+            uploadingGuests.Remove(guestId);
+            StateHasChanged();
+        }
+    }
+
+    private async Task ProcessOcr(GuestDto guest, int photoNumber)
+    {
+        processingOcrGuests.Add(guest.Id);
+        ocrSuccessGuests.Remove(guest.Id);
+        StateHasChanged();
+
+        try
+        {
+            var ocrResult = await ApiClient.ProcessOcrAsync(guest.Id, photoNumber);
+
+            if (ocrResult != null)
+            {
+                // Auto-fill guest information from OCR
+                guest.GuestName = ocrResult.GuestName ?? guest.GuestName;
+                guest.Address = ocrResult.Address ?? guest.Address;
+                guest.City = ocrResult.City ?? guest.City;
+                guest.State = ocrResult.State ?? guest.State;
+                guest.Country = ocrResult.Country ?? guest.Country;
+                guest.MobileNo = ocrResult.MobileNo ?? guest.MobileNo;
+                guest.PanOrAadharNo = ocrResult.IdNumber ?? guest.PanOrAadharNo;
+
+                ocrSuccessGuests.Add(guest.Id);
+            }
+        }
+        finally
+        {
+            processingOcrGuests.Remove(guest.Id);
+            StateHasChanged();
+        }
+    }
+
+    private async Task UpdateGuest(GuestDto guest)
+    {
+        var updateDto = new CreateGuestDto
+        {
+            GuestName = guest.GuestName,
+            Address = guest.Address,
+            City = guest.City,
+            State = guest.State,
+            Country = guest.Country,
+            MobileNo = guest.MobileNo,
+            PanOrAadharNo = guest.PanOrAadharNo
+        };
+
+        var result = await ApiClient.UpdateGuestAsync(guest.Id, updateDto);
+        if (result != null)
+        {
+            // Update successful
+            var guestIndex = managedGuests.FindIndex(g => g.Id == guest.Id);
+            if (guestIndex >= 0)
+            {
+                managedGuests[guestIndex] = result;
+            }
         }
     }
 }

@@ -1,0 +1,258 @@
+@page "/users"
+@inject IApiClientService ApiClient
+@inject NavigationManager Navigation
+@using HMSMini.Web.Services
+@using HMSMini.Web.Models
+
+<PageTitle>User Management - HMS Mini</PageTitle>
+
+<div class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>User Management</h2>
+        <button class="btn btn-primary" @onclick="ShowCreateModal">
+            <i class="bi bi-person-plus"></i> Create New User
+        </button>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">All Users</h5>
+        </div>
+        <div class="card-body">
+            @if (loading)
+            {
+                <div class="text-center">
+                    <div class="spinner-border"></div>
+                </div>
+            }
+            else if (users.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Username</th>
+                                <th>Full Name</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var user in users)
+                            {
+                                <tr>
+                                    <td>@user.Id</td>
+                                    <td>@user.Username</td>
+                                    <td>@user.FullName</td>
+                                    <td>@user.Email</td>
+                                    <td>
+                                        <span class="badge bg-@GetRoleBadgeColor(user.Role)">
+                                            @GetRoleName(user.Role)
+                                        </span>
+                                    </td>
+                                    <td>
+                                        @if (user.IsActive)
+                                        {
+                                            <span class="badge bg-success">Active</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">Inactive</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (user.IsActive)
+                                        {
+                                            <button class="btn btn-sm btn-danger" @onclick="() => DeactivateUser(user.Id)">
+                                                Deactivate
+                                            </button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <p class="text-muted">No users found</p>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- Create User Modal -->
+@if (showCreateModal)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Create New User</h5>
+                    <button type="button" class="btn-close" @onclick="HideCreateModal"></button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="newUser" OnValidSubmit="CreateUser">
+                        <div class="mb-3">
+                            <label>Username</label>
+                            <InputText @bind-Value="newUser.Username" class="form-control" placeholder="Enter username" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label>Full Name</label>
+                            <InputText @bind-Value="newUser.FullName" class="form-control" placeholder="Enter full name" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label>Email</label>
+                            <InputText @bind-Value="newUser.Email" type="email" class="form-control" placeholder="Enter email address" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label>Password</label>
+                            <InputText @bind-Value="newUser.Password" type="password" class="form-control" placeholder="Enter password (min 6 characters)" />
+                            <small class="text-muted">Minimum 6 characters required</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label>Role</label>
+                            <InputSelect @bind-Value="newUser.Role" class="form-control">
+                                <option value="0">Admin</option>
+                                <option value="1">Manager</option>
+                                <option value="2">Receptionist</option>
+                            </InputSelect>
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(errorMessage))
+                        {
+                            <div class="alert alert-danger">
+                                @errorMessage
+                            </div>
+                        }
+
+                        @if (!string.IsNullOrEmpty(successMessage))
+                        {
+                            <div class="alert alert-success">
+                                @successMessage
+                            </div>
+                        }
+
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" @onclick="HideCreateModal">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Create User</button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<UserDto> users = new();
+    private RegisterRequest newUser = new();
+    private bool loading = true;
+    private bool showCreateModal = false;
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsers();
+    }
+
+    private async Task LoadUsers()
+    {
+        loading = true;
+        users = await ApiClient.GetAllUsersAsync();
+        loading = false;
+    }
+
+    private void ShowCreateModal()
+    {
+        newUser = new RegisterRequest { Role = 2 }; // Default to Receptionist
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+        showCreateModal = true;
+    }
+
+    private void HideCreateModal()
+    {
+        showCreateModal = false;
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+    }
+
+    private async Task CreateUser()
+    {
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+
+        // Basic validation
+        if (string.IsNullOrWhiteSpace(newUser.Username))
+        {
+            errorMessage = "Username is required";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(newUser.Email))
+        {
+            errorMessage = "Email is required";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(newUser.Password) || newUser.Password.Length < 6)
+        {
+            errorMessage = "Password must be at least 6 characters";
+            return;
+        }
+
+        var result = await ApiClient.CreateUserAsync(newUser);
+        if (result != null)
+        {
+            successMessage = "User created successfully!";
+            await LoadUsers();
+            await Task.Delay(1500); // Show success message briefly
+            HideCreateModal();
+        }
+        else
+        {
+            errorMessage = "Failed to create user. Username or email may already exist.";
+        }
+    }
+
+    private async Task DeactivateUser(int id)
+    {
+        if (await ApiClient.DeactivateUserAsync(id))
+        {
+            await LoadUsers();
+        }
+    }
+
+    private string GetRoleName(int role)
+    {
+        return role switch
+        {
+            0 => "Admin",
+            1 => "Manager",
+            2 => "Receptionist",
+            _ => "Unknown"
+        };
+    }
+
+    private string GetRoleBadgeColor(int role)
+    {
+        return role switch
+        {
+            0 => "danger",       // Admin - Red
+            1 => "primary",      // Manager - Blue
+            2 => "info",         // Receptionist - Light Blue
+            _ => "secondary"
+        };
+    }
+}

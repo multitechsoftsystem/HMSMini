@@ -26,3 +26,15 @@ public class CreateGuestDto
     public string? MobileNo { get; set; }
     public string? PanOrAadharNo { get; set; }
 }
+
+public class GuestInfoDto
+{
+    public string GuestName { get; set; } = string.Empty;
+    public string? Address { get; set; }
+    public string? City { get; set; }
+    public string? State { get; set; }
+    public string? Country { get; set; }
+    public string? MobileNo { get; set; }
+    public string? IdType { get; set; }
+    public string? IdNumber { get; set; }
+}

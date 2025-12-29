@@ -1,62 +1,72 @@
 @page "/rooms"
 @inject IApiClientService ApiClient
-@using HMSMini.Web.Services
-@using HMSMini.Web.Models
 
 <PageTitle>Rooms - HMS Mini</PageTitle>
 
 <div class="container-fluid p-4">
-    <h2 class="mb-4">Rooms</h2>
+    <h2 class="mb-4">All Rooms</h2>
 
-    <div class="card">
-        <div class="card-body">
-            @if (loading)
+    @if (loading)
+    {
+        <div class="text-center">
+            <div class="spinner-border"></div>
+        </div>
+    }
+    else if (rooms.Any())
+    {
+        <!-- Status Summary -->
+        <div class="status-summary mb-4">
+            <div class="status-card available">
+                <div class="status-label">Available</div>
+                <div class="status-count">@rooms.Count(r => r.RoomStatus == 0)</div>
+            </div>
+            <div class="status-card occupied">
+                <div class="status-label">Occupied</div>
+                <div class="status-count">@rooms.Count(r => r.RoomStatus == 1)</div>
+            </div>
+            <div class="status-card dirty">
+                <div class="status-label">Dirty</div>
+                <div class="status-count">@rooms.Count(r => r.RoomStatus == 2)</div>
+            </div>
+            <div class="status-card maintenance">
+                <div class="status-label">Maintenance</div>
+                <div class="status-count">@rooms.Count(r => r.RoomStatus == 3)</div>
+            </div>
+            <div class="status-card blocked">
+                <div class="status-label">Blocked</div>
+                <div class="status-count">@rooms.Count(r => r.RoomStatus == 4)</div>
+            </div>
+        </div>
+
+        <!-- Room Cards -->
+        <div class="room-chart">
+            @foreach (var room in rooms.OrderBy(r => r.RoomNumber))
             {
-                <div class="text-center">
-                    <div class="spinner-border"></div>
+                <div class="room-card @GetRoomStatusClass(room.RoomStatus)">
+                    <div>
+                        <div class="room-number">@room.RoomNumber</div>
+                        <div class="room-type">@room.RoomTypeName</div>
+                        <span class="room-status-badge bg-@GetStatusColor(room.RoomStatus)">
+                            @room.RoomStatusName
+                        </span>
+                    </div>
+
+                    @if (room.RoomStatus == 3 && room.RoomStatusFromDate.HasValue && room.RoomStatusToDate.HasValue)
+                    {
+                        <div class="room-guest-info">
+                            <div class="room-checkout-date">
+                                <i class="bi bi-tools"></i> @room.RoomStatusFromDate.Value.ToShortDateString() - @room.RoomStatusToDate.Value.ToShortDateString()
+                            </div>
+                        </div>
+                    }
                 </div>
-            }
-            else if (rooms.Any())
-            {
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>Room Number</th>
-                                <th>Room Type</th>
-                                <th>Status</th>
-                                <th>Status Dates</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var room in rooms)
-                            {
-                                <tr>
-                                    <td><strong>@room.RoomNumber</strong></td>
-                                    <td>@room.RoomTypeName</td>
-                                    <td>
-                                        <span class="badge bg-@GetStatusColor(room.RoomStatus)">
-                                            @room.RoomStatusName
-                                        </span>
-                                    </td>
-                                    <td>
-                                        @if (room.RoomStatusFromDate.HasValue && room.RoomStatusToDate.HasValue)
-                                        {
-                                            <text>@room.RoomStatusFromDate.Value.ToShortDateString() - @room.RoomStatusToDate.Value.ToShortDateString()</text>
-                                        }
-                                    </td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            }
-            else
-            {
-                <p class="text-muted">No rooms available</p>
             }
         </div>
-    </div>
+    }
+    else
+    {
+        <p class="text-muted">No rooms available</p>
+    }
 </div>
 
 @code {
@@ -73,6 +83,19 @@
         loading = true;
         rooms = await ApiClient.GetRoomsAsync();
         loading = false;
+    }
+
+    private string GetRoomStatusClass(int status)
+    {
+        return status switch
+        {
+            0 => "available",
+            1 => "occupied",
+            2 => "dirty",
+            3 => "maintenance",
+            4 => "blocked",
+            _ => "available"
+        };
     }
 
     private string GetStatusColor(int status)

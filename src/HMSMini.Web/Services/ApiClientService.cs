@@ -30,9 +30,16 @@ public interface IApiClientService
     Task<GuestDto?> GetGuestByIdAsync(int id);
     Task<List<GuestDto>> GetGuestsByCheckInIdAsync(int checkInId);
     Task<GuestDto?> UpdateGuestAsync(int id, CreateGuestDto guest);
+    Task<GuestDto?> UploadGuestPhotoAsync(int guestId, int photoNumber, Stream fileStream, string fileName);
+    Task<GuestInfoDto?> ProcessOcrAsync(int guestId, int photoNumber);
 
     // Room Types
     Task<List<RoomTypeDto>> GetRoomTypesAsync();
+
+    // Users
+    Task<List<UserDto>> GetAllUsersAsync();
+    Task<UserDto?> CreateUserAsync(RegisterRequest request);
+    Task<bool> DeactivateUserAsync(int id);
 }
 
 public class ApiClientService : IApiClientService
@@ -230,6 +237,36 @@ public class ApiClientService : IApiClientService
         catch { return null; }
     }
 
+    public async Task<GuestDto?> UploadGuestPhotoAsync(int guestId, int photoNumber, Stream fileStream, string fileName)
+    {
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            using var streamContent = new StreamContent(fileStream);
+            streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg");
+            content.Add(streamContent, "file", fileName);
+            content.Add(new StringContent(photoNumber.ToString()), "photoNumber");
+
+            var response = await _httpClient.PostAsync($"/api/guests/{guestId}/upload-photo", content);
+            return response.IsSuccessStatusCode
+                ? await response.Content.ReadFromJsonAsync<GuestDto>()
+                : null;
+        }
+        catch { return null; }
+    }
+
+    public async Task<GuestInfoDto?> ProcessOcrAsync(int guestId, int photoNumber)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsync($"/api/guests/{guestId}/process-ocr?photoNumber={photoNumber}", null);
+            return response.IsSuccessStatusCode
+                ? await response.Content.ReadFromJsonAsync<GuestInfoDto>()
+                : null;
+        }
+        catch { return null; }
+    }
+
     // Room Types
     public async Task<List<RoomTypeDto>> GetRoomTypesAsync()
     {
@@ -238,5 +275,51 @@ public class ApiClientService : IApiClientService
             return await _httpClient.GetFromJsonAsync<List<RoomTypeDto>>("/api/roomtypes") ?? new();
         }
         catch { return new(); }
+    }
+
+    // Users
+    public async Task<List<UserDto>> GetAllUsersAsync()
+    {
+        try
+        {
+            return await _httpClient.GetFromJsonAsync<List<UserDto>>("/api/auth") ?? new();
+        }
+        catch { return new(); }
+    }
+
+    public async Task<UserDto?> CreateUserAsync(RegisterRequest request)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync("/api/auth/register", request);
+            if (response.IsSuccessStatusCode)
+            {
+                var authResponse = await response.Content.ReadFromJsonAsync<AuthResponse>();
+                if (authResponse != null)
+                {
+                    return new UserDto
+                    {
+                        Id = authResponse.Id,
+                        Username = authResponse.Username,
+                        Email = authResponse.Email,
+                        FullName = authResponse.FullName,
+                        Role = authResponse.Role,
+                        IsActive = true
+                    };
+                }
+            }
+            return null;
+        }
+        catch { return null; }
+    }
+
+    public async Task<bool> DeactivateUserAsync(int id)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsync($"/api/auth/{id}/deactivate", null);
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
     }
 }

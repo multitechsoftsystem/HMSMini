@@ -106,23 +106,42 @@
                     <EditForm Model="newReservation" OnValidSubmit="CreateReservation">
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label>Room Number</label>
-                                <InputText @bind-Value="newReservation.RoomNumber" class="form-control" />
+                                <label>Check-In Date</label>
+                                <InputDate @bind-Value="newReservation.CheckInDate" class="form-control" @onchange="OnDateChange" />
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label>Number of Guests</label>
-                                <InputNumber @bind-Value="newReservation.NumberOfGuests" class="form-control" />
+                                <label>Check-Out Date</label>
+                                <InputDate @bind-Value="newReservation.CheckOutDate" class="form-control" @onchange="OnDateChange" />
                             </div>
                         </div>
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label>Check-In Date</label>
-                                <InputDate @bind-Value="newReservation.CheckInDate" class="form-control" />
+                                <label>Room Type</label>
+                                <InputSelect @bind-Value="selectedRoomType" class="form-control" @onchange="OnRoomTypeChange">
+                                    <option value="">-- Select Room Type --</option>
+                                    @foreach (var roomType in roomTypes)
+                                    {
+                                        <option value="@roomType.RoomType">@roomType.RoomType</option>
+                                    }
+                                </InputSelect>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label>Check-Out Date</label>
-                                <InputDate @bind-Value="newReservation.CheckOutDate" class="form-control" />
+                                <label>Available Room</label>
+                                <InputSelect @bind-Value="newReservation.RoomNumber" class="form-control">
+                                    <option value="">-- Select Room --</option>
+                                    @foreach (var room in filteredAvailableRooms)
+                                    {
+                                        <option value="@room.RoomNumber">@room.RoomNumber</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label>Number of Guests</label>
+                                <InputNumber @bind-Value="newReservation.NumberOfGuests" class="form-control" />
                             </div>
                         </div>
 
@@ -161,6 +180,10 @@
 @code {
     private List<ReservationDto> reservations = new();
     private CreateReservationDto newReservation = new();
+    private List<RoomTypeDto> roomTypes = new();
+    private List<RoomDto> availableRooms = new();
+    private List<RoomDto> filteredAvailableRooms = new();
+    private string selectedRoomType = "";
     private bool loading = true;
     private bool showCreateModal = false;
 
@@ -176,10 +199,43 @@
         loading = false;
     }
 
-    private void ShowCreateModal()
+    private async Task ShowCreateModal()
     {
-        newReservation = new CreateReservationDto();
+        // Load room types and available rooms
+        roomTypes = await ApiClient.GetRoomTypesAsync();
+        var allRooms = await ApiClient.GetRoomsAsync();
+        availableRooms = allRooms.Where(r => r.RoomStatus == 0).ToList();
+        filteredAvailableRooms = new List<RoomDto>();
+        selectedRoomType = "";
+
+        newReservation = new CreateReservationDto
+        {
+            CheckInDate = DateTime.Today.AddDays(1),
+            CheckOutDate = DateTime.Today.AddDays(3),
+            NumberOfGuests = 1
+        };
         showCreateModal = true;
+    }
+
+    private void OnRoomTypeChange()
+    {
+        if (string.IsNullOrEmpty(selectedRoomType))
+        {
+            filteredAvailableRooms = new List<RoomDto>();
+        }
+        else
+        {
+            filteredAvailableRooms = availableRooms
+                .Where(r => r.RoomTypeName == selectedRoomType)
+                .ToList();
+        }
+        newReservation.RoomNumber = ""; // Reset room selection
+    }
+
+    private void OnDateChange()
+    {
+        // Could add logic to check room availability for selected dates
+        // For now, just refresh the available rooms
     }
 
     private void HideCreateModal()

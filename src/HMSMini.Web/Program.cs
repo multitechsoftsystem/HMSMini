@@ -12,10 +12,21 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 // Add Blazored LocalStorage
 builder.Services.AddBlazoredLocalStorage();
 
-// Configure HttpClient for API
-builder.Services.AddScoped(sp => new HttpClient
+// Register message handler
+builder.Services.AddScoped<AuthorizationMessageHandler>();
+
+// Configure HttpClient for API with authorization handler
+builder.Services.AddScoped(sp =>
 {
-    BaseAddress = new Uri("http://localhost:5096/")
+    var handler = sp.GetRequiredService<AuthorizationMessageHandler>();
+    handler.InnerHandler = new HttpClientHandler();
+
+    var client = new HttpClient(handler)
+    {
+        BaseAddress = new Uri("http://localhost:5096/")
+    };
+
+    return client;
 });
 
 // Register services

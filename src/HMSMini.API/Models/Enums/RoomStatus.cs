@@ -16,22 +16,17 @@ public enum RoomStatus
     Occupied = 1,
 
     /// <summary>
+    /// Room needs cleaning after checkout
+    /// </summary>
+    Dirty = 2,
+
+    /// <summary>
     /// Room is under maintenance
     /// </summary>
-    Maintenance = 2,
+    Maintenance = 3,
 
     /// <summary>
     /// Room is blocked and unavailable
     /// </summary>
-    Blocked = 3,
-
-    /// <summary>
-    /// Room needs cleaning after checkout
-    /// </summary>
-    Dirty = 4,
-
-    /// <summary>
-    /// Room is reserved for management use
-    /// </summary>
-    Management = 5
+    Blocked = 4
 }
