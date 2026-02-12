@@ -70,6 +70,61 @@ public class CheckIn
     public string? Remarks { get; set; }
 
     /// <summary>
+    /// Foreign key to company (null for walk-in guests)
+    /// </summary>
+    public int? CompanyId { get; set; }
+
+    /// <summary>
+    /// Foreign key to business source (booking channel)
+    /// </summary>
+    public int? BusinessSourceId { get; set; }
+
+    /// <summary>
+    /// Foreign key to meal plan
+    /// </summary>
+    public int? MealPlanId { get; set; }
+
+    /// <summary>
+    /// Foreign key to guest type (Normal, Complimentary, Family, etc.)
+    /// </summary>
+    public int? GuestTypeId { get; set; }
+
+    /// <summary>
+    /// Meal plan rate applied at check-in time (total meal plan rate per night)
+    /// </summary>
+    [Column(TypeName = "decimal(10,2)")]
+    public decimal? MealPlanRate { get; set; }
+
+    /// <summary>
+    /// Tariff rate applied at check-in time
+    /// </summary>
+    [Column(TypeName = "decimal(10,2)")]
+    public decimal? TariffApplied { get; set; }
+
+    /// <summary>
+    /// Discount percentage applied (0-100)
+    /// </summary>
+    [Column(TypeName = "decimal(5,2)")]
+    public decimal DiscountPercentage { get; set; } = 0;
+
+    /// <summary>
+    /// Final amount after discount
+    /// </summary>
+    [Column(TypeName = "decimal(10,2)")]
+    public decimal? FinalAmount { get; set; }
+
+    /// <summary>
+    /// Tax type for this check-in (IGST or CGST+SGST)
+    /// </summary>
+    [Required]
+    public TaxType TaxType { get; set; } = TaxType.CgstSgst;
+
+    /// <summary>
+    /// Tax slab snapshot at check-in time (stored as JSON for historical accuracy)
+    /// </summary>
+    public string? TaxSlabSnapshotJson { get; set; }
+
+    /// <summary>
     /// Record creation timestamp
     /// </summary>
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
@@ -106,5 +161,18 @@ public class CheckIn
     [ForeignKey(nameof(RoomId))]
     public virtual RoomNo Room { get; set; } = null!;
 
+    [ForeignKey(nameof(CompanyId))]
+    public virtual Company? Company { get; set; }
+
+    [ForeignKey(nameof(BusinessSourceId))]
+    public virtual MBusinessSource? BusinessSource { get; set; }
+
+    [ForeignKey(nameof(MealPlanId))]
+    public virtual MMealPlan? MealPlan { get; set; }
+
+    [ForeignKey(nameof(GuestTypeId))]
+    public virtual MGuestType? GuestType { get; set; }
+
     public virtual ICollection<Guest> Guests { get; set; } = new List<Guest>();
+    public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
 }

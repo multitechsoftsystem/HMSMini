@@ -24,6 +24,33 @@ public static class ServiceExtensions
         services.AddScoped<IOcrService, OcrService>();
         services.AddScoped<IImageStorageService, ImageStorageService>();
         services.AddScoped<IReservationService, ReservationService>();
+        services.AddScoped<ICompanyService, CompanyService>();
+        services.AddScoped<ITariffService, TariffService>();
+        services.AddScoped<IBusinessSourceService, BusinessSourceService>();
+        services.AddScoped<IMealPlanService, MealPlanService>();
+        services.AddScoped<IGuestTypeService, GuestTypeService>();
+        services.AddScoped<IBillingService, BillingService>();
+        services.AddScoped<ITaxService, TaxService>();
+
+        // Banquet Module Services
+        services.AddScoped<IBanquetHallService, BanquetHallService>();
+        services.AddScoped<IEventTypeService, EventTypeService>();
+        services.AddScoped<IBanquetServiceService, BanquetServiceService>();
+        services.AddScoped<IMenuService, MenuService>();
+        services.AddScoped<IBanquetBookingService, BanquetBookingServiceImpl>();
+        services.AddScoped<IBanquetChargeService, BanquetChargeService>();
+        services.AddScoped<IBanquetPaymentService, BanquetPaymentService>();
+        services.AddScoped<IBanquetBillingService, BanquetBillingService>();
+
+        // Unified Payment & Financial Reports
+        services.AddScoped<IPaymentService, PaymentService>();
+        services.AddScoped<IFinancialReportService, FinancialReportService>();
+
+        // Day Closing and Voucher System Services
+        services.AddScoped<IDateTimeProvider, DateTimeProvider>();
+        services.AddScoped<ISystemSettingsService, SystemSettingsService>();
+        services.AddScoped<IVoucherService, VoucherService>();
+        services.AddScoped<IDayClosingService, DayClosingService>();
 
         return services;
     }
