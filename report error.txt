@@ -1,0 +1,10 @@
+This page tried to register a source or trigger using the Attribution Reporting API but failed because the reporting origin was not potentially trustworthy.
+
+The reporting origin is typically the server that sets the Attribution-Reporting-Register-Source or Attribution-Reporting-Register-Trigger header.
+
+The reporting origin must use HTTPS unless it is localhost or 127.0.0.1.
+
+1 violation
+Element	Request	Untrustworthy origin
+
+pagehide?tm=2026-01-01T07%3A47%3A26.024Z	http://me.kis.v2.scr.kaspersky-labs.com

@@ -1,0 +1,449 @@
+@page "/ocr-scanner"
+@using HMSMini.Web.Models
+@using HMSMini.Web.Services
+@using System.Text.Json
+@inject IApiClientService ApiClient
+@inject IJSRuntime JSRuntime
+
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="mb-3">
+                <span class="bi bi-scan"></span> OCR Scanner
+            </h2>
+            <p class="text-muted">Upload ID card images and extract text information automatically</p>
+            <div class="alert alert-info alert-dismissible fade show" role="alert">
+                <strong><span class="bi bi-info-circle"></span> Tips:</strong>
+                <ul class="mb-0 mt-2">
+                    <li>Ensure you are logged in with Admin, Manager, or Receptionist role</li>
+                    <li>Supported formats: JPG, PNG, GIF, BMP, WEBP (max 10MB)</li>
+                    <li>For best results, use clear, well-lit photos with minimal glare</li>
+                    <li>Check browser console (F12) for detailed error messages if processing fails</li>
+                </ul>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Upload Section -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <span class="bi bi-cloud-upload"></span> Upload Images
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <!-- Image 1 Upload -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Image 1</label>
+                        <InputFile OnChange="@(e => HandleImageSelected(e, 1))"
+                                   class="form-control"
+                                   accept="image/*" />
+                        @if (!string.IsNullOrEmpty(image1Preview))
+                        {
+                            <div class="mt-3">
+                                <img src="@image1Preview" alt="Image 1 Preview" class="img-thumbnail" style="max-width: 100%; max-height: 300px;" />
+                                <button class="btn btn-sm btn-danger mt-2" @onclick="() => ClearImage(1)">
+                                    <span class="bi bi-trash"></span> Clear
+                                </button>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Image 2 Upload (Optional) -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Image 2 (Optional)</label>
+                        <InputFile OnChange="@(e => HandleImageSelected(e, 2))"
+                                   class="form-control"
+                                   accept="image/*" />
+                        @if (!string.IsNullOrEmpty(image2Preview))
+                        {
+                            <div class="mt-3">
+                                <img src="@image2Preview" alt="Image 2 Preview" class="img-thumbnail" style="max-width: 100%; max-height: 300px;" />
+                                <button class="btn btn-sm btn-danger mt-2" @onclick="() => ClearImage(2)">
+                                    <span class="bi bi-trash"></span> Clear
+                                </button>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-primary btn-lg"
+                                @onclick="ProcessImages"
+                                disabled="@(image1File == null || isProcessing)">
+                            @if (isProcessing)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                <span>Processing...</span>
+                            }
+                            else
+                            {
+                                <span class="bi bi-play-circle me-2"></span>
+                                <span>Process OCR</span>
+                            }
+                        </button>
+                        <button class="btn btn-outline-secondary" @onclick="ClearAll" disabled="@isProcessing">
+                            <span class="bi bi-arrow-clockwise"></span> Clear All
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div class="col-lg-6 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <span class="bi bi-file-text"></span> Extraction Results
+                    </h5>
+                </div>
+                <div class="card-body">
+                    @if (ocrResults.Count == 0 && !isProcessing)
+                    {
+                        <div class="text-center text-muted py-5">
+                            <span class="bi bi-inbox" style="font-size: 3rem;"></span>
+                            <p class="mt-3">No results yet. Upload and process images to see extracted data.</p>
+                        </div>
+                    }
+                    else if (isProcessing)
+                    {
+                        <div class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-3">Processing images...</p>
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var (result, index) in ocrResults.Select((r, i) => (r, i)))
+                        {
+                            <div class="mb-4">
+                                <h6 class="fw-bold text-primary mb-3">
+                                    <span class="bi bi-image"></span> Image @(index + 1) Results
+                                </h6>
+
+                                <!-- Confidence Badge -->
+                                <div class="mb-3">
+                                    <span class="badge @GetConfidenceBadgeClass(result.Confidence)">
+                                        Confidence: @result.Confidence.ToString("P1")
+                                    </span>
+                                </div>
+
+                                <!-- Extracted Guest Information -->
+                                <div class="card mb-3">
+                                    <div class="card-body">
+                                        <h6 class="card-subtitle mb-3 text-muted">Extracted Information</h6>
+                                        <dl class="row mb-0">
+                                            @if (!string.IsNullOrWhiteSpace(result.GuestInfo.GuestName))
+                                            {
+                                                <dt class="col-sm-4">Name:</dt>
+                                                <dd class="col-sm-8">@result.GuestInfo.GuestName</dd>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(result.GuestInfo.IdNumber))
+                                            {
+                                                <dt class="col-sm-4">ID Number:</dt>
+                                                <dd class="col-sm-8">@result.GuestInfo.IdNumber</dd>
+                                            }
+                                            @if (result.GuestInfo.DateOfBirth.HasValue)
+                                            {
+                                                <dt class="col-sm-4">Date of Birth:</dt>
+                                                <dd class="col-sm-8">@result.GuestInfo.DateOfBirth.Value.ToString("dd/MM/yyyy")</dd>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(result.GuestInfo.Address))
+                                            {
+                                                <dt class="col-sm-4">Address:</dt>
+                                                <dd class="col-sm-8">@result.GuestInfo.Address</dd>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(result.GuestInfo.City))
+                                            {
+                                                <dt class="col-sm-4">City:</dt>
+                                                <dd class="col-sm-8">@result.GuestInfo.City</dd>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(result.GuestInfo.State))
+                                            {
+                                                <dt class="col-sm-4">State:</dt>
+                                                <dd class="col-sm-8">@result.GuestInfo.State</dd>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(result.GuestInfo.Country))
+                                            {
+                                                <dt class="col-sm-4">Country:</dt>
+                                                <dd class="col-sm-8">@result.GuestInfo.Country</dd>
+                                            }
+                                            @if (!string.IsNullOrWhiteSpace(result.GuestInfo.MobileNo))
+                                            {
+                                                <dt class="col-sm-4">Mobile:</dt>
+                                                <dd class="col-sm-8">@result.GuestInfo.MobileNo</dd>
+                                            }
+                                        </dl>
+                                    </div>
+                                </div>
+
+                                <!-- Raw Text (Collapsible) -->
+                                <div class="card">
+                                    <div class="card-body">
+                                        <button class="btn btn-sm btn-outline-secondary w-100"
+                                                type="button"
+                                                @onclick="() => ToggleRawText(index)">
+                                            <span class="bi @(showRawText[index] ? "bi-chevron-up" : "bi-chevron-down")"></span>
+                                            @(showRawText[index] ? "Hide" : "Show") Raw Text
+                                        </button>
+                                        @if (showRawText[index])
+                                        {
+                                            <pre class="mt-3 p-3 bg-light border rounded" style="max-height: 300px; overflow-y: auto; font-size: 0.85rem;">@result.RawText</pre>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            @if (index < ocrResults.Count - 1)
+                            {
+                                <hr />
+                            }
+                        }
+
+                        <!-- Download JSON Button -->
+                        <div class="d-grid gap-2 mt-4">
+                            <button class="btn btn-success" @onclick="DownloadAsJson">
+                                <span class="bi bi-download"></span> Download Results as JSON
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="row">
+            <div class="col-12">
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <span class="bi bi-exclamation-triangle-fill me-2"></span>
+                    <strong>Error:</strong> @errorMessage
+                    <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private IBrowserFile? image1File;
+    private IBrowserFile? image2File;
+    private string? image1Preview;
+    private string? image2Preview;
+
+    private List<OcrReviewDto> ocrResults = new();
+    private Dictionary<int, bool> showRawText = new();
+
+    private bool isProcessing = false;
+    private string errorMessage = string.Empty;
+
+    private async Task HandleImageSelected(InputFileChangeEventArgs e, int imageNumber)
+    {
+        var file = e.File;
+
+        if (file.Size > 10 * 1024 * 1024) // 10MB limit
+        {
+            errorMessage = "File size must be less than 10MB";
+            return;
+        }
+
+        // Store the file
+        if (imageNumber == 1)
+        {
+            image1File = file;
+        }
+        else
+        {
+            image2File = file;
+        }
+
+        // Generate preview
+        try
+        {
+            var buffer = new byte[file.Size];
+            await file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024).ReadAsync(buffer);
+            var base64 = Convert.ToBase64String(buffer);
+            var preview = $"data:{file.ContentType};base64,{base64}";
+
+            if (imageNumber == 1)
+            {
+                image1Preview = preview;
+            }
+            else
+            {
+                image2Preview = preview;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading image preview: {ex.Message}";
+        }
+    }
+
+    private void ClearImage(int imageNumber)
+    {
+        if (imageNumber == 1)
+        {
+            image1File = null;
+            image1Preview = null;
+        }
+        else
+        {
+            image2File = null;
+            image2Preview = null;
+        }
+    }
+
+    private void ClearAll()
+    {
+        image1File = null;
+        image2File = null;
+        image1Preview = null;
+        image2Preview = null;
+        ocrResults.Clear();
+        showRawText.Clear();
+        errorMessage = string.Empty;
+    }
+
+    private async Task ProcessImages()
+    {
+        errorMessage = string.Empty;
+        ocrResults.Clear();
+        showRawText.Clear();
+        isProcessing = true;
+
+        try
+        {
+            // Process Image 1
+            if (image1File != null)
+            {
+                Console.WriteLine($"Processing image 1: {image1File.Name} ({image1File.Size} bytes)");
+                var result = await ProcessSingleImage(image1File);
+                if (result != null)
+                {
+                    ocrResults.Add(result);
+                    showRawText[ocrResults.Count - 1] = false;
+                    Console.WriteLine($"Successfully processed image 1");
+                }
+            }
+
+            // Process Image 2 if provided
+            if (image2File != null)
+            {
+                Console.WriteLine($"Processing image 2: {image2File.Name} ({image2File.Size} bytes)");
+                var result = await ProcessSingleImage(image2File);
+                if (result != null)
+                {
+                    ocrResults.Add(result);
+                    showRawText[ocrResults.Count - 1] = false;
+                    Console.WriteLine($"Successfully processed image 2");
+                }
+            }
+
+            if (ocrResults.Count == 0)
+            {
+                if (string.IsNullOrEmpty(errorMessage))
+                {
+                    errorMessage = "Failed to process images. Please check browser console for details.";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error processing images: {ex.Message}";
+            Console.WriteLine($"Exception in ProcessImages: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private async Task<OcrReviewDto?> ProcessSingleImage(IBrowserFile file)
+    {
+        try
+        {
+            // Open a fresh stream for API processing (separate from preview stream)
+            using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            var result = await ApiClient.ProcessOcrDirectAsync(stream, file.Name);
+
+            if (result == null)
+            {
+                errorMessage += $"Failed to process {file.Name}. ";
+                Console.WriteLine($"API returned null for {file.Name}");
+            }
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            errorMessage += $"Error processing {file.Name}: {ex.Message}. ";
+            Console.WriteLine($"Error processing {file.Name}: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            return null;
+        }
+    }
+
+    private void ToggleRawText(int index)
+    {
+        if (showRawText.ContainsKey(index))
+        {
+            showRawText[index] = !showRawText[index];
+        }
+        else
+        {
+            showRawText[index] = true;
+        }
+    }
+
+    private string GetConfidenceBadgeClass(double confidence)
+    {
+        return confidence switch
+        {
+            >= 0.8 => "bg-success",
+            >= 0.6 => "bg-warning",
+            _ => "bg-danger"
+        };
+    }
+
+    private async Task DownloadAsJson()
+    {
+        try
+        {
+            var jsonOptions = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            };
+
+            var json = JsonSerializer.Serialize(new
+            {
+                ProcessedDate = DateTime.Now,
+                TotalImages = ocrResults.Count,
+                Results = ocrResults.Select((result, index) => new
+                {
+                    ImageNumber = index + 1,
+                    Confidence = result.Confidence,
+                    ExtractedInformation = result.GuestInfo,
+                    RawText = result.RawText
+                })
+            }, jsonOptions);
+
+            var fileName = $"ocr-results-{DateTime.Now:yyyyMMdd-HHmmss}.json";
+
+            // Download the file
+            await JSRuntime.InvokeVoidAsync("downloadFile", fileName, "application/json", json);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error downloading JSON: {ex.Message}";
+        }
+    }
+}

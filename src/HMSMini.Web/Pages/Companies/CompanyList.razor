@@ -1,0 +1,371 @@
+@page "/companies"
+@inject IApiClientService ApiClient
+@inject IAuthenticationService AuthService
+@using HMSMini.Web.Services
+@using HMSMini.Web.Models
+
+<PageTitle>Companies - MSS</PageTitle>
+
+<div class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Companies</h2>
+        @if (canManageCompanies)
+        {
+            <button class="btn btn-primary" @onclick="ShowCreateModal">
+                <i class="bi bi-plus-circle"></i> New Company
+            </button>
+        }
+    </div>
+
+    @if (loading)
+    {
+        <div class="text-center">
+            <div class="spinner-border"></div>
+        </div>
+    }
+    else if (companies.Any())
+    {
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Company Name</th>
+                        <th>GST Number</th>
+                        <th>City</th>
+                        <th>Contact Person</th>
+                        <th>Contact Number</th>
+                        <th>Discount %</th>
+                        <th>Status</th>
+                        <th>Total Check-Ins</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var company in companies)
+                    {
+                        <tr>
+                            <td><strong>@company.CompanyName</strong></td>
+                            <td>
+                                @if (!string.IsNullOrEmpty(company.GSTNumber))
+                                {
+                                    <span>@company.GSTNumber</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">-</span>
+                                }
+                            </td>
+                            <td>@company.City</td>
+                            <td>@company.ContactPerson</td>
+                            <td>@company.ContactNumber</td>
+                            <td><span class="badge bg-info">@company.DiscountPercentage%</span></td>
+                            <td>
+                                @if (company.IsActive)
+                                {
+                                    <span class="badge bg-success">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">Inactive</span>
+                                }
+                            </td>
+                            <td>@company.TotalCheckIns</td>
+                            <td>
+                                @if (canManageCompanies)
+                                {
+                                    <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => ShowEditModal(company.Id)">
+                                        <i class="bi bi-pencil"></i> Edit
+                                    </button>
+                                    @if (company.IsActive)
+                                    {
+                                        <button class="btn btn-sm btn-outline-warning" @onclick="() => DeactivateCompany(company.Id)">
+                                            <i class="bi bi-pause-circle"></i> Deactivate
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-sm btn-outline-success" @onclick="() => ActivateCompany(company.Id)">
+                                            <i class="bi bi-play-circle"></i> Activate
+                                        </button>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="text-muted">View Only</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> No companies found. Click "New Company" to add one.
+        </div>
+    }
+</div>
+
+<!-- Create/Edit Company Modal -->
+@if (showModal)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(editingCompanyId.HasValue ? "Edit Company" : "New Company")</h5>
+                    <button type="button" class="btn-close" @onclick="HideModal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrWhiteSpace(errorMessage))
+                    {
+                        <div class="alert alert-danger">@errorMessage</div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(successMessage))
+                    {
+                        <div class="alert alert-success">@successMessage</div>
+                    }
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label>Company Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" @bind="companyForm.CompanyName" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label>GST Number</label>
+                            <input type="text" class="form-control" @bind="companyForm.GSTNumber" />
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label>Address</label>
+                        <textarea class="form-control" rows="2" @bind="companyForm.Address"></textarea>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label>City</label>
+                            <input type="text" class="form-control" @bind="companyForm.City" />
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label>State</label>
+                            <input type="text" class="form-control" @bind="companyForm.State" />
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label>Country</label>
+                            <input type="text" class="form-control" @bind="companyForm.Country" />
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label>Contact Person</label>
+                            <input type="text" class="form-control" @bind="companyForm.ContactPerson" />
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label>Designation</label>
+                            <input type="text" class="form-control" @bind="companyForm.Designation" />
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label>Discount Percentage <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" @bind="companyForm.DiscountPercentage" min="0" max="100" step="0.01" />
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label>Email</label>
+                            <input type="email" class="form-control" @bind="companyForm.Email" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label>Contact Number</label>
+                            <input type="text" class="form-control" @bind="companyForm.ContactNumber" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideModal">Cancel</button>
+                    <button type="button" class="btn btn-primary" @onclick="SaveCompany" disabled="@saving">
+                        @if (saving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        @(editingCompanyId.HasValue ? "Update" : "Create")
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<CompanyListDto> companies = new();
+    private bool loading = true;
+    private bool showModal = false;
+    private bool saving = false;
+    private int? editingCompanyId = null;
+    private string errorMessage = "";
+    private string successMessage = "";
+
+    private CreateCompanyDto companyForm = new();
+
+    // Role-based permissions
+    private bool canManageCompanies = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckUserPermissions();
+        await LoadCompanies();
+    }
+
+    private async Task CheckUserPermissions()
+    {
+        var currentUser = await AuthService.GetCurrentUserAsync();
+        if (currentUser != null)
+        {
+            // Only Admin (0) and Manager (1) can manage companies
+            canManageCompanies = currentUser.Role == 0 || currentUser.Role == 1;
+        }
+    }
+
+    private async Task LoadCompanies()
+    {
+        loading = true;
+        companies = await ApiClient.GetAllCompaniesAsync(includeInactive: true);
+        loading = false;
+    }
+
+    private void ShowCreateModal()
+    {
+        editingCompanyId = null;
+        companyForm = new CreateCompanyDto();
+        errorMessage = "";
+        successMessage = "";
+        showModal = true;
+    }
+
+    private async Task ShowEditModal(int companyId)
+    {
+        editingCompanyId = companyId;
+        var company = await ApiClient.GetCompanyByIdAsync(companyId);
+        if (company != null)
+        {
+            companyForm = new CreateCompanyDto
+            {
+                CompanyName = company.CompanyName,
+                Address = company.Address,
+                City = company.City,
+                State = company.State,
+                Country = company.Country,
+                GSTNumber = company.GSTNumber,
+                ContactPerson = company.ContactPerson,
+                Designation = company.Designation,
+                Email = company.Email,
+                ContactNumber = company.ContactNumber,
+                DiscountPercentage = company.DiscountPercentage
+            };
+            errorMessage = "";
+            successMessage = "";
+            showModal = true;
+        }
+    }
+
+    private void HideModal()
+    {
+        showModal = false;
+        editingCompanyId = null;
+        companyForm = new();
+        errorMessage = "";
+        successMessage = "";
+    }
+
+    private async Task SaveCompany()
+    {
+        errorMessage = "";
+        successMessage = "";
+
+        if (string.IsNullOrWhiteSpace(companyForm.CompanyName))
+        {
+            errorMessage = "Company name is required.";
+            return;
+        }
+
+        saving = true;
+
+        try
+        {
+            if (editingCompanyId.HasValue)
+            {
+                var updateDto = new UpdateCompanyDto
+                {
+                    CompanyName = companyForm.CompanyName,
+                    Address = companyForm.Address,
+                    City = companyForm.City,
+                    State = companyForm.State,
+                    Country = companyForm.Country,
+                    GSTNumber = companyForm.GSTNumber,
+                    ContactPerson = companyForm.ContactPerson,
+                    Designation = companyForm.Designation,
+                    Email = companyForm.Email,
+                    ContactNumber = companyForm.ContactNumber,
+                    DiscountPercentage = companyForm.DiscountPercentage
+                };
+
+                var result = await ApiClient.UpdateCompanyAsync(editingCompanyId.Value, updateDto);
+                if (result != null)
+                {
+                    successMessage = "Company updated successfully!";
+                    await LoadCompanies();
+                    await Task.Delay(1000);
+                    HideModal();
+                }
+                else
+                {
+                    errorMessage = "Failed to update company.";
+                }
+            }
+            else
+            {
+                var result = await ApiClient.CreateCompanyAsync(companyForm);
+                if (result != null)
+                {
+                    successMessage = "Company created successfully!";
+                    await LoadCompanies();
+                    await Task.Delay(1000);
+                    HideModal();
+                }
+                else
+                {
+                    errorMessage = "Failed to create company.";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private async Task ActivateCompany(int companyId)
+    {
+        if (await ApiClient.ActivateCompanyAsync(companyId))
+        {
+            await LoadCompanies();
+        }
+    }
+
+    private async Task DeactivateCompany(int companyId)
+    {
+        if (await ApiClient.DeactivateCompanyAsync(companyId))
+        {
+            await LoadCompanies();
+        }
+    }
+}

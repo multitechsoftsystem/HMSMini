@@ -23,7 +23,7 @@ public class PaymentsController : ControllerBase
     /// Create a payment (room or banquet)
     /// </summary>
     [HttpPost]
-    [Authorize(Roles = "Admin,Manager,Receptionist")]
+    [Authorize(Roles = "Admin,Manager,Receptionist,BanquetManager,BanquetStaff")]
     [ProducesResponseType(typeof(PaymentDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<PaymentDto>> Create([FromBody] CreatePaymentDto dto)

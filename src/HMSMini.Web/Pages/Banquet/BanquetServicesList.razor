@@ -1,0 +1,258 @@
+@page "/banquet/services"
+@inject IApiClientService ApiClient
+@inject IAuthenticationService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Banquet Services - MSS</PageTitle>
+
+<div class="page-header">
+    <h3>Banquet Services Management</h3>
+    @if (canManage)
+    {
+        <button class="btn btn-primary" @onclick="ShowCreateModal">
+            <span class="icon">+</span> Add Service
+        </button>
+    }
+</div>
+
+@if (isLoading)
+{
+    <div class="loading">Loading services...</div>
+}
+else if (services.Count == 0)
+{
+    <div class="empty-state">
+        <p>No banquet services found.</p>
+        @if (canManage)
+        {
+            <button class="btn btn-primary" @onclick="ShowCreateModal">Add Service</button>
+        }
+    </div>
+}
+else
+{
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Service Name</th>
+                    <th>Default Rate</th>
+                    <th>Unit</th>
+                    <th>Apply Tax</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var svc in services)
+                {
+                    <tr>
+                        <td>@svc.ServiceName</td>
+                        <td>@svc.DefaultRate.ToString("N2")</td>
+                        <td>@(svc.Unit ?? "-")</td>
+                        <td>@(svc.ApplyTax ? "Yes" : "No")</td>
+                        <td>
+                            <span class="status-badge @(svc.IsActive ? "status-active" : "status-inactive")">
+                                @(svc.IsActive ? "Active" : "Inactive")
+                            </span>
+                        </td>
+                        <td>
+                            @if (canManage)
+                            {
+                                <div class="action-buttons">
+                                    <button class="btn btn-sm btn-secondary" @onclick="() => ShowEditModal(svc)">Edit</button>
+                                    @if (svc.IsActive)
+                                    {
+                                        <button class="btn btn-sm btn-warning" @onclick="() => Deactivate(svc.Id)">Deactivate</button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-sm btn-success" @onclick="() => Activate(svc.Id)">Activate</button>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <span class="text-muted">View Only</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success alert-dismissible fade show mt-2">
+        @successMessage
+        <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+    </div>
+}
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show mt-2">
+        @errorMessage
+        <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+    </div>
+}
+
+@if (showModal)
+{
+    <div class="modal-overlay" @onclick="HideModal">
+        <div class="modal-content" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h4>@(editing == null ? "Add Service" : "Edit Service")</h4>
+                <button class="btn-close" @onclick="HideModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                @if (!string.IsNullOrEmpty(formError))
+                {
+                    <div class="alert alert-danger">@formError</div>
+                }
+                <div class="form-group">
+                    <label>Service Name *</label>
+                    <input type="text" class="form-control" @bind="formModel.ServiceName" />
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Default Rate</label>
+                            <input type="number" step="0.01" class="form-control" @bind="formModel.DefaultRate" />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Unit</label>
+                            <input type="text" class="form-control" @bind="formModel.Unit" placeholder="e.g., Per Hour, Per Plate" />
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group form-check mt-2">
+                    <input type="checkbox" class="form-check-input" id="applyTax" @bind="formModel.ApplyTax" />
+                    <label class="form-check-label" for="applyTax">Apply Tax</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="HideModal">Cancel</button>
+                <button class="btn btn-primary" @onclick="Save" disabled="@isSaving">
+                    @(isSaving ? "Saving..." : "Save")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<BanquetServiceModel> services = new();
+    private bool isLoading = true;
+    private bool showModal = false;
+    private bool isSaving = false;
+    private bool canManage = false;
+    private BanquetServiceModel? editing = null;
+    private CreateBanquetServiceModel formModel = new();
+    private string? errorMessage;
+    private string? successMessage;
+    private string? formError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = await AuthService.GetCurrentUserAsync();
+        canManage = user != null && (user.Role == 0 || user.Role == 1 || user.Role == 5);
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        services = await ApiClient.GetAllBanquetServicesAsync(true);
+        isLoading = false;
+    }
+
+    private void ShowCreateModal()
+    {
+        editing = null;
+        formModel = new CreateBanquetServiceModel();
+        showModal = true;
+    }
+
+    private void ShowEditModal(BanquetServiceModel svc)
+    {
+        editing = svc;
+        formModel = new CreateBanquetServiceModel
+        {
+            ServiceName = svc.ServiceName,
+            DefaultRate = svc.DefaultRate,
+            Unit = svc.Unit,
+            ApplyTax = svc.ApplyTax,
+            VoucherTaxConfigId = svc.VoucherTaxConfigId
+        };
+        showModal = true;
+    }
+
+    private void HideModal()
+    {
+        showModal = false;
+        editing = null;
+    }
+
+    private async Task Save()
+    {
+        formError = null;
+        if (string.IsNullOrWhiteSpace(formModel.ServiceName))
+        {
+            formError = "Service name is required.";
+            return;
+        }
+        isSaving = true;
+        try
+        {
+            if (editing == null)
+            {
+                var result = await ApiClient.CreateBanquetServiceAsync(formModel);
+                if (result == null) { formError = "Failed to create service."; return; }
+                successMessage = "Service created successfully.";
+            }
+            else
+            {
+                var updateModel = new UpdateBanquetServiceModel
+                {
+                    ServiceName = formModel.ServiceName,
+                    DefaultRate = formModel.DefaultRate,
+                    Unit = formModel.Unit,
+                    ApplyTax = formModel.ApplyTax,
+                    VoucherTaxConfigId = formModel.VoucherTaxConfigId
+                };
+                var result = await ApiClient.UpdateBanquetServiceAsync(editing.Id, updateModel);
+                if (result == null) { formError = "Failed to update service."; return; }
+                successMessage = "Service updated successfully.";
+            }
+            await LoadData();
+            HideModal();
+        }
+        catch (Exception ex)
+        {
+            formError = $"Error: {ex.Message}";
+        }
+        finally { isSaving = false; }
+    }
+
+    private async Task Activate(int id)
+    {
+        errorMessage = null;
+        var result = await ApiClient.ActivateBanquetServiceAsync(id);
+        if (result) { successMessage = "Service activated."; }
+        else { errorMessage = "Failed to activate service."; }
+        await LoadData();
+    }
+
+    private async Task Deactivate(int id)
+    {
+        errorMessage = null;
+        var result = await ApiClient.DeactivateBanquetServiceAsync(id);
+        if (result) { successMessage = "Service deactivated."; }
+        else { errorMessage = "Failed to deactivate service."; }
+        await LoadData();
+    }
+}

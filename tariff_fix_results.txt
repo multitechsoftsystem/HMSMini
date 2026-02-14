@@ -1,0 +1,16 @@
+Starting tariff update for existing check-ins...
+ 
+Current check-ins without tariff:
+Id          RoomId      RoomNumber           RoomType                                           Pax         CheckInDate                            CheckOutDate                           TariffApplied MealPlanRate Status     
+----------- ----------- -------------------- -------------------------------------------------- ----------- -------------------------------------- -------------------------------------- ------------- ------------ -----------
+       2008           9 302                  Suite                                                        1            2026-01-27 00:00:00.0000000            2026-01-29 00:00:00.0000000          NULL         NULL           0
+       2007          13 404                  Deluxe                                                       1            2026-01-27 00:00:00.0000000            2026-01-30 00:00:00.0000000          NULL         NULL           0
+       2004           7 204                  Double                                                       1            2026-01-21 00:00:00.0000000            2026-01-23 00:00:00.0000000          NULL         NULL           0
+       2003           1 101                  Single                                                       1            2026-01-05 00:00:00.0000000            2026-01-07 00:00:00.0000000          NULL         NULL           0
+       1002           3 103                  Single                                                       2            2025-12-31 00:00:00.0000000            2026-01-02 00:00:00.0000000          NULL         NULL           0
+
+(5 rows affected)
+ 
+Updating check-ins with base tariff...
+Msg 208, Level 16, State 1, Server MSS\LOCALDB#F2BBE310, Line 35
+Invalid object name 'BaseTariffs'.

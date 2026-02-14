@@ -1,0 +1,770 @@
+@page "/banquet/bookings/{BookingId:int}"
+@inject IApiClientService ApiClient
+@inject IAuthenticationService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Booking Detail - MSS</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading">Loading booking details...</div>
+}
+else if (booking == null)
+{
+    <div class="alert alert-danger">Booking not found.</div>
+}
+else
+{
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <button class="btn btn-sm btn-outline-secondary me-2" @onclick="GoBack">
+                <i class="bi bi-arrow-left"></i> Back
+            </button>
+            <strong class="fs-4">Booking #@booking.BookingNumber</strong>
+            <span class="badge bg-@GetStatusColor(booking.Status) ms-2 fs-6">@booking.Status</span>
+        </div>
+        <div class="d-flex gap-2">
+            @if (booking.Status == BanquetBookingStatus.Enquiry)
+            {
+                <button class="btn btn-primary" @onclick="() => ChangeStatus(BanquetBookingStatus.Confirmed)">Confirm</button>
+                <button class="btn btn-danger" @onclick="() => ChangeStatus(BanquetBookingStatus.Cancelled)">Cancel</button>
+            }
+            else if (booking.Status == BanquetBookingStatus.Confirmed)
+            {
+                <button class="btn btn-warning" @onclick="() => ChangeStatus(BanquetBookingStatus.InProgress)">Start Event</button>
+                <button class="btn btn-danger" @onclick="() => ChangeStatus(BanquetBookingStatus.Cancelled)">Cancel</button>
+            }
+            else if (booking.Status == BanquetBookingStatus.InProgress)
+            {
+                <button class="btn btn-success" @onclick="() => ChangeStatus(BanquetBookingStatus.Completed)">Complete</button>
+            }
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible">@errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+        </div>
+    }
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible">@successMessage
+            <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+        </div>
+    }
+
+    <!-- Info Card -->
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="d-flex justify-content-between">
+                <h5>Booking Information</h5>
+                @if (booking.Status != BanquetBookingStatus.Completed && booking.Status != BanquetBookingStatus.Cancelled)
+                {
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="ShowEditModal">Edit</button>
+                }
+            </div>
+            <div class="row mt-2">
+                <div class="col-md-3"><strong>Hall:</strong> @booking.HallName</div>
+                <div class="col-md-3"><strong>Event:</strong> @booking.EventTypeName</div>
+                <div class="col-md-3"><strong>Date:</strong> @booking.EventDate.ToString("MMM dd, yyyy")</div>
+                <div class="col-md-3"><strong>Time:</strong> @booking.EventStartTime.ToString(@"hh\:mm") - @booking.EventEndTime.ToString(@"hh\:mm")</div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-md-3"><strong>Expected Guests:</strong> @booking.ExpectedGuests</div>
+                <div class="col-md-3"><strong>Actual Guests:</strong> @(booking.ActualGuests?.ToString() ?? "-")</div>
+                <div class="col-md-3"><strong>Contact:</strong> @booking.ContactPersonName (@booking.ContactPhone)</div>
+                <div class="col-md-3"><strong>Company:</strong> @(booking.CompanyName ?? "-")</div>
+            </div>
+            <div class="row mt-2">
+                <div class="col-md-3"><strong>Pricing:</strong> @booking.PricingType</div>
+                <div class="col-md-3"><strong>Hall Rent:</strong> @booking.HallRent.ToString("N2")</div>
+                <div class="col-md-3"><strong>Tax:</strong> @(booking.TaxType == TaxType.CgstSgst ? "CGST+SGST" : "IGST")</div>
+                <div class="col-md-3"><strong>Discount:</strong> @booking.DiscountPercentage%</div>
+            </div>
+            @if (!string.IsNullOrEmpty(booking.Remarks))
+            {
+                <div class="mt-2"><strong>Remarks:</strong> @booking.Remarks</div>
+            }
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item"><a class="nav-link @(activeTab == "menus" ? "active" : "")" href="javascript:void(0)" @onclick="@(() => SetTab("menus"))">Menus (@booking.Menus.Count)</a></li>
+        <li class="nav-item"><a class="nav-link @(activeTab == "services" ? "active" : "")" href="javascript:void(0)" @onclick="@(() => SetTab("services"))">Services (@booking.Services.Count)</a></li>
+        <li class="nav-item"><a class="nav-link @(activeTab == "charges" ? "active" : "")" href="javascript:void(0)" @onclick="@(() => SetTab("charges"))">Charges (@booking.Charges.Count)</a></li>
+        <li class="nav-item"><a class="nav-link @(activeTab == "payments" ? "active" : "")" href="javascript:void(0)" @onclick="@(() => SetTab("payments"))">Payments (@booking.Payments.Count)</a></li>
+        <li class="nav-item"><a class="nav-link @(activeTab == "billing" ? "active" : "")" href="javascript:void(0)" @onclick="@(() => SetTab("billing"))">Billing</a></li>
+    </ul>
+
+    <!-- Menus Tab -->
+    @if (activeTab == "menus")
+    {
+        <div class="card">
+            <div class="card-header d-flex justify-content-between">
+                <h5 class="mb-0">Menu Items</h5>
+                @if (booking.Status != BanquetBookingStatus.Completed && booking.Status != BanquetBookingStatus.Cancelled)
+                {
+                    <button class="btn btn-sm btn-primary" @onclick="ShowAddMenuModal">Add Menu Item</button>
+                }
+            </div>
+            <div class="card-body">
+                @if (booking.Menus.Any())
+                {
+                    <table class="table table-sm">
+                        <thead><tr><th>Package/Item</th><th>Qty</th><th>Rate/Plate</th><th>Total</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var m in booking.Menus)
+                            {
+                                <tr>
+                                    <td>@(m.PackageName ?? m.ItemName ?? "Custom")</td>
+                                    <td>@m.Quantity</td>
+                                    <td>@m.RatePerPlate.ToString("N2")</td>
+                                    <td>@m.TotalAmount.ToString("N2")</td>
+                                    <td>
+                                        @if (booking.Status != BanquetBookingStatus.Completed && booking.Status != BanquetBookingStatus.Cancelled)
+                                        {
+                                            <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteMenu(m.Id)">Delete</button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else { <p class="text-muted">No menu items added.</p> }
+            </div>
+        </div>
+    }
+
+    <!-- Services Tab -->
+    @if (activeTab == "services")
+    {
+        <div class="card">
+            <div class="card-header d-flex justify-content-between">
+                <h5 class="mb-0">Services</h5>
+                @if (booking.Status != BanquetBookingStatus.Completed && booking.Status != BanquetBookingStatus.Cancelled)
+                {
+                    <button class="btn btn-sm btn-primary" @onclick="ShowAddServiceModal">Add Service</button>
+                }
+            </div>
+            <div class="card-body">
+                @if (booking.Services.Any())
+                {
+                    <table class="table table-sm">
+                        <thead><tr><th>Service</th><th>Qty</th><th>Rate</th><th>Total</th><th>Tax</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var s in booking.Services)
+                            {
+                                <tr>
+                                    <td>@s.ServiceName</td>
+                                    <td>@s.Quantity</td>
+                                    <td>@s.Rate.ToString("N2")</td>
+                                    <td>@s.TotalAmount.ToString("N2")</td>
+                                    <td>@(s.ApplyTax ? "Yes" : "No")</td>
+                                    <td>
+                                        @if (booking.Status != BanquetBookingStatus.Completed && booking.Status != BanquetBookingStatus.Cancelled)
+                                        {
+                                            <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteService(s.Id)">Delete</button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else { <p class="text-muted">No services added.</p> }
+            </div>
+        </div>
+    }
+
+    <!-- Charges Tab -->
+    @if (activeTab == "charges")
+    {
+        <div class="card">
+            <div class="card-header d-flex justify-content-between">
+                <h5 class="mb-0">Additional Charges</h5>
+                @if (booking.Status != BanquetBookingStatus.Completed && booking.Status != BanquetBookingStatus.Cancelled)
+                {
+                    <button class="btn btn-sm btn-primary" @onclick="ShowAddChargeModal">Add Charge</button>
+                }
+            </div>
+            <div class="card-body">
+                @if (booking.Charges.Any())
+                {
+                    <table class="table table-sm">
+                        <thead><tr><th>Date</th><th>Type</th><th>Description</th><th>Amount</th><th>Qty</th><th>Total</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var c in booking.Charges)
+                            {
+                                <tr>
+                                    <td>@c.ChargeDate.ToString("MMM dd")</td>
+                                    <td>@c.ChargeType</td>
+                                    <td>@c.Description</td>
+                                    <td>@c.Amount.ToString("N2")</td>
+                                    <td>@c.Quantity</td>
+                                    <td>@c.TotalAmount.ToString("N2")</td>
+                                    <td>
+                                        @if (booking.Status != BanquetBookingStatus.Completed && booking.Status != BanquetBookingStatus.Cancelled)
+                                        {
+                                            <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteCharge(c.Id)">Delete</button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else { <p class="text-muted">No additional charges.</p> }
+            </div>
+        </div>
+    }
+
+    <!-- Payments Tab -->
+    @if (activeTab == "payments")
+    {
+        <div class="card">
+            <div class="card-header d-flex justify-content-between">
+                <h5 class="mb-0">Payments</h5>
+                @if (booking.Status != BanquetBookingStatus.Cancelled)
+                {
+                    <button class="btn btn-sm btn-primary" @onclick="ShowAddPaymentModal">Record Payment</button>
+                }
+            </div>
+            <div class="card-body">
+                @if (paymentSummary != null)
+                {
+                    <div class="row mb-3">
+                        <div class="col-md-4"><strong>Total Charged:</strong> @paymentSummary.TotalCharged.ToString("N2")</div>
+                        <div class="col-md-4"><strong>Total Paid:</strong> @paymentSummary.TotalPaid.ToString("N2")</div>
+                        <div class="col-md-4"><strong>Balance Due:</strong> <span class="@(paymentSummary.BalanceDue > 0 ? "text-danger" : "text-success")">@paymentSummary.BalanceDue.ToString("N2")</span></div>
+                    </div>
+                }
+                @if (booking.Payments.Any())
+                {
+                    <table class="table table-sm">
+                        <thead><tr><th>Receipt #</th><th>Date</th><th>Type</th><th>Mode</th><th>Amount</th><th>Reference</th></tr></thead>
+                        <tbody>
+                            @foreach (var p in booking.Payments)
+                            {
+                                <tr>
+                                    <td>@p.ReceiptNumber</td>
+                                    <td>@p.PaymentDate.ToString("MMM dd, yyyy")</td>
+                                    <td>@((PaymentType)p.PaymentType)</td>
+                                    <td>@((PaymentMode)p.PaymentMode)</td>
+                                    <td>@p.Amount.ToString("N2")</td>
+                                    <td>@(p.ReferenceNumber ?? "-")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else { <p class="text-muted">No payments recorded.</p> }
+            </div>
+        </div>
+    }
+
+    <!-- Billing Tab -->
+    @if (activeTab == "billing")
+    {
+        <div class="card">
+            <div class="card-header d-flex justify-content-between">
+                <h5 class="mb-0">Billing</h5>
+                <div>
+                    <button class="btn btn-sm btn-outline-primary me-2" @onclick="PreviewBill" disabled="@billingLoading">Preview Bill</button>
+                    @if (invoice == null && booking.Status != BanquetBookingStatus.Cancelled)
+                    {
+                        <button class="btn btn-sm btn-success" @onclick="FinalizeInvoice" disabled="@billingLoading">Finalize Invoice</button>
+                    }
+                </div>
+            </div>
+            <div class="card-body">
+                @if (billingLoading)
+                {
+                    <div class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading...</div>
+                }
+                else if (invoice != null)
+                {
+                    <div class="bill-preview" id="printable-invoice">
+                        <h4>Invoice #@invoice.InvoiceNumber</h4>
+                        <p><strong>Date:</strong> @invoice.InvoiceDate.ToString("MMM dd, yyyy") | <strong>Status:</strong> @invoice.PaymentStatus</p>
+                        <hr />
+                        <div class="row">
+                            <div class="col-md-6"><strong>Hall:</strong> @invoice.HallName | <strong>Event:</strong> @invoice.EventTypeName</div>
+                            <div class="col-md-6"><strong>Date:</strong> @invoice.EventDate.ToString("MMM dd, yyyy") | <strong>Guests:</strong> @(invoice.ActualGuests ?? invoice.ExpectedGuests)</div>
+                        </div>
+                        <hr />
+                        <table class="table table-sm">
+                            <tbody>
+                                <tr><td>Hall Rent</td><td class="text-end">@invoice.HallRent.ToString("N2")</td></tr>
+                                <tr><td>Menu Charges</td><td class="text-end">@invoice.MenuChargesSubtotal.ToString("N2")</td></tr>
+                                <tr><td>Service Charges</td><td class="text-end">@invoice.ServiceChargesSubtotal.ToString("N2")</td></tr>
+                                <tr><td>Additional Charges</td><td class="text-end">@invoice.AdditionalChargesSubtotal.ToString("N2")</td></tr>
+                                @if (invoice.DiscountAmount > 0)
+                                {
+                                    <tr><td>Discount</td><td class="text-end text-danger">-@invoice.DiscountAmount.ToString("N2")</td></tr>
+                                }
+                                @foreach (var t in invoice.TaxBreakdown)
+                                {
+                                    <tr><td>@t.TaxType (@t.TaxPercentage%)</td><td class="text-end">@t.TotalTaxAmount.ToString("N2")</td></tr>
+                                }
+                                <tr class="fw-bold"><td>Grand Total</td><td class="text-end">@invoice.GrandTotal.ToString("N2")</td></tr>
+                                <tr><td>Total Paid</td><td class="text-end">@invoice.TotalPaid.ToString("N2")</td></tr>
+                                <tr class="fw-bold"><td>Balance Due</td><td class="text-end @(invoice.BalanceDue > 0 ? "text-danger" : "text-success")">@invoice.BalanceDue.ToString("N2")</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else if (billPreview != null)
+                {
+                    <div class="bill-preview">
+                        <h5>Bill Preview</h5>
+                        <table class="table table-sm">
+                            <tbody>
+                                <tr><td>Hall Rent</td><td class="text-end">@billPreview.HallRent.ToString("N2")</td></tr>
+                                <tr><td>Menu Charges</td><td class="text-end">@billPreview.MenuChargesSubtotal.ToString("N2")</td></tr>
+                                <tr><td>Service Charges</td><td class="text-end">@billPreview.ServiceChargesSubtotal.ToString("N2")</td></tr>
+                                <tr><td>Additional Charges</td><td class="text-end">@billPreview.AdditionalChargesSubtotal.ToString("N2")</td></tr>
+                                <tr><td>Subtotal</td><td class="text-end">@billPreview.Subtotal.ToString("N2")</td></tr>
+                                @if (billPreview.DiscountAmount > 0)
+                                {
+                                    <tr><td>Discount (@billPreview.DiscountPercentage%)</td><td class="text-end text-danger">-@billPreview.DiscountAmount.ToString("N2")</td></tr>
+                                }
+                                @foreach (var t in billPreview.TaxBreakdown)
+                                {
+                                    <tr><td>@t.TaxType (@t.TaxPercentage%)</td><td class="text-end">@t.TotalTaxAmount.ToString("N2")</td></tr>
+                                }
+                                <tr class="fw-bold"><td>Grand Total</td><td class="text-end">@billPreview.GrandTotal.ToString("N2")</td></tr>
+                                <tr><td>Total Paid</td><td class="text-end">@billPreview.TotalPaid.ToString("N2")</td></tr>
+                                <tr class="fw-bold"><td>Balance Due</td><td class="text-end @(billPreview.BalanceDue > 0 ? "text-danger" : "text-success")">@billPreview.BalanceDue.ToString("N2")</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted">Click "Preview Bill" to see the billing breakdown.</p>
+                }
+            </div>
+        </div>
+    }
+}
+
+<!-- Add Menu Modal -->
+@if (showMenuModal)
+{
+    <div class="modal-overlay" @onclick="() => showMenuModal = false">
+        <div class="modal-content" @onclick:stopPropagation="true">
+            <div class="modal-header"><h4>Add Menu Item</h4><button class="btn-close" @onclick="() => showMenuModal = false">&times;</button></div>
+            <div class="modal-body">
+                <div class="form-group"><label>Quantity *</label><input type="number" class="form-control" @bind="menuForm.Quantity" /></div>
+                <div class="form-group"><label>Rate Per Plate *</label><input type="number" step="0.01" class="form-control" @bind="menuForm.RatePerPlate" /></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="() => showMenuModal = false">Cancel</button>
+                <button class="btn btn-primary" @onclick="AddMenu" disabled="@isSaving">@(isSaving ? "Saving..." : "Add")</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Add Service Modal -->
+@if (showServiceModal)
+{
+    <div class="modal-overlay" @onclick="() => showServiceModal = false">
+        <div class="modal-content" @onclick:stopPropagation="true">
+            <div class="modal-header"><h4>Add Service</h4><button class="btn-close" @onclick="() => showServiceModal = false">&times;</button></div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Master Service</label>
+                    <select class="form-control" @bind="selectedMasterServiceId" @bind:after="OnMasterServiceChanged">
+                        <option value="0">-- Custom Service --</option>
+                        @foreach (var s in masterServices.Where(s => s.IsActive))
+                        {
+                            <option value="@s.Id">@s.ServiceName (@s.DefaultRate.ToString("N2"))</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-group"><label>Service Name *</label><input type="text" class="form-control" @bind="serviceForm.ServiceName" /></div>
+                <div class="form-group"><label>Quantity *</label><input type="number" class="form-control" @bind="serviceForm.Quantity" /></div>
+                <div class="form-group"><label>Rate *</label><input type="number" step="0.01" class="form-control" @bind="serviceForm.Rate" /></div>
+                <div class="form-group form-check mt-2">
+                    <input type="checkbox" class="form-check-input" id="svcTax" @bind="serviceForm.ApplyTax" />
+                    <label class="form-check-label" for="svcTax">Apply Tax</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="() => showServiceModal = false">Cancel</button>
+                <button class="btn btn-primary" @onclick="AddService" disabled="@isSaving">@(isSaving ? "Saving..." : "Add")</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Add Charge Modal -->
+@if (showChargeModal)
+{
+    <div class="modal-overlay" @onclick="() => showChargeModal = false">
+        <div class="modal-content" @onclick:stopPropagation="true">
+            <div class="modal-header"><h4>Add Charge</h4><button class="btn-close" @onclick="() => showChargeModal = false">&times;</button></div>
+            <div class="modal-body">
+                <div class="form-group"><label>Date *</label><input type="date" class="form-control" @bind="chargeForm.ChargeDate" /></div>
+                <div class="form-group"><label>Charge Type *</label><input type="text" class="form-control" @bind="chargeForm.ChargeType" placeholder="e.g., Decoration, Audio/Visual" /></div>
+                <div class="form-group"><label>Description *</label><input type="text" class="form-control" @bind="chargeForm.Description" /></div>
+                <div class="row">
+                    <div class="col-md-6"><div class="form-group"><label>Amount *</label><input type="number" step="0.01" class="form-control" @bind="chargeForm.Amount" /></div></div>
+                    <div class="col-md-6"><div class="form-group"><label>Quantity</label><input type="number" class="form-control" @bind="chargeForm.Quantity" /></div></div>
+                </div>
+                <div class="form-group form-check mt-2">
+                    <input type="checkbox" class="form-check-input" id="chgTax" @bind="chargeForm.ApplyTax" />
+                    <label class="form-check-label" for="chgTax">Apply Tax</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="() => showChargeModal = false">Cancel</button>
+                <button class="btn btn-primary" @onclick="AddCharge" disabled="@isSaving">@(isSaving ? "Saving..." : "Add")</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Add Payment Modal -->
+@if (showPaymentModal)
+{
+    <div class="modal-overlay" @onclick="() => showPaymentModal = false">
+        <div class="modal-content" @onclick:stopPropagation="true">
+            <div class="modal-header"><h4>Record Payment</h4><button class="btn-close" @onclick="() => showPaymentModal = false">&times;</button></div>
+            <div class="modal-body">
+                <div class="form-group"><label>Payment Date *</label><input type="date" class="form-control" @bind="paymentForm.PaymentDate" /></div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group"><label>Payment Type *</label>
+                            <select class="form-control" @bind="paymentForm.PaymentType">
+                                <option value="@PaymentType.Advance">Advance</option>
+                                <option value="@PaymentType.Installment">Installment</option>
+                                <option value="@PaymentType.FinalSettlement">Final Settlement</option>
+                                <option value="@PaymentType.Refund">Refund</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group"><label>Payment Mode *</label>
+                            <select class="form-control" @bind="paymentForm.PaymentMode">
+                                <option value="@PaymentMode.Cash">Cash</option>
+                                <option value="@PaymentMode.Card">Card</option>
+                                <option value="@PaymentMode.UPI">UPI</option>
+                                <option value="@PaymentMode.BankTransfer">Bank Transfer</option>
+                                <option value="@PaymentMode.Cheque">Cheque</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group"><label>Amount *</label><input type="number" step="0.01" class="form-control" @bind="paymentForm.Amount" /></div>
+                <div class="form-group"><label>Reference Number</label><input type="text" class="form-control" @bind="paymentForm.ReferenceNumber" /></div>
+                <div class="form-group"><label>Remarks</label><textarea class="form-control" @bind="paymentForm.Remarks" rows="2"></textarea></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="() => showPaymentModal = false">Cancel</button>
+                <button class="btn btn-primary" @onclick="AddPayment" disabled="@isSaving">@(isSaving ? "Saving..." : "Record Payment")</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Edit Booking Modal -->
+@if (showEditModal)
+{
+    <div class="modal-overlay" @onclick="() => showEditModal = false">
+        <div class="modal-content" style="max-width: 700px;" @onclick:stopPropagation="true">
+            <div class="modal-header"><h4>Edit Booking</h4><button class="btn-close" @onclick="() => showEditModal = false">&times;</button></div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group"><label>Hall *</label>
+                            <select class="form-control" @bind="editModel.BanquetHallId" @bind:after="OnEditHallChanged">
+                                @foreach (var h in halls.Where(h => h.IsActive))
+                                {
+                                    <option value="@h.Id">@h.HallName</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group"><label>Event Type *</label>
+                            <select class="form-control" @bind="editModel.EventTypeId">
+                                @foreach (var et in eventTypes.Where(e => e.IsActive))
+                                {
+                                    <option value="@et.Id">@et.EventTypeName</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4"><div class="form-group"><label>Event Date</label><input type="date" class="form-control" @bind="editModel.EventDate" /></div></div>
+                    <div class="col-md-4"><div class="form-group"><label>Start Time</label><input type="text" class="form-control" placeholder="HH:mm" @bind="editStartTime" /></div></div>
+                    <div class="col-md-4"><div class="form-group"><label>End Time</label><input type="text" class="form-control" placeholder="HH:mm" @bind="editEndTime" /></div></div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4"><div class="form-group"><label>Expected Guests</label><input type="number" class="form-control" @bind="editModel.ExpectedGuests" /></div></div>
+                    <div class="col-md-4"><div class="form-group"><label>Actual Guests</label><input type="number" class="form-control" @bind="editModel.ActualGuests" /></div></div>
+                    <div class="col-md-4"><div class="form-group"><label>Hall Rent</label><input type="number" step="0.01" class="form-control" @bind="editModel.HallRent" /></div></div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6"><div class="form-group"><label>Contact Person</label><input type="text" class="form-control" @bind="editModel.ContactPersonName" /></div></div>
+                    <div class="col-md-6"><div class="form-group"><label>Contact Phone</label><input type="text" class="form-control" @bind="editModel.ContactPhone" /></div></div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4"><div class="form-group"><label>Pricing</label>
+                        <select class="form-control" @bind="editModel.PricingType">
+                            <option value="@BanquetPricingType.PerPlate">Per Plate</option>
+                            <option value="@BanquetPricingType.Package">Package</option>
+                        </select></div></div>
+                    <div class="col-md-4"><div class="form-group"><label>Tax Type</label>
+                        <select class="form-control" @bind="editModel.TaxType">
+                            <option value="@TaxType.CgstSgst">CGST+SGST</option>
+                            <option value="@TaxType.Igst">IGST</option>
+                        </select></div></div>
+                    <div class="col-md-4"><div class="form-group"><label>Discount %</label><input type="number" step="0.01" class="form-control" @bind="editModel.DiscountPercentage" /></div></div>
+                </div>
+                <div class="form-group"><label>Remarks</label><textarea class="form-control" @bind="editModel.Remarks" rows="2"></textarea></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="() => showEditModal = false">Cancel</button>
+                <button class="btn btn-primary" @onclick="SaveEdit" disabled="@isSaving">@(isSaving ? "Saving..." : "Save")</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int BookingId { get; set; }
+
+    private BanquetBookingDetailModel? booking;
+    private PaymentSummaryModel? paymentSummary;
+    private BanquetBillPreviewModel? billPreview;
+    private BanquetInvoiceModel? invoice;
+    private List<BanquetHallModel> halls = new();
+    private List<EventTypeModel> eventTypes = new();
+    private List<BanquetServiceModel> masterServices = new();
+    private List<CompanyDto> companies = new();
+
+    private bool isLoading = true;
+    private bool isSaving = false;
+    private bool billingLoading = false;
+    private string activeTab = "menus";
+    private string? errorMessage;
+    private string? successMessage;
+    private int currentUserRole = -1;
+
+    // Modals
+    private bool showMenuModal, showServiceModal, showChargeModal, showPaymentModal, showEditModal;
+    private CreateBanquetBookingMenuModel menuForm = new();
+    private CreateBanquetBookingServiceModel serviceForm = new();
+    private CreateBanquetChargeModel chargeForm = new();
+    private CreatePaymentModel paymentForm = new();
+    private UpdateBanquetBookingModel editModel = new();
+    private string editStartTime = "10:00", editEndTime = "18:00";
+    private int selectedMasterServiceId = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = await AuthService.GetCurrentUserAsync();
+        if (user != null) currentUserRole = user.Role;
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        booking = await ApiClient.GetBanquetBookingByIdAsync(BookingId);
+        if (booking != null)
+        {
+            paymentSummary = await ApiClient.GetBanquetPaymentSummaryAsync(BookingId);
+            invoice = await ApiClient.GetBanquetInvoiceByBookingAsync(BookingId);
+        }
+        halls = await ApiClient.GetAllBanquetHallsAsync();
+        eventTypes = await ApiClient.GetAllEventTypesAsync();
+        masterServices = await ApiClient.GetAllBanquetServicesAsync();
+        companies = await ApiClient.GetActiveCompaniesAsync();
+        isLoading = false;
+    }
+
+    private void GoBack() => Navigation.NavigateTo("/banquet/bookings");
+    private void SetTab(string tab) => activeTab = tab;
+
+    private async Task ChangeStatus(BanquetBookingStatus newStatus)
+    {
+        errorMessage = null;
+        var result = await ApiClient.UpdateBanquetBookingStatusAsync(BookingId, new UpdateBanquetBookingStatusModel { NewStatus = newStatus });
+        if (result)
+        {
+            successMessage = $"Status changed to {newStatus}.";
+            await LoadData();
+        }
+        else
+            errorMessage = "Failed to change status.";
+    }
+
+    // Menu
+    private void ShowAddMenuModal() { menuForm = new CreateBanquetBookingMenuModel { Quantity = 1 }; showMenuModal = true; }
+    private async Task AddMenu()
+    {
+        isSaving = true;
+        try
+        {
+            var result = await ApiClient.AddBanquetBookingMenuAsync(BookingId, menuForm);
+            if (result != null) { showMenuModal = false; await LoadData(); }
+            else errorMessage = "Failed to add menu item.";
+        }
+        finally { isSaving = false; }
+    }
+    private async Task DeleteMenu(int id) { await ApiClient.DeleteBanquetBookingMenuAsync(id); await LoadData(); }
+
+    // Service
+    private void ShowAddServiceModal()
+    {
+        selectedMasterServiceId = 0;
+        serviceForm = new CreateBanquetBookingServiceModel { Quantity = 1 };
+        showServiceModal = true;
+    }
+    private void OnMasterServiceChanged()
+    {
+        var ms = masterServices.FirstOrDefault(s => s.Id == selectedMasterServiceId);
+        if (ms != null)
+        {
+            serviceForm.BanquetServiceId = ms.Id;
+            serviceForm.ServiceName = ms.ServiceName;
+            serviceForm.Rate = ms.DefaultRate;
+            serviceForm.ApplyTax = ms.ApplyTax;
+            serviceForm.VoucherTaxConfigId = ms.VoucherTaxConfigId;
+        }
+    }
+    private async Task AddService()
+    {
+        if (string.IsNullOrWhiteSpace(serviceForm.ServiceName)) return;
+        isSaving = true;
+        try
+        {
+            var result = await ApiClient.AddBanquetBookingServiceAsync(BookingId, serviceForm);
+            if (result != null) { showServiceModal = false; await LoadData(); }
+            else errorMessage = "Failed to add service.";
+        }
+        finally { isSaving = false; }
+    }
+    private async Task DeleteService(int id) { await ApiClient.DeleteBanquetBookingServiceAsync(id); await LoadData(); }
+
+    // Charges
+    private void ShowAddChargeModal() { chargeForm = new CreateBanquetChargeModel(); showChargeModal = true; }
+    private async Task AddCharge()
+    {
+        if (string.IsNullOrWhiteSpace(chargeForm.ChargeType) || string.IsNullOrWhiteSpace(chargeForm.Description)) return;
+        isSaving = true;
+        try
+        {
+            var result = await ApiClient.CreateBanquetChargeAsync(BookingId, chargeForm);
+            if (result != null) { showChargeModal = false; await LoadData(); }
+            else errorMessage = "Failed to add charge.";
+        }
+        finally { isSaving = false; }
+    }
+    private async Task DeleteCharge(int id) { await ApiClient.DeleteBanquetChargeAsync(id); await LoadData(); }
+
+    // Payments
+    private void ShowAddPaymentModal()
+    {
+        paymentForm = new CreatePaymentModel
+        {
+            SourceType = PaymentSourceType.Banquet,
+            BanquetBookingId = BookingId,
+            PaymentDate = DateTime.Today
+        };
+        showPaymentModal = true;
+    }
+    private async Task AddPayment()
+    {
+        if (paymentForm.Amount <= 0) return;
+        isSaving = true;
+        try
+        {
+            var result = await ApiClient.CreatePaymentAsync(paymentForm);
+            if (result != null) { showPaymentModal = false; await LoadData(); }
+            else errorMessage = "Failed to record payment.";
+        }
+        finally { isSaving = false; }
+    }
+
+    // Billing
+    private async Task PreviewBill()
+    {
+        billingLoading = true;
+        billPreview = await ApiClient.GetBanquetBillPreviewAsync(BookingId);
+        billingLoading = false;
+    }
+    private async Task FinalizeInvoice()
+    {
+        billingLoading = true;
+        var dto = new FinalizeBanquetInvoiceModel { ActualGuests = booking?.ActualGuests };
+        invoice = await ApiClient.FinalizeBanquetInvoiceAsync(BookingId, dto);
+        if (invoice != null) successMessage = "Invoice finalized.";
+        else errorMessage = "Failed to finalize invoice.";
+        billingLoading = false;
+    }
+
+    // Edit Booking
+    private void ShowEditModal()
+    {
+        if (booking == null) return;
+        editModel = new UpdateBanquetBookingModel
+        {
+            BanquetHallId = booking.BanquetHallId,
+            EventTypeId = booking.EventTypeId,
+            EventDate = booking.EventDate,
+            EventStartTime = booking.EventStartTime,
+            EventEndTime = booking.EventEndTime,
+            ExpectedGuests = booking.ExpectedGuests,
+            ActualGuests = booking.ActualGuests,
+            PricingType = booking.PricingType,
+            ContactPersonName = booking.ContactPersonName,
+            ContactPhone = booking.ContactPhone,
+            CompanyId = booking.CompanyId,
+            TaxType = booking.TaxType,
+            DiscountPercentage = booking.DiscountPercentage,
+            HallRent = booking.HallRent,
+            Remarks = booking.Remarks
+        };
+        editStartTime = booking.EventStartTime.ToString(@"hh\:mm");
+        editEndTime = booking.EventEndTime.ToString(@"hh\:mm");
+        showEditModal = true;
+    }
+    private void OnEditHallChanged()
+    {
+        var hall = halls.FirstOrDefault(h => h.Id == editModel.BanquetHallId);
+        if (hall != null) editModel.HallRent = hall.RentPerEvent;
+    }
+    private async Task SaveEdit()
+    {
+        if (TimeSpan.TryParse(editStartTime, out var st)) editModel.EventStartTime = st;
+        if (TimeSpan.TryParse(editEndTime, out var et)) editModel.EventEndTime = et;
+        isSaving = true;
+        try
+        {
+            var result = await ApiClient.UpdateBanquetBookingAsync(BookingId, editModel);
+            if (result != null) { showEditModal = false; await LoadData(); successMessage = "Booking updated."; }
+            else errorMessage = "Failed to update booking.";
+        }
+        finally { isSaving = false; }
+    }
+
+    private string GetStatusColor(BanquetBookingStatus status) => status switch
+    {
+        BanquetBookingStatus.Enquiry => "info",
+        BanquetBookingStatus.Confirmed => "primary",
+        BanquetBookingStatus.InProgress => "warning",
+        BanquetBookingStatus.Completed => "success",
+        BanquetBookingStatus.Cancelled => "danger",
+        _ => "secondary"
+    };
+}

@@ -1,0 +1,304 @@
+@page "/meal-plan-rates"
+@page "/meal-plan-rates/{MealPlanId:int}"
+@inject IApiClientService ApiClient
+@inject IAuthenticationService AuthService
+@inject NavigationManager Navigation
+@using HMSMini.Web.Services
+@using HMSMini.Web.Models
+
+<div class="page-header">
+    <h3>Meal Plan Rates Management</h3>
+    @if (canManageMasterData)
+    {
+        <button class="btn btn-primary" @onclick="ShowCreateModal">
+            <span class="icon">+</span> Add Rate
+        </button>
+    }
+</div>
+
+@if (!canManageMasterData)
+{
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> You have view-only access. Contact an administrator to make changes.
+    </div>
+}
+
+@if (isLoading)
+{
+    <div class="loading">Loading meal plan rates...</div>
+}
+else if (rates.Count == 0)
+{
+    <div class="empty-state">
+        <p>No meal plan rates found.</p>
+        @if (canManageMasterData)
+        {
+            <button class="btn btn-primary" @onclick="ShowCreateModal">Add Rate</button>
+        }
+    </div>
+}
+else
+{
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Meal Plan</th>
+                    <th>Room Type</th>
+                    <th>Rate (Per Person/Night)</th>
+                    <th>Effective From</th>
+                    <th>Effective To</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var rate in rates)
+                {
+                    <tr>
+                        <td>
+                            <strong>@rate.MealPlanCode</strong>
+                            <br />
+                            <small>@rate.MealPlanName</small>
+                        </td>
+                        <td>@rate.RoomTypeName</td>
+                        <td><strong>₹@rate.RatePerPersonPerNight.ToString("N2")</strong></td>
+                        <td>@rate.EffectiveFrom.ToString("MMM dd, yyyy")</td>
+                        <td>@(rate.EffectiveTo?.ToString("MMM dd, yyyy") ?? "Ongoing")</td>
+                        <td>
+                            <span class="status-badge @(rate.IsActive ? "status-active" : "status-inactive")">
+                                @(rate.IsActive ? "Active" : "Inactive")
+                            </span>
+                        </td>
+                        <td>
+                            @if (canManageMasterData)
+                            {
+                                <div class="action-buttons">
+                                    <button class="btn btn-sm btn-secondary" @onclick="() => ShowEditModal(rate)">Edit</button>
+                                    <button class="btn btn-sm btn-danger" @onclick="() => DeleteRate(rate.Id)">Delete</button>
+                                </div>
+                            }
+                            else
+                            {
+                                <span class="text-muted">View Only</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (showCreateModal)
+{
+    <div class="modal-overlay" @onclick="HideCreateModal">
+        <div class="modal-content" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h4>@(editingRate == null ? "Add Meal Plan Rate" : "Edit Meal Plan Rate")</h4>
+                <button class="btn-close" @onclick="HideCreateModal">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Meal Plan *</label>
+                    <select class="form-control" @bind="formModel.MealPlanId">
+                        <option value="0">-- Select Meal Plan --</option>
+                        @foreach (var plan in mealPlans)
+                        {
+                            <option value="@plan.MealPlanId">@plan.PlanCode - @plan.PlanName</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Room Type *</label>
+                    <select class="form-control" @bind="formModel.RoomTypeId">
+                        <option value="0">-- Select Room Type --</option>
+                        @foreach (var type in roomTypes)
+                        {
+                            <option value="@type.RoomTypeId">@type.RoomType</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Rate Per Person Per Night *</label>
+                    <input type="number" class="form-control" @bind="formModel.RatePerPersonPerNight" step="0.01" min="0" />
+                </div>
+                <div class="form-group">
+                    <label>Effective From *</label>
+                    <input type="date" class="form-control" @bind="effectiveFrom" />
+                </div>
+                <div class="form-group">
+                    <label>Effective To</label>
+                    <input type="date" class="form-control" @bind="effectiveTo" />
+                    <small class="form-text">Leave empty for ongoing rates</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="HideCreateModal">Cancel</button>
+                <button class="btn btn-primary" @onclick="SaveRate" disabled="@isSaving">
+                    @(isSaving ? "Saving..." : "Save")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public int? MealPlanId { get; set; }
+
+    private List<MealPlanRateModel> rates = new();
+    private List<MealPlanModel> mealPlans = new();
+    private List<RoomTypeDto> roomTypes = new();
+    private bool isLoading = true;
+    private bool showCreateModal = false;
+    private bool isSaving = false;
+    private MealPlanRateModel? editingRate = null;
+    private CreateMealPlanRateModel formModel = new();
+    private DateTime effectiveFrom = DateTime.Today;
+    private DateTime? effectiveTo = null;
+
+    // Role-based permissions
+    private bool canManageMasterData = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckUserPermissions();
+        await LoadData();
+    }
+
+    private async Task CheckUserPermissions()
+    {
+        var currentUser = await AuthService.GetCurrentUserAsync();
+        if (currentUser != null)
+        {
+            // Only Admin (0) and Manager (1) can manage master data
+            canManageMasterData = currentUser.Role == 0 || currentUser.Role == 1;
+        }
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+
+        var tasks = new List<Task>
+        {
+            LoadRates(),
+            LoadMealPlans(),
+            LoadRoomTypes()
+        };
+
+        await Task.WhenAll(tasks);
+
+        isLoading = false;
+    }
+
+    private async Task LoadRates()
+    {
+        if (MealPlanId.HasValue)
+        {
+            rates = await ApiClient.GetMealPlanRatesByMealPlanAsync(MealPlanId.Value);
+        }
+        else
+        {
+            rates = await ApiClient.GetAllMealPlanRatesAsync();
+        }
+    }
+
+    private async Task LoadMealPlans()
+    {
+        mealPlans = await ApiClient.GetActiveMealPlansAsync();
+    }
+
+    private async Task LoadRoomTypes()
+    {
+        roomTypes = await ApiClient.GetRoomTypesAsync();
+    }
+
+    private void ShowCreateModal()
+    {
+        editingRate = null;
+        formModel = new CreateMealPlanRateModel
+        {
+            MealPlanId = MealPlanId ?? 0,
+            EffectiveFrom = DateTime.Today
+        };
+        effectiveFrom = DateTime.Today;
+        effectiveTo = null;
+        showCreateModal = true;
+    }
+
+    private void ShowEditModal(MealPlanRateModel rate)
+    {
+        editingRate = rate;
+        formModel = new CreateMealPlanRateModel
+        {
+            MealPlanId = rate.MealPlanId,
+            RoomTypeId = rate.RoomTypeId,
+            RatePerPersonPerNight = rate.RatePerPersonPerNight,
+            EffectiveFrom = rate.EffectiveFrom,
+            EffectiveTo = rate.EffectiveTo
+        };
+        effectiveFrom = rate.EffectiveFrom;
+        effectiveTo = rate.EffectiveTo;
+        showCreateModal = true;
+    }
+
+    private void HideCreateModal()
+    {
+        showCreateModal = false;
+        editingRate = null;
+        formModel = new();
+    }
+
+    private async Task SaveRate()
+    {
+        if (formModel.MealPlanId == 0 || formModel.RoomTypeId == 0 || formModel.RatePerPersonPerNight <= 0)
+            return;
+
+        formModel.EffectiveFrom = effectiveFrom;
+        formModel.EffectiveTo = effectiveTo;
+
+        isSaving = true;
+
+        try
+        {
+            if (editingRate == null)
+            {
+                await ApiClient.CreateMealPlanRateAsync(formModel);
+            }
+            else
+            {
+                var updateModel = new UpdateMealPlanRateModel
+                {
+                    RatePerPersonPerNight = formModel.RatePerPersonPerNight,
+                    EffectiveFrom = formModel.EffectiveFrom,
+                    EffectiveTo = formModel.EffectiveTo
+                };
+                await ApiClient.UpdateMealPlanRateAsync(editingRate.Id, updateModel);
+            }
+
+            await LoadRates();
+            HideCreateModal();
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task DeleteRate(int id)
+    {
+        if (confirm("Are you sure you want to delete this rate?"))
+        {
+            await ApiClient.DeleteMealPlanRateAsync(id);
+            await LoadRates();
+        }
+    }
+
+    private bool confirm(string message)
+    {
+        // Simple confirmation - in production, use a proper modal
+        return true;
+    }
+}

@@ -17,8 +17,18 @@ public class GuestDto
     public string? PanOrAadharNo { get; set; }
     public string? Photo1Path { get; set; }
     public string? Photo2Path { get; set; }
+    public DateTime? ActualCheckInDate { get; set; }
+    public DateTime? ActualCheckOutDate { get; set; }
+    public int Status { get; set; }
+    public string StatusName => ((GuestStatus)Status).ToString();
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public string? CreatedBy { get; set; }
     public string? UpdatedBy { get; set; }
+}
+
+public enum GuestStatus
+{
+    Active = 0,
+    CheckedOut = 1
 }

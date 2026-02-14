@@ -3,7 +3,7 @@
 @inject IAuthenticationService AuthService
 @inject NavigationManager Navigation
 
-<PageTitle>Dashboard - HMS Mini</PageTitle>
+<PageTitle>Dashboard - MSS</PageTitle>
 
 @if (!isAuthenticated)
 {
@@ -12,7 +12,28 @@
 else
 {
     <div class="dashboard">
-        <h2 class="mb-4">Room Status Dashboard</h2>
+        <!-- Working Date Display -->
+        @if (workingDate != null)
+        {
+            <div class="alert alert-info d-flex justify-content-between align-items-center mb-4" role="alert">
+                <div>
+                    <i class="bi bi-calendar-check-fill me-2"></i>
+                    <strong>Working Date:</strong> @workingDate.WorkingDate.ToString("dddd, MMMM dd, yyyy")
+                    @if (workingDate.DaysBehindSystemDate > 0)
+                    {
+                        <span class="badge bg-warning text-dark ms-2">
+                            @workingDate.DaysBehindSystemDate day(s) behind
+                        </span>
+                    }
+                </div>
+                @if (isAdminOrManager)
+                {
+                    <a href="/day-closing" class="btn btn-primary btn-sm">
+                        <i class="bi bi-lock-fill me-1"></i> Day Closing
+                    </a>
+                }
+            </div>
+        }
 
         <!-- Status Summary Cards -->
         <div class="status-summary">
@@ -42,47 +63,8 @@ else
             </div>
         </div>
 
-        <!-- Room Chart -->
-        <h4 class="mb-3">All Rooms</h4>
-        @if (loading)
-        {
-            <div class="text-center">
-                <div class="spinner-border"></div>
-            </div>
-        }
-        else
-        {
-            <div class="room-chart">
-                @foreach (var room in rooms.OrderBy(r => r.RoomNumber))
-                {
-                    <div class="room-card @GetRoomStatusClass(room.RoomStatus)" @onclick="() => SelectRoom(room)">
-                        <div>
-                            <div class="room-number">@room.RoomNumber</div>
-                            <div class="room-type">@room.RoomTypeName</div>
-                            <span class="room-status-badge bg-@GetStatusColor(room.RoomStatus)">
-                                @room.RoomStatusName
-                            </span>
-                        </div>
-
-                        @if (room.RoomStatus == 1 && roomOccupancy.ContainsKey(room.RoomId))
-                        {
-                            var occupancy = roomOccupancy[room.RoomId];
-                            <div class="room-guest-info">
-                                <div class="room-guest-name">
-                                    <i class="bi bi-person-fill"></i> @occupancy.GuestName
-                                </div>
-                                <div class="room-checkout-date">
-                                    <i class="bi bi-calendar-x"></i> Checkout: @occupancy.CheckoutDate.ToShortDateString()
-                                </div>
-                            </div>
-                        }
-                    </div>
-                }
-            </div>
-        }
-
-        <!-- Upcoming Check-Ins -->
-        <div class="row mt-4">
+        <!-- Today's Arrivals and Current Guests -->
+        <div class="row mb-4">
             <div class="col-md-6">
                 <div class="card">
                     <div class="card-header">
@@ -180,6 +162,45 @@ else
                 </div>
             </div>
         </div>
+
+        <!-- Room Chart -->
+        <h4 class="mb-3">All Rooms</h4>
+        @if (loading)
+        {
+            <div class="text-center">
+                <div class="spinner-border"></div>
+            </div>
+        }
+        else
+        {
+            <div class="room-chart">
+                @foreach (var room in rooms.OrderBy(r => r.RoomNumber))
+                {
+                    <div class="room-card @GetRoomStatusClass(room.RoomStatus)" @onclick="() => SelectRoom(room)">
+                        <div>
+                            <div class="room-number">@room.RoomNumber</div>
+                            <div class="room-type">@room.RoomTypeName</div>
+                            <span class="room-status-badge bg-@GetStatusColor(room.RoomStatus)">
+                                @room.RoomStatusName
+                            </span>
+                        </div>
+
+                        @if (room.RoomStatus == 1 && roomOccupancy.ContainsKey(room.RoomId))
+                        {
+                            var occupancy = roomOccupancy[room.RoomId];
+                            <div class="room-guest-info">
+                                <div class="room-guest-name">
+                                    <i class="bi bi-person-fill"></i> @occupancy.GuestName
+                                </div>
+                                <div class="room-checkout-date">
+                                    <i class="bi bi-calendar-x"></i> Checkout: @occupancy.CheckoutDate.ToShortDateString()
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        }
     </div>
 }
 
@@ -192,6 +213,8 @@ else
     private int dirtyCount = 0;
     private int maintenanceCount = 0;
     private int blockedCount = 0;
+    private bool isAdminOrManager = false;
+    private WorkingDateModel? workingDate;
 
     private List<RoomDto> rooms = new();
     private List<ReservationDto> todayArrivals = new();
@@ -224,6 +247,22 @@ else
         loading = true;
         try
         {
+            // Check if user is Admin or Manager for Day Closing access
+            var currentUser = await AuthService.GetCurrentUserAsync();
+            isAdminOrManager = currentUser != null &&
+                (currentUser.Role == 0 || currentUser.Role == 1); // Admin=0, Manager=1
+
+            // Load working date
+            try
+            {
+                workingDate = await ApiClient.GetWorkingDateAsync();
+            }
+            catch
+            {
+                // If working date fails, continue loading other data
+                workingDate = null;
+            }
+
             // Load all data
             rooms = await ApiClient.GetRoomsAsync();
             var checkIns = await ApiClient.GetActiveCheckInsAsync();
@@ -293,7 +332,7 @@ else
             1 => "danger",       // Occupied
             2 => "warning",      // Dirty
             3 => "secondary",    // Maintenance
-            4 => "dark",         // Blocked
+            4 => "pink",         // Blocked
             _ => "secondary"
         };
     }

@@ -4,7 +4,7 @@
 @using HMSMini.Web.Services
 @using HMSMini.Web.Models
 
-<PageTitle>User Management - HMS Mini</PageTitle>
+<PageTitle>User Management - MSS</PageTitle>
 
 <div class="container-fluid p-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -125,6 +125,8 @@
                                 <option value="0">Admin</option>
                                 <option value="1">Manager</option>
                                 <option value="2">Receptionist</option>
+                                <option value="3">Housekeeping</option>
+                                <option value="4">Maintenance</option>
                             </InputSelect>
                         </div>
 
@@ -241,6 +243,8 @@
             0 => "Admin",
             1 => "Manager",
             2 => "Receptionist",
+            3 => "Housekeeping",
+            4 => "Maintenance",
             _ => "Unknown"
         };
     }
@@ -252,6 +256,8 @@
             0 => "danger",       // Admin - Red
             1 => "primary",      // Manager - Blue
             2 => "info",         // Receptionist - Light Blue
+            3 => "warning",      // Housekeeping - Yellow
+            4 => "secondary",    // Maintenance - Gray
             _ => "secondary"
         };
     }

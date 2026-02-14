@@ -13,4 +13,5 @@ public class GuestInfoDto
     public string? MobileNo { get; set; }
     public string? IdType { get; set; } // Aadhaar, PAN, DL
     public string? IdNumber { get; set; }
+    public DateTime? DateOfBirth { get; set; }
 }

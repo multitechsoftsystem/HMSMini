@@ -7,6 +7,9 @@ public interface IRoomService
     Task<List<RoomDto>> GetAllAsync();
     Task<RoomDto> GetByIdAsync(int id);
     Task<List<RoomDto>> GetAvailableRoomsAsync(DateTime checkIn, DateTime checkOut);
+    Task<List<RoomAvailabilityDto>> GetRoomAvailabilityAsync(DateTime startDate, DateTime endDate);
+    Task<OccupancyReportDto> GetOccupancyReportAsync(DateTime date);
+    Task<byte[]> ExportOccupancyReportToExcelAsync(DateTime date);
     Task<RoomDto> CreateAsync(CreateRoomDto dto);
     Task<RoomDto> UpdateStatusAsync(int id, UpdateRoomStatusDto dto);
     Task DeleteAsync(int id);

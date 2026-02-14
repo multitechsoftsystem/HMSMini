@@ -5,7 +5,7 @@ namespace HMSMini.API.Models.DTOs.Reservation;
 /// </summary>
 public class CreateReservationDto
 {
-    public string RoomNumber { get; set; } = string.Empty;
+    public string RoomType { get; set; } = string.Empty;
     public DateTime CheckInDate { get; set; }
     public DateTime CheckOutDate { get; set; }
     public int NumberOfGuests { get; set; }
@@ -13,4 +13,7 @@ public class CreateReservationDto
     public string? GuestEmail { get; set; }
     public string GuestMobile { get; set; } = string.Empty;
     public string? SpecialRequests { get; set; }
+    public int? CompanyId { get; set; }
+    public int? BusinessSourceId { get; set; }
+    public int? MealPlanId { get; set; }
 }

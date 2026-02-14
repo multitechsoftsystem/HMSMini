@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using HMSMini.API.Models.DTOs.Guest;
+using HMSMini.API.Models.Enums;
 
 namespace HMSMini.API.Models.DTOs.CheckIn;
 
@@ -24,6 +25,19 @@ public class CreateCheckInDto
 
     [StringLength(1000)]
     public string? Remarks { get; set; }
+
+    public int? CompanyId { get; set; }
+
+    public int? BusinessSourceId { get; set; }
+
+    public int? MealPlanId { get; set; }
+
+    public int? GuestTypeId { get; set; }
+
+    /// <summary>
+    /// Tax type for this check-in (CGST+SGST or IGST)
+    /// </summary>
+    public TaxType TaxType { get; set; } = TaxType.CgstSgst;
 
     [Required]
     [MinLength(1)]

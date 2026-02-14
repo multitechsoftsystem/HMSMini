@@ -15,23 +15,30 @@ public class ReservationService : IReservationService
 {
     private readonly ApplicationDbContext _context;
     private readonly IRoomService _roomService;
+    private readonly ITariffService _tariffService;
     private readonly ILogger<ReservationService> _logger;
 
     public ReservationService(
         ApplicationDbContext context,
         IRoomService roomService,
+        ITariffService tariffService,
         ILogger<ReservationService> logger)
     {
         _context = context;
         _roomService = roomService;
+        _tariffService = tariffService;
         _logger = logger;
     }
 
     public async Task<List<ReservationDto>> GetAllAsync()
     {
         var reservations = await _context.Reservations
+            .Include(r => r.RoomType)
             .Include(r => r.Room)
-            .ThenInclude(room => room.RoomType)
+            .ThenInclude(room => room!.RoomType)
+            .Include(r => r.Company)
+            .Include(r => r.BusinessSource)
+            .Include(r => r.MealPlan)
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync();
 
@@ -41,8 +48,12 @@ public class ReservationService : IReservationService
     public async Task<ReservationDto> GetByIdAsync(int id)
     {
         var reservation = await _context.Reservations
+            .Include(r => r.RoomType)
             .Include(r => r.Room)
-            .ThenInclude(room => room.RoomType)
+            .ThenInclude(room => room!.RoomType)
+            .Include(r => r.Company)
+            .Include(r => r.BusinessSource)
+            .Include(r => r.MealPlan)
             .FirstOrDefaultAsync(r => r.Id == id);
 
         if (reservation == null)
@@ -56,8 +67,12 @@ public class ReservationService : IReservationService
     public async Task<ReservationDto> GetByReservationNumberAsync(string reservationNumber)
     {
         var reservation = await _context.Reservations
+            .Include(r => r.RoomType)
             .Include(r => r.Room)
-            .ThenInclude(room => room.RoomType)
+            .ThenInclude(room => room!.RoomType)
+            .Include(r => r.Company)
+            .Include(r => r.BusinessSource)
+            .Include(r => r.MealPlan)
             .FirstOrDefaultAsync(r => r.ReservationNumber == reservationNumber);
 
         if (reservation == null)
@@ -71,8 +86,12 @@ public class ReservationService : IReservationService
     public async Task<List<ReservationDto>> GetByStatusAsync(ReservationStatus status)
     {
         var reservations = await _context.Reservations
+            .Include(r => r.RoomType)
             .Include(r => r.Room)
-            .ThenInclude(room => room.RoomType)
+            .ThenInclude(room => room!.RoomType)
+            .Include(r => r.Company)
+            .Include(r => r.BusinessSource)
+            .Include(r => r.MealPlan)
             .Where(r => r.Status == status)
             .OrderBy(r => r.CheckInDate)
             .ToListAsync();
@@ -84,8 +103,12 @@ public class ReservationService : IReservationService
     {
         var today = DateTime.Today;
         var reservations = await _context.Reservations
+            .Include(r => r.RoomType)
             .Include(r => r.Room)
-            .ThenInclude(room => room.RoomType)
+            .ThenInclude(room => room!.RoomType)
+            .Include(r => r.Company)
+            .Include(r => r.BusinessSource)
+            .Include(r => r.MealPlan)
             .Where(r => r.CheckInDate >= today &&
                        (r.Status == ReservationStatus.Confirmed || r.Status == ReservationStatus.Pending))
             .OrderBy(r => r.CheckInDate)
@@ -113,14 +136,35 @@ public class ReservationService : IReservationService
             throw new BusinessRuleException("Number of guests must be between 1 and 3.");
         }
 
-        // Get room
-        var roomId = await _roomService.GetRoomIdByNumberAsync(dto.RoomNumber);
+        // Get room type
+        var roomType = await _context.RoomTypes
+            .FirstOrDefaultAsync(rt => rt.RoomType == dto.RoomType);
 
-        // Check if room is available for the specified dates
-        var isAvailable = await IsRoomAvailableAsync(roomId, dto.CheckInDate, dto.CheckOutDate);
-        if (!isAvailable)
+        if (roomType == null)
         {
-            throw new BusinessRuleException("Room is not available for the selected dates.");
+            throw new NotFoundException($"Room type '{dto.RoomType}' was not found.");
+        }
+
+        // Calculate estimated amount if company is provided
+        decimal? estimatedAmount = null;
+        if (dto.CompanyId.HasValue)
+        {
+            try
+            {
+                var tariffCalc = await _tariffService.CalculateTariffAsync(
+                    roomType.RoomTypeId,
+                    dto.NumberOfGuests,
+                    dto.CheckInDate,
+                    dto.CheckOutDate,
+                    dto.CompanyId,
+                    dto.MealPlanId);
+
+                estimatedAmount = tariffCalc.MealPlanId.HasValue ? tariffCalc.TotalAmountWithMealPlan : tariffCalc.TotalAmount;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to calculate tariff for reservation, proceeding without estimated amount");
+            }
         }
 
         // Generate unique reservation number
@@ -129,7 +173,8 @@ public class ReservationService : IReservationService
         var reservation = new Reservation
         {
             ReservationNumber = reservationNumber,
-            RoomId = roomId,
+            RoomTypeId = roomType.RoomTypeId,
+            RoomId = null, // Room will be assigned at check-in
             CheckInDate = dto.CheckInDate,
             CheckOutDate = dto.CheckOutDate,
             NumberOfGuests = dto.NumberOfGuests,
@@ -137,14 +182,18 @@ public class ReservationService : IReservationService
             GuestEmail = dto.GuestEmail,
             GuestMobile = dto.GuestMobile,
             SpecialRequests = dto.SpecialRequests,
-            Status = ReservationStatus.Pending
+            Status = ReservationStatus.Pending,
+            CompanyId = dto.CompanyId,
+            BusinessSourceId = dto.BusinessSourceId,
+            MealPlanId = dto.MealPlanId,
+            EstimatedAmount = estimatedAmount
         };
 
         _context.Reservations.Add(reservation);
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Reservation created: {ReservationNumber} for room {RoomNumber}",
-            reservationNumber, dto.RoomNumber);
+        _logger.LogInformation("Reservation created: {ReservationNumber} for room type {RoomType}",
+            reservationNumber, dto.RoomType);
 
         return await GetByIdAsync(reservation.Id);
     }
@@ -247,6 +296,97 @@ public class ReservationService : IReservationService
         return await GetByIdAsync(id);
     }
 
+    public async Task<ReservationDto> AssignRoomAsync(int id, AssignRoomDto dto)
+    {
+        var reservation = await _context.Reservations
+            .Include(r => r.RoomType)
+            .FirstOrDefaultAsync(r => r.Id == id);
+
+        if (reservation == null)
+        {
+            throw new NotFoundException($"Reservation with key '{id}' was not found.");
+        }
+
+        // Cannot assign room to cancelled or checked-in reservations
+        if (reservation.Status == ReservationStatus.Cancelled)
+        {
+            throw new BusinessRuleException("Cannot assign room to a cancelled reservation.");
+        }
+
+        if (reservation.Status == ReservationStatus.CheckedIn)
+        {
+            throw new BusinessRuleException("Cannot assign room to a reservation that has been checked in.");
+        }
+
+        // Verify the room exists and matches the reservation's room type
+        var room = await _context.Rooms
+            .Include(r => r.RoomType)
+            .FirstOrDefaultAsync(r => r.RoomId == dto.RoomId);
+
+        if (room == null)
+        {
+            throw new NotFoundException($"Room with ID '{dto.RoomId}' was not found.");
+        }
+
+        if (room.RoomTypeId != reservation.RoomTypeId)
+        {
+            throw new BusinessRuleException($"Room {room.RoomNumber} is type '{room.RoomType.RoomType}' but reservation requires '{reservation.RoomType.RoomType}'.");
+        }
+
+        // Check if the room is available for the reservation dates
+        var isAvailable = await IsRoomAvailableAsync(dto.RoomId, reservation.CheckInDate, reservation.CheckOutDate, reservation.Id);
+        if (!isAvailable)
+        {
+            throw new BusinessRuleException($"Room {room.RoomNumber} is not available for the selected dates.");
+        }
+
+        reservation.RoomId = dto.RoomId;
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Room {RoomNumber} assigned to reservation {ReservationNumber}",
+            room.RoomNumber, reservation.ReservationNumber);
+
+        return await GetByIdAsync(id);
+    }
+
+    public async Task<ReservationDto> ExtendStayAsync(int id, ExtendStayDto dto)
+    {
+        var reservation = await _context.Reservations
+            .Include(r => r.RoomType)
+            .Include(r => r.Room)
+            .Include(r => r.Company)
+            .Include(r => r.BusinessSource)
+            .Include(r => r.MealPlan)
+            .FirstOrDefaultAsync(r => r.Id == id);
+
+        if (reservation == null)
+            throw new NotFoundException($"Reservation with key '{id}' was not found.");
+
+        if (reservation.Status == ReservationStatus.CheckedIn)
+            throw new BusinessRuleException("Cannot extend a reservation that has already been checked in. Please extend the check-in instead.");
+
+        if (reservation.Status == ReservationStatus.Cancelled)
+            throw new BusinessRuleException("Cannot extend a cancelled reservation.");
+
+        if (dto.NewCheckOutDate <= reservation.CheckOutDate)
+            throw new BusinessRuleException("New checkout date must be after the current checkout date.");
+
+        if (dto.NewCheckOutDate <= DateTime.Today)
+            throw new BusinessRuleException("New checkout date must be in the future.");
+
+        // Update checkout date
+        var oldCheckOutDate = reservation.CheckOutDate;
+        reservation.CheckOutDate = dto.NewCheckOutDate;
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Extended reservation {ReservationNumber} from {OldDate} to {NewDate}",
+            reservation.ReservationNumber, oldCheckOutDate, dto.NewCheckOutDate);
+
+        return await GetByIdAsync(id);
+    }
+
     public async Task CancelReservationAsync(int id)
     {
         var reservation = await _context.Reservations.FindAsync(id);
@@ -300,7 +440,7 @@ public class ReservationService : IReservationService
         _logger.LogInformation("Reservation deleted: {ReservationNumber}", reservation.ReservationNumber);
     }
 
-    private async Task<bool> IsRoomAvailableAsync(int roomId, DateTime checkInDate, DateTime checkOutDate)
+    private async Task<bool> IsRoomAvailableAsync(int roomId, DateTime checkInDate, DateTime checkOutDate, int? excludeReservationId = null)
     {
         // Check for existing active check-ins
         var hasActiveCheckIn = await _context.CheckIns
@@ -314,12 +454,19 @@ public class ReservationService : IReservationService
             return false;
         }
 
-        // Check for existing reservations
-        var hasConflictingReservation = await _context.Reservations
-            .AnyAsync(r => r.RoomId == roomId &&
-                          (r.Status == ReservationStatus.Confirmed || r.Status == ReservationStatus.Pending) &&
-                          r.CheckInDate < checkOutDate &&
-                          r.CheckOutDate > checkInDate);
+        // Check for existing reservations (excluding the current one if specified)
+        var reservationsQuery = _context.Reservations
+            .Where(r => r.RoomId == roomId &&
+                       (r.Status == ReservationStatus.Confirmed || r.Status == ReservationStatus.Pending) &&
+                       r.CheckInDate < checkOutDate &&
+                       r.CheckOutDate > checkInDate);
+
+        if (excludeReservationId.HasValue)
+        {
+            reservationsQuery = reservationsQuery.Where(r => r.Id != excludeReservationId.Value);
+        }
+
+        var hasConflictingReservation = await reservationsQuery.AnyAsync();
 
         if (hasConflictingReservation)
         {
@@ -374,8 +521,8 @@ public class ReservationService : IReservationService
         {
             Id = reservation.Id,
             ReservationNumber = reservation.ReservationNumber,
-            RoomNumber = reservation.Room.RoomNumber,
-            RoomTypeName = reservation.Room.RoomType.RoomType,
+            RoomNumber = reservation.Room?.RoomNumber,
+            RoomTypeName = reservation.RoomType.RoomType,
             CheckInDate = reservation.CheckInDate,
             CheckOutDate = reservation.CheckOutDate,
             NumberOfGuests = reservation.NumberOfGuests,
@@ -385,6 +532,14 @@ public class ReservationService : IReservationService
             SpecialRequests = reservation.SpecialRequests,
             Status = reservation.Status,
             CheckInId = reservation.CheckInId,
+            CompanyId = reservation.CompanyId,
+            CompanyName = reservation.Company?.CompanyName,
+            CompanyGSTNumber = reservation.Company?.GSTNumber,
+            BusinessSourceId = reservation.BusinessSourceId,
+            BusinessSourceName = reservation.BusinessSource?.SourceName,
+            MealPlanId = reservation.MealPlanId,
+            MealPlanName = reservation.MealPlan?.PlanName,
+            EstimatedAmount = reservation.EstimatedAmount,
             CreatedAt = reservation.CreatedAt
         };
     }

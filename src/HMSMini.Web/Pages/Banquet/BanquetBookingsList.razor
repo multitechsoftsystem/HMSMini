@@ -1,0 +1,355 @@
+@page "/banquet/bookings"
+@inject IApiClientService ApiClient
+@inject IAuthenticationService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Banquet Bookings - MSS</PageTitle>
+
+<div class="page-header">
+    <h3>Banquet Bookings</h3>
+    <button class="btn btn-primary" @onclick="ShowCreateModal">
+        <span class="icon">+</span> New Booking
+    </button>
+</div>
+
+<!-- Status Filter Cards -->
+<div class="status-summary mb-3">
+    <div class="status-card @(statusFilter == null ? "active-filter" : "")" style="border-top-color: #6c757d; cursor:pointer" @onclick="() => FilterByStatus(null)">
+        <div class="status-label">All</div>
+        <div class="status-count">@allBookings.Count</div>
+    </div>
+    <div class="status-card @(statusFilter == BanquetBookingStatus.Enquiry ? "active-filter" : "")" style="border-top-color: #17a2b8; cursor:pointer" @onclick="() => FilterByStatus(BanquetBookingStatus.Enquiry)">
+        <div class="status-label">Enquiry</div>
+        <div class="status-count">@allBookings.Count(b => b.Status == BanquetBookingStatus.Enquiry)</div>
+    </div>
+    <div class="status-card @(statusFilter == BanquetBookingStatus.Confirmed ? "active-filter" : "")" style="border-top-color: #007bff; cursor:pointer" @onclick="() => FilterByStatus(BanquetBookingStatus.Confirmed)">
+        <div class="status-label">Confirmed</div>
+        <div class="status-count">@allBookings.Count(b => b.Status == BanquetBookingStatus.Confirmed)</div>
+    </div>
+    <div class="status-card @(statusFilter == BanquetBookingStatus.InProgress ? "active-filter" : "")" style="border-top-color: #ffc107; cursor:pointer" @onclick="() => FilterByStatus(BanquetBookingStatus.InProgress)">
+        <div class="status-label">In Progress</div>
+        <div class="status-count">@allBookings.Count(b => b.Status == BanquetBookingStatus.InProgress)</div>
+    </div>
+    <div class="status-card @(statusFilter == BanquetBookingStatus.Completed ? "active-filter" : "")" style="border-top-color: #28a745; cursor:pointer" @onclick="() => FilterByStatus(BanquetBookingStatus.Completed)">
+        <div class="status-label">Completed</div>
+        <div class="status-count">@allBookings.Count(b => b.Status == BanquetBookingStatus.Completed)</div>
+    </div>
+    <div class="status-card @(statusFilter == BanquetBookingStatus.Cancelled ? "active-filter" : "")" style="border-top-color: #dc3545; cursor:pointer" @onclick="() => FilterByStatus(BanquetBookingStatus.Cancelled)">
+        <div class="status-label">Cancelled</div>
+        <div class="status-count">@allBookings.Count(b => b.Status == BanquetBookingStatus.Cancelled)</div>
+    </div>
+</div>
+
+<!-- Search -->
+<div class="mb-3">
+    <input type="text" class="form-control" placeholder="Search by booking#, hall, contact, company..."
+           @bind="searchTerm" @bind:event="oninput" />
+</div>
+
+@if (isLoading)
+{
+    <div class="loading">Loading bookings...</div>
+}
+else if (filteredBookings.Count == 0)
+{
+    <div class="empty-state"><p>No bookings found.</p></div>
+}
+else
+{
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Booking #</th>
+                    <th>Hall</th>
+                    <th>Event Type</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Guests</th>
+                    <th>Contact</th>
+                    <th>Company</th>
+                    <th>Rent</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var b in filteredBookings)
+                {
+                    <tr style="cursor:pointer" @onclick="() => ViewBooking(b.Id)">
+                        <td><strong>@b.BookingNumber</strong></td>
+                        <td>@b.HallName</td>
+                        <td>@b.EventTypeName</td>
+                        <td>@b.EventDate.ToString("MMM dd, yyyy")</td>
+                        <td>@b.EventStartTime.ToString(@"hh\:mm") - @b.EventEndTime.ToString(@"hh\:mm")</td>
+                        <td>@b.ExpectedGuests</td>
+                        <td>@b.ContactPersonName</td>
+                        <td>@(b.CompanyName ?? "-")</td>
+                        <td>@b.HallRent.ToString("N2")</td>
+                        <td><span class="badge bg-@GetStatusColor(b.Status)">@b.Status</span></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (showCreateModal)
+{
+    <div class="modal-overlay" @onclick="HideCreateModal">
+        <div class="modal-content" style="max-width: 700px;" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h4>New Banquet Booking</h4>
+                <button class="btn-close" @onclick="HideCreateModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                @if (!string.IsNullOrEmpty(createError))
+                {
+                    <div class="alert alert-danger">@createError</div>
+                }
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Hall *</label>
+                            <select class="form-control" @bind="createModel.BanquetHallId" @bind:after="OnHallChanged">
+                                <option value="0">-- Select Hall --</option>
+                                @foreach (var h in halls.Where(h => h.IsActive))
+                                {
+                                    <option value="@h.Id">@h.HallName (Cap: @h.MinCapacity-@h.MaxCapacity)</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Event Type *</label>
+                            <select class="form-control" @bind="createModel.EventTypeId">
+                                <option value="0">-- Select Event Type --</option>
+                                @foreach (var et in eventTypes.Where(e => e.IsActive))
+                                {
+                                    <option value="@et.Id">@et.EventTypeName</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label>Event Date *</label>
+                            <input type="date" class="form-control" @bind="createModel.EventDate" />
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label>Start Time *</label>
+                            <input type="text" class="form-control" placeholder="HH:mm" @bind="startTimeStr" />
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label>End Time *</label>
+                            <input type="text" class="form-control" placeholder="HH:mm" @bind="endTimeStr" />
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label>Expected Guests *</label>
+                            <input type="number" class="form-control" @bind="createModel.ExpectedGuests" />
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label>Pricing Type</label>
+                            <select class="form-control" @bind="createModel.PricingType">
+                                <option value="@BanquetPricingType.PerPlate">Per Plate</option>
+                                <option value="@BanquetPricingType.Package">Package</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label>Hall Rent</label>
+                            <input type="number" step="0.01" class="form-control" @bind="createModel.HallRent" />
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Contact Person *</label>
+                            <input type="text" class="form-control" @bind="createModel.ContactPersonName" />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Contact Phone *</label>
+                            <input type="text" class="form-control" @bind="createModel.ContactPhone" />
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label>Company</label>
+                            <select class="form-control" @bind="createModel.CompanyId">
+                                <option value="">-- None --</option>
+                                @foreach (var c in companies)
+                                {
+                                    <option value="@c.Id">@c.CompanyName</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label>Tax Type</label>
+                            <select class="form-control" @bind="createModel.TaxType">
+                                <option value="@TaxType.CgstSgst">CGST+SGST</option>
+                                <option value="@TaxType.Igst">IGST</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            <label>Discount %</label>
+                            <input type="number" step="0.01" class="form-control" @bind="createModel.DiscountPercentage" />
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Remarks</label>
+                    <textarea class="form-control" @bind="createModel.Remarks" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="HideCreateModal">Cancel</button>
+                <button class="btn btn-primary" @onclick="CreateBooking" disabled="@isSaving">
+                    @(isSaving ? "Creating..." : "Create Booking")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<BanquetBookingListModel> allBookings = new();
+    private List<BanquetHallModel> halls = new();
+    private List<EventTypeModel> eventTypes = new();
+    private List<CompanyDto> companies = new();
+    private bool isLoading = true;
+    private BanquetBookingStatus? statusFilter = null;
+    private string searchTerm = "";
+    private bool showCreateModal = false;
+    private bool isSaving = false;
+    private string? createError;
+    private CreateBanquetBookingModel createModel = new();
+    private string startTimeStr = "10:00";
+    private string endTimeStr = "18:00";
+
+    private List<BanquetBookingListModel> filteredBookings
+    {
+        get
+        {
+            var list = allBookings.AsEnumerable();
+            if (statusFilter.HasValue)
+                list = list.Where(b => b.Status == statusFilter.Value);
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var term = searchTerm.ToLower();
+                list = list.Where(b =>
+                    b.BookingNumber.ToLower().Contains(term) ||
+                    b.HallName.ToLower().Contains(term) ||
+                    b.ContactPersonName.ToLower().Contains(term) ||
+                    (b.CompanyName?.ToLower().Contains(term) ?? false));
+            }
+            return list.OrderByDescending(b => b.EventDate).ToList();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        allBookings = await ApiClient.GetAllBanquetBookingsAsync();
+        halls = await ApiClient.GetAllBanquetHallsAsync();
+        eventTypes = await ApiClient.GetAllEventTypesAsync();
+        companies = await ApiClient.GetActiveCompaniesAsync();
+        isLoading = false;
+    }
+
+    private void FilterByStatus(BanquetBookingStatus? status)
+    {
+        statusFilter = status;
+    }
+
+    private void ViewBooking(int id) => Navigation.NavigateTo($"/banquet/bookings/{id}");
+
+    private void ShowCreateModal()
+    {
+        createModel = new CreateBanquetBookingModel();
+        startTimeStr = "10:00";
+        endTimeStr = "18:00";
+        createError = null;
+        showCreateModal = true;
+    }
+
+    private void HideCreateModal() => showCreateModal = false;
+
+    private void OnHallChanged()
+    {
+        var hall = halls.FirstOrDefault(h => h.Id == createModel.BanquetHallId);
+        if (hall != null)
+        {
+            createModel.HallRent = hall.RentPerEvent;
+        }
+    }
+
+    private async Task CreateBooking()
+    {
+        createError = null;
+        if (createModel.BanquetHallId == 0 || createModel.EventTypeId == 0 ||
+            string.IsNullOrWhiteSpace(createModel.ContactPersonName) ||
+            string.IsNullOrWhiteSpace(createModel.ContactPhone))
+        {
+            createError = "Please fill all required fields.";
+            return;
+        }
+
+        if (TimeSpan.TryParse(startTimeStr, out var startTime))
+            createModel.EventStartTime = startTime;
+        if (TimeSpan.TryParse(endTimeStr, out var endTime))
+            createModel.EventEndTime = endTime;
+
+        isSaving = true;
+        try
+        {
+            var result = await ApiClient.CreateBanquetBookingAsync(createModel);
+            if (result != null)
+            {
+                showCreateModal = false;
+                Navigation.NavigateTo($"/banquet/bookings/{result.Id}");
+            }
+            else
+            {
+                createError = "Failed to create booking. Please check your input.";
+            }
+        }
+        finally { isSaving = false; }
+    }
+
+    private string GetStatusColor(BanquetBookingStatus status) => status switch
+    {
+        BanquetBookingStatus.Enquiry => "info",
+        BanquetBookingStatus.Confirmed => "primary",
+        BanquetBookingStatus.InProgress => "warning",
+        BanquetBookingStatus.Completed => "success",
+        BanquetBookingStatus.Cancelled => "danger",
+        _ => "secondary"
+    };
+}

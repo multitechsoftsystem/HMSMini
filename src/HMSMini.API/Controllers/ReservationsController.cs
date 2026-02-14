@@ -109,6 +109,39 @@ public class ReservationsController : ControllerBase
     }
 
     /// <summary>
+    /// Assign a room to a reservation
+    /// </summary>
+    [HttpPost("{id}/assign-room")]
+    [Authorize(Roles = "Admin,Manager,Receptionist")]
+    public async Task<ActionResult<ReservationDto>> AssignRoom(int id, [FromBody] AssignRoomDto dto)
+    {
+        var reservation = await _reservationService.AssignRoomAsync(id, dto);
+        return Ok(reservation);
+    }
+
+    /// <summary>
+    /// Extend a reservation's checkout date
+    /// </summary>
+    [HttpPost("{id}/extend")]
+    [Authorize(Roles = "Admin,Manager,Receptionist")]
+    [ProducesResponseType(typeof(ReservationDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<ReservationDto>> ExtendStay(int id, [FromBody] ExtendStayDto dto)
+    {
+        try
+        {
+            var updatedReservation = await _reservationService.ExtendStayAsync(id, dto);
+            return Ok(updatedReservation);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error extending reservation {ReservationId}", id);
+            return BadRequest(ex.Message);
+        }
+    }
+
+    /// <summary>
     /// Cancel a reservation
     /// </summary>
     [HttpPost("{id}/cancel")]

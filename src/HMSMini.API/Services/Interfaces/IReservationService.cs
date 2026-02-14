@@ -49,6 +49,16 @@ public interface IReservationService
     Task<ReservationDto> ConfirmReservationAsync(int id);
 
     /// <summary>
+    /// Assign a room to a reservation
+    /// </summary>
+    Task<ReservationDto> AssignRoomAsync(int id, AssignRoomDto dto);
+
+    /// <summary>
+    /// Extend a reservation's checkout date
+    /// </summary>
+    Task<ReservationDto> ExtendStayAsync(int id, ExtendStayDto dto);
+
+    /// <summary>
     /// Cancel a reservation
     /// </summary>
     Task CancelReservationAsync(int id);

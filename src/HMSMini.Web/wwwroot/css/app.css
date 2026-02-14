@@ -154,8 +154,8 @@ code {
 }
 
 .room-card.blocked {
-    border-left: 4px solid #343a40;
-    background: #f0f0f0;
+    border-left: 4px solid #0dcaf0;
+    background: #e7f6fd;
 }
 
 .room-number {
@@ -235,7 +235,7 @@ code {
 }
 
 .status-card.blocked {
-    border-top-color: #343a40;
+    border-top-color: #0dcaf0;
 }
 
 .status-count {
@@ -249,6 +249,68 @@ code {
     color: #6c757d;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+}
+
+/* Status Card Interactive States */
+.status-card {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.status-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.status-card:active {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+}
+
+/* Active Filter State */
+.status-card.active-filter {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    transform: scale(1.05);
+    border: 2px solid #333;
+}
+
+.status-card.active-filter::after {
+    content: '\2713'; /* Checkmark */
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #333;
+    color: white;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+/* Specific hover colors for each status type */
+.status-card.available:hover {
+    border-top-color: #1e7e34;
+}
+
+.status-card.occupied:hover {
+    border-top-color: #bd2130;
+}
+
+.status-card.dirty:hover {
+    border-top-color: #d39e00;
+}
+
+.status-card.maintenance:hover {
+    border-top-color: #545b62;
+}
+
+.status-card.blocked:hover {
+    border-top-color: #0aa2c0;
 }
 
 /* Improve Dashboard Layout */
@@ -318,4 +380,165 @@ main {
     border-radius: 4px;
     font-size: 0.85rem;
     color: #0056b3;
+}
+
+/* Pink badge for blocked status */
+.bg-pink {
+    background-color: #e91e63 !important;
+    color: white !important;
+}
+
+/* Room actions */
+.room-actions {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.room-actions .btn {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+}
+
+/* Print Styles for Bill */
+@media print {
+    /* Hide everything by default */
+    body * {
+        visibility: hidden;
+    }
+
+    /* Show only the printable bill */
+    #printable-bill,
+    #printable-bill *,
+    #printable-bill-preview,
+    #printable-bill-preview * {
+        visibility: visible;
+    }
+
+    /* Position the printable bill at the top */
+    #printable-bill,
+    #printable-bill-preview {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+    }
+
+    /* Show printable report content */
+    #printable-report,
+    #printable-report * {
+        visibility: visible !important;
+    }
+
+    /* Position the printable report at the top */
+    #printable-report {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        padding: 20px;
+    }
+
+    /* Hide modal elements */
+    .modal-backdrop,
+    .modal-header,
+    .modal-footer,
+    .no-print {
+        display: none !important;
+    }
+
+    /* Ensure proper page breaks */
+    .card {
+        page-break-inside: avoid;
+    }
+
+    /* Remove shadows and borders for print */
+    .card {
+        box-shadow: none;
+        border: 1px solid #dee2e6;
+    }
+
+    /* Ensure badges print with proper colors */
+    .badge {
+        border: 1px solid #000;
+    }
+
+    /* Occupancy Report Print Styles */
+    #printable-report * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+    }
+
+    #printable-report .card {
+        border: 2px solid #000 !important;
+        margin-bottom: 10px;
+    }
+
+    #printable-report .card-body {
+        padding: 10px;
+    }
+
+    #printable-report .table {
+        border: 2px solid #000 !important;
+        width: 100%;
+    }
+
+    #printable-report .table th,
+    #printable-report .table td {
+        border: 1px solid #000 !important;
+        padding: 8px;
+    }
+
+    #printable-report .bg-primary { background-color: #0d6efd !important; color: white !important; }
+    #printable-report .bg-danger { background-color: #dc3545 !important; color: white !important; }
+    #printable-report .bg-warning { background-color: #ffc107 !important; color: #000 !important; }
+    #printable-report .bg-success { background-color: #198754 !important; color: white !important; }
+    #printable-report .bg-info { background-color: #0dcaf0 !important; color: #000 !important; }
+    #printable-report .bg-secondary { background-color: #6c757d !important; color: white !important; }
+
+    #printable-report .text-primary { color: #0d6efd !important; }
+    #printable-report .text-danger { color: #dc3545 !important; }
+    #printable-report .text-warning { color: #ffc107 !important; }
+    #printable-report .text-success { color: #198754 !important; }
+    #printable-report .text-info { color: #0dcaf0 !important; }
+    #printable-report .text-secondary { color: #6c757d !important; }
+
+    #printable-report .border-primary { border-color: #0d6efd !important; }
+    #printable-report .border-danger { border-color: #dc3545 !important; }
+    #printable-report .border-warning { border-color: #ffc107 !important; }
+    #printable-report .border-success { border-color: #198754 !important; }
+    #printable-report .border-info { border-color: #0dcaf0 !important; }
+    #printable-report .border-secondary { border-color: #6c757d !important; }
+
+    #printable-report .d-none.d-print-block {
+        display: block !important;
+    }
+
+    #printable-report .progress {
+        border: 1px solid #000;
+        background-color: #e9ecef !important;
+    }
+
+    #printable-report .progress-bar {
+        -webkit-print-color-adjust: exact !important;
+    }
+}
+
+/* Masters submenu styles */
+.masters-child {
+    padding-left: 2rem !important;
+}
+
+.masters-child .nav-link {
+    font-size: 0.9rem;
+}
+
+.masters-toggle-icon {
+    transition: transform 0.2s ease;
+    display: inline-block;
+}
+
+.masters-toggle-icon.expanded {
+    transform: rotate(90deg);
 }

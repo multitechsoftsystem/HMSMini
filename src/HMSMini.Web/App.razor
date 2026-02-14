@@ -1,12 +1,57 @@
-﻿<Router AppAssembly="@typeof(App).Assembly">
+@inject IAuthenticationService AuthService
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<Router AppAssembly="@typeof(App).Assembly">
     <Found Context="routeData">
-        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+        <RouteView RouteData="@routeData" DefaultLayout="@layoutType" />
         <FocusOnNavigate RouteData="@routeData" Selector="h1" />
     </Found>
     <NotFound>
         <PageTitle>Not found</PageTitle>
-        <LayoutView Layout="@typeof(MainLayout)">
+        <LayoutView Layout="@layoutType">
             <p role="alert">Sorry, there's nothing at this address.</p>
         </LayoutView>
     </NotFound>
 </Router>
+
+@code {
+    private Type layoutType = typeof(MainLayout);
+
+    protected override async Task OnInitializedAsync()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+        await EvaluateLayout();
+    }
+
+    private async void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        await EvaluateLayout();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task EvaluateLayout()
+    {
+        try
+        {
+            var user = await AuthService.GetCurrentUserAsync();
+            if (user != null && (user.Role == 5 || user.Role == 6))
+            {
+                layoutType = typeof(BanquetLayout);
+            }
+            else
+            {
+                layoutType = typeof(MainLayout);
+            }
+        }
+        catch
+        {
+            layoutType = typeof(MainLayout);
+        }
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
+}

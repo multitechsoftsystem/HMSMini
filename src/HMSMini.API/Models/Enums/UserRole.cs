@@ -18,5 +18,25 @@ public enum UserRole
     /// <summary>
     /// Receptionist - Can handle check-ins, check-outs, and guest management
     /// </summary>
-    Receptionist = 2
+    Receptionist = 2,
+
+    /// <summary>
+    /// Housekeeping - Can manage room cleaning and status updates
+    /// </summary>
+    Housekeeping = 3,
+
+    /// <summary>
+    /// Maintenance - Can manage room maintenance and repairs
+    /// </summary>
+    Maintenance = 4,
+
+    /// <summary>
+    /// BanquetManager - Full access to banquet module
+    /// </summary>
+    BanquetManager = 5,
+
+    /// <summary>
+    /// BanquetStaff - Banquet operations (no masters, no edit invoice)
+    /// </summary>
+    BanquetStaff = 6
 }

@@ -54,6 +54,20 @@ public class GuestsController : ControllerBase
     }
 
     /// <summary>
+    /// Add a new guest to an existing check-in
+    /// </summary>
+    [HttpPost("checkin/{checkInId}")]
+    [Authorize(Roles = "Admin,Manager,Receptionist")]
+    [ProducesResponseType(typeof(GuestDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<GuestDto>> AddGuestToCheckIn(int checkInId, [FromBody] CreateGuestDto dto)
+    {
+        var guest = await _guestService.CreateAsync(checkInId, dto);
+        return CreatedAtAction(nameof(GetById), new { id = guest.Id }, guest);
+    }
+
+    /// <summary>
     /// Update guest information
     /// </summary>
     [HttpPut("{id}")]
@@ -63,6 +77,20 @@ public class GuestsController : ControllerBase
     public async Task<ActionResult<GuestDto>> Update(int id, [FromBody] CreateGuestDto dto)
     {
         var guest = await _guestService.UpdateAsync(id, dto);
+        return Ok(guest);
+    }
+
+    /// <summary>
+    /// Check out an individual guest
+    /// </summary>
+    [HttpPost("{id}/checkout")]
+    [Authorize(Roles = "Admin,Manager,Receptionist")]
+    [ProducesResponseType(typeof(GuestDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<GuestDto>> CheckOutGuest(int id)
+    {
+        var guest = await _guestService.CheckOutGuestAsync(id);
         return Ok(guest);
     }
 
@@ -86,6 +114,8 @@ public class GuestsController : ControllerBase
     /// <param name="photoNumber">Photo number (1 or 2)</param>
     /// <param name="file">The image file</param>
     [HttpPost("{id}/upload-photo")]
+    [Consumes("multipart/form-data")]
+    [ApiExplorerSettings(IgnoreApi = true)]
     [Authorize(Roles = "Admin,Manager,Receptionist")]
     [ProducesResponseType(typeof(GuestDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -117,10 +147,10 @@ public class GuestsController : ControllerBase
     /// <param name="photoNumber">Photo number to process (1 or 2)</param>
     [HttpPost("{id}/process-ocr")]
     [Authorize(Roles = "Admin,Manager,Receptionist")]
-    [ProducesResponseType(typeof(GuestInfoDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(OcrReviewDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<GuestInfoDto>> ProcessOcr(int id, [FromQuery] int photoNumber = 1)
+    public async Task<ActionResult<OcrReviewDto>> ProcessOcr(int id, [FromQuery] int photoNumber = 1)
     {
         // Validate photo number
         if (photoNumber < 1 || photoNumber > 2)
@@ -138,12 +168,24 @@ public class GuestsController : ControllerBase
         // Get full physical path
         var fullPath = _imageStorageService.GetPhysicalPath(photoPath);
 
-        // Process OCR
-        var guestInfo = await _ocrService.ProcessImageFileAsync(fullPath);
+        // Process OCR - get raw text first
+        using var fileStream = System.IO.File.OpenRead(fullPath);
+        var ocrResult = await _ocrService.ProcessImageAsync(fileStream, Path.GetFileName(fullPath));
+
+        // Extract guest info from the raw text
+        var guestInfo = await _ocrService.ExtractGuestInfoAsync(ocrResult.ExtractedText);
+
+        // Create review DTO
+        var reviewDto = new OcrReviewDto
+        {
+            RawText = ocrResult.ExtractedText,
+            Confidence = ocrResult.Confidence,
+            GuestInfo = guestInfo
+        };
 
         _logger.LogInformation("OCR processed for guest {GuestId}, photo {PhotoNumber}", id, photoNumber);
 
-        return Ok(guestInfo);
+        return Ok(reviewDto);
     }
 
     /// <summary>
@@ -152,6 +194,7 @@ public class GuestsController : ControllerBase
     /// <param name="id">Guest ID</param>
     /// <param name="photoNumber">Photo number (1 or 2)</param>
     [HttpGet("{id}/photos/{photoNumber}")]
+    [AllowAnonymous]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetPhoto(int id, int photoNumber)
@@ -182,5 +225,83 @@ public class GuestsController : ControllerBase
         };
 
         return File(imageBytes, contentType);
+    }
+
+    /// <summary>
+    /// Search guests by mobile number
+    /// </summary>
+    [HttpGet("search/mobile")]
+    [ProducesResponseType(typeof(List<GuestDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<GuestDto>>> SearchByMobile([FromQuery] string mobile)
+    {
+        if (string.IsNullOrWhiteSpace(mobile))
+            return Ok(new List<GuestDto>());
+
+        var guests = await _guestService.SearchGuestsByMobileAsync(mobile);
+        return Ok(guests);
+    }
+
+    /// <summary>
+    /// Search guests by name
+    /// </summary>
+    [HttpGet("search/name")]
+    [ProducesResponseType(typeof(List<GuestDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<GuestDto>>> SearchByName([FromQuery] string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return Ok(new List<GuestDto>());
+
+        var guests = await _guestService.SearchGuestsByNameAsync(name);
+        return Ok(guests);
+    }
+
+    /// <summary>
+    /// Search guests by mobile or name
+    /// </summary>
+    [HttpGet("search")]
+    [ProducesResponseType(typeof(List<GuestDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<GuestDto>>> Search([FromQuery] string query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+            return Ok(new List<GuestDto>());
+
+        var guests = await _guestService.SearchGuestsAsync(query);
+        return Ok(guests);
+    }
+
+    /// <summary>
+    /// Process OCR directly from uploaded image (no guest creation required)
+    /// </summary>
+    [HttpPost("ocr/direct")]
+    [Consumes("multipart/form-data")]
+    [ApiExplorerSettings(IgnoreApi = true)]
+    [Authorize(Roles = "Admin,Manager,Receptionist")]
+    [ProducesResponseType(typeof(OcrReviewDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<OcrReviewDto>> ProcessOcrDirect([FromForm] IFormFile file)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest("No file uploaded");
+
+        if (file.Length > 10 * 1024 * 1024) // 10MB limit
+            return BadRequest("File size must be less than 10MB");
+
+        using var stream = file.OpenReadStream();
+        var ocrResult = await _ocrService.ProcessImageAsync(stream, file.FileName);
+
+        // Extract guest info from the raw text
+        var guestInfo = await _ocrService.ExtractGuestInfoAsync(ocrResult.ExtractedText);
+
+        // Create review DTO
+        var reviewDto = new OcrReviewDto
+        {
+            RawText = ocrResult.ExtractedText,
+            Confidence = ocrResult.Confidence,
+            GuestInfo = guestInfo
+        };
+
+        _logger.LogInformation("Direct OCR processed for file {FileName}", file.FileName);
+
+        return Ok(reviewDto);
     }
 }

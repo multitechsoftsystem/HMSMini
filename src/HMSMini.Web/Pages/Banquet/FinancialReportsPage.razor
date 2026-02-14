@@ -1,0 +1,356 @@
+@page "/banquet/reports"
+@inject IApiClientService ApiClient
+@inject IAuthenticationService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Financial Reports - MSS</PageTitle>
+
+<h3 class="mb-4">Financial Reports</h3>
+
+@if (isStaffRole)
+{
+    <!-- BanquetStaff: Restricted view - today/yesterday only -->
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> Showing reports for today and yesterday only.
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h5 class="mb-0">Company Outstanding (Today)</h5></div>
+        <div class="card-body">
+            @if (outstandingLoading)
+            {
+                <div class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading...</div>
+            }
+            else if (companyOutstanding != null && companyOutstanding.Companies.Any())
+            {
+                <div class="row mb-3">
+                    <div class="col-md-4"><strong>Total Charged:</strong> @companyOutstanding.GrandTotalCharged.ToString("N2")</div>
+                    <div class="col-md-4"><strong>Total Paid:</strong> @companyOutstanding.GrandTotalPaid.ToString("N2")</div>
+                    <div class="col-md-4"><strong>Outstanding:</strong> <span class="text-danger">@companyOutstanding.GrandTotalOutstanding.ToString("N2")</span></div>
+                </div>
+                <table class="table table-sm">
+                    <thead><tr><th>Company</th><th>Room</th><th>Banquet</th><th>Charged</th><th>Paid</th><th>Outstanding</th></tr></thead>
+                    <tbody>
+                        @foreach (var c in companyOutstanding.Companies)
+                        {
+                            <tr>
+                                <td>@c.CompanyName</td>
+                                <td>@c.RoomCharges.ToString("N2")</td>
+                                <td>@c.BanquetCharges.ToString("N2")</td>
+                                <td>@c.TotalCharged.ToString("N2")</td>
+                                <td>@c.TotalPaid.ToString("N2")</td>
+                                <td class="@(c.Outstanding > 0 ? "text-danger" : "")">@c.Outstanding.ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else { <p class="text-muted">No outstanding data.</p> }
+        </div>
+    </div>
+}
+else
+{
+    <!-- BanquetManager / Admin / Manager: Full reports with date range -->
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item"><a class="nav-link @(activeTab == "outstanding" ? "active" : "")" href="javascript:void(0)" @onclick="@(() => SwitchTab("outstanding"))">Company Outstanding</a></li>
+        <li class="nav-item"><a class="nav-link @(activeTab == "statement" ? "active" : "")" href="javascript:void(0)" @onclick="@(() => SwitchTab("statement"))">Company Statement</a></li>
+        <li class="nav-item"><a class="nav-link @(activeTab == "aging" ? "active" : "")" href="javascript:void(0)" @onclick="@(() => SwitchTab("aging"))">Aging Report</a></li>
+        <li class="nav-item"><a class="nav-link @(activeTab == "source" ? "active" : "")" href="javascript:void(0)" @onclick="@(() => SwitchTab("source"))">Business Source Outstanding</a></li>
+    </ul>
+
+    <!-- Company Outstanding Tab -->
+    @if (activeTab == "outstanding")
+    {
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Company Outstanding</h5>
+                <div class="d-flex gap-2 align-items-center">
+                    <label class="mb-0">As of:</label>
+                    <input type="date" class="form-control form-control-sm" style="width:auto" @bind="outstandingDate" />
+                    <button class="btn btn-sm btn-primary" @onclick="LoadOutstanding">Load</button>
+                </div>
+            </div>
+            <div class="card-body">
+                @if (outstandingLoading)
+                {
+                    <div class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading...</div>
+                }
+                else if (companyOutstanding != null && companyOutstanding.Companies.Any())
+                {
+                    <div class="status-summary mb-3">
+                        <div class="status-card" style="border-top-color: #17a2b8;"><div class="status-label">Total Charged</div><div class="status-count">@companyOutstanding.GrandTotalCharged.ToString("N0")</div></div>
+                        <div class="status-card" style="border-top-color: #28a745;"><div class="status-label">Total Paid</div><div class="status-count">@companyOutstanding.GrandTotalPaid.ToString("N0")</div></div>
+                        <div class="status-card" style="border-top-color: #dc3545;"><div class="status-label">Outstanding</div><div class="status-count">@companyOutstanding.GrandTotalOutstanding.ToString("N0")</div></div>
+                    </div>
+                    <table class="table table-sm table-hover">
+                        <thead><tr><th>Company</th><th>Room Charges</th><th>Banquet Charges</th><th>Total Charged</th><th>Total Paid</th><th>Outstanding</th></tr></thead>
+                        <tbody>
+                            @foreach (var c in companyOutstanding.Companies)
+                            {
+                                <tr>
+                                    <td>@c.CompanyName</td>
+                                    <td>@c.RoomCharges.ToString("N2")</td>
+                                    <td>@c.BanquetCharges.ToString("N2")</td>
+                                    <td>@c.TotalCharged.ToString("N2")</td>
+                                    <td>@c.TotalPaid.ToString("N2")</td>
+                                    <td class="@(c.Outstanding > 0 ? "text-danger fw-bold" : "text-success")">@c.Outstanding.ToString("N2")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else { <p class="text-muted">No outstanding data available.</p> }
+            </div>
+        </div>
+    }
+
+    <!-- Company Statement Tab -->
+    @if (activeTab == "statement")
+    {
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Company Statement</h5>
+                <div class="d-flex gap-2 align-items-center mt-2">
+                    <label class="mb-0">Company:</label>
+                    <select class="form-control form-control-sm" style="width:auto" @bind="selectedCompanyId">
+                        <option value="0">-- Select --</option>
+                        @foreach (var c in companies)
+                        {
+                            <option value="@c.Id">@c.CompanyName</option>
+                        }
+                    </select>
+                    <label class="mb-0">From:</label>
+                    <input type="date" class="form-control form-control-sm" style="width:auto" @bind="statementFromDate" />
+                    <label class="mb-0">To:</label>
+                    <input type="date" class="form-control form-control-sm" style="width:auto" @bind="statementToDate" />
+                    <button class="btn btn-sm btn-primary" @onclick="LoadStatement">Load</button>
+                </div>
+            </div>
+            <div class="card-body">
+                @if (statementLoading)
+                {
+                    <div class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading...</div>
+                }
+                else if (statement != null)
+                {
+                    <div class="row mb-3">
+                        <div class="col-md-3"><strong>Opening Balance:</strong> @statement.OpeningBalance.ToString("N2")</div>
+                        <div class="col-md-3"><strong>Total Charges:</strong> @statement.TotalCharges.ToString("N2")</div>
+                        <div class="col-md-3"><strong>Total Payments:</strong> @statement.TotalPayments.ToString("N2")</div>
+                        <div class="col-md-3"><strong>Closing Balance:</strong> <span class="@(statement.ClosingBalance > 0 ? "text-danger" : "text-success")">@statement.ClosingBalance.ToString("N2")</span></div>
+                    </div>
+                    @if (statement.LineItems.Any())
+                    {
+                        <table class="table table-sm">
+                            <thead><tr><th>Date</th><th>Type</th><th>Source</th><th>Description</th><th>Charge</th><th>Payment</th><th>Balance</th></tr></thead>
+                            <tbody>
+                                @foreach (var item in statement.LineItems)
+                                {
+                                    <tr>
+                                        <td>@item.Date.ToString("MMM dd, yyyy")</td>
+                                        <td>@item.TransactionType</td>
+                                        <td>@item.SourceType</td>
+                                        <td>@item.Description</td>
+                                        <td>@(item.ChargeAmount > 0 ? item.ChargeAmount.ToString("N2") : "")</td>
+                                        <td>@(item.PaymentAmount > 0 ? item.PaymentAmount.ToString("N2") : "")</td>
+                                        <td>@item.RunningBalance.ToString("N2")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                }
+                else { <p class="text-muted">Select a company and date range, then click Load.</p> }
+            </div>
+        </div>
+    }
+
+    <!-- Aging Report Tab -->
+    @if (activeTab == "aging")
+    {
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Aging Report</h5>
+                <div class="d-flex gap-2 align-items-center">
+                    <label class="mb-0">As of:</label>
+                    <input type="date" class="form-control form-control-sm" style="width:auto" @bind="agingDate" />
+                    <button class="btn btn-sm btn-primary" @onclick="LoadAging">Load</button>
+                </div>
+            </div>
+            <div class="card-body">
+                @if (agingLoading)
+                {
+                    <div class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading...</div>
+                }
+                else if (agingReport != null && agingReport.Companies.Any())
+                {
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>Company</th>
+                                <th>Current</th>
+                                <th>31-60 Days</th>
+                                <th>61-90 Days</th>
+                                <th>90+ Days</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var b in agingReport.Companies)
+                            {
+                                <tr>
+                                    <td>@b.CompanyName</td>
+                                    <td>@b.Current.ToString("N2")</td>
+                                    <td>@b.Days31To60.ToString("N2")</td>
+                                    <td>@b.Days61To90.ToString("N2")</td>
+                                    <td class="@(b.Over90Days > 0 ? "text-danger" : "")">@b.Over90Days.ToString("N2")</td>
+                                    <td class="fw-bold">@b.TotalOutstanding.ToString("N2")</td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot>
+                            <tr class="fw-bold">
+                                <td>Total</td>
+                                <td>@agingReport.TotalCurrent.ToString("N2")</td>
+                                <td>@agingReport.TotalDays31To60.ToString("N2")</td>
+                                <td>@agingReport.TotalDays61To90.ToString("N2")</td>
+                                <td>@agingReport.TotalOver90Days.ToString("N2")</td>
+                                <td>@agingReport.GrandTotal.ToString("N2")</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                }
+                else { <p class="text-muted">No aging data available.</p> }
+            </div>
+        </div>
+    }
+
+    <!-- Business Source Outstanding Tab -->
+    @if (activeTab == "source")
+    {
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Business Source Outstanding</h5>
+                <div class="d-flex gap-2 align-items-center">
+                    <label class="mb-0">As of:</label>
+                    <input type="date" class="form-control form-control-sm" style="width:auto" @bind="sourceDate" />
+                    <button class="btn btn-sm btn-primary" @onclick="LoadSourceOutstanding">Load</button>
+                </div>
+            </div>
+            <div class="card-body">
+                @if (sourceLoading)
+                {
+                    <div class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading...</div>
+                }
+                else if (sourceOutstanding != null && sourceOutstanding.Sources.Any())
+                {
+                    <div class="status-summary mb-3">
+                        <div class="status-card" style="border-top-color: #17a2b8;"><div class="status-label">Total Charged</div><div class="status-count">@sourceOutstanding.GrandTotalCharged.ToString("N0")</div></div>
+                        <div class="status-card" style="border-top-color: #28a745;"><div class="status-label">Total Paid</div><div class="status-count">@sourceOutstanding.GrandTotalPaid.ToString("N0")</div></div>
+                        <div class="status-card" style="border-top-color: #dc3545;"><div class="status-label">Outstanding</div><div class="status-count">@sourceOutstanding.GrandTotalOutstanding.ToString("N0")</div></div>
+                    </div>
+                    <table class="table table-sm table-hover">
+                        <thead><tr><th>Business Source</th><th>Total Charged</th><th>Total Paid</th><th>Outstanding</th></tr></thead>
+                        <tbody>
+                            @foreach (var s in sourceOutstanding.Sources)
+                            {
+                                <tr>
+                                    <td>@s.BusinessSourceName</td>
+                                    <td>@s.TotalCharged.ToString("N2")</td>
+                                    <td>@s.TotalPaid.ToString("N2")</td>
+                                    <td class="@(s.Outstanding > 0 ? "text-danger fw-bold" : "text-success")">@s.Outstanding.ToString("N2")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+                else { <p class="text-muted">No business source data available.</p> }
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private bool isStaffRole = false;
+    private string activeTab = "outstanding";
+    private List<CompanyDto> companies = new();
+
+    // Outstanding
+    private CompanyOutstandingListModel? companyOutstanding;
+    private DateTime outstandingDate = DateTime.Today;
+    private bool outstandingLoading = false;
+
+    // Statement
+    private CompanyStatementModel? statement;
+    private int selectedCompanyId = 0;
+    private DateTime statementFromDate = DateTime.Today.AddMonths(-1);
+    private DateTime statementToDate = DateTime.Today;
+    private bool statementLoading = false;
+
+    // Aging
+    private AgingReportModel? agingReport;
+    private DateTime agingDate = DateTime.Today;
+    private bool agingLoading = false;
+
+    // Source Outstanding
+    private BusinessSourceOutstandingModel? sourceOutstanding;
+    private DateTime sourceDate = DateTime.Today;
+    private bool sourceLoading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = await AuthService.GetCurrentUserAsync();
+        if (user == null)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+
+        // Only Admin(0), Manager(1), BanquetManager(5), BanquetStaff(6) can access
+        if (user.Role != 0 && user.Role != 1 && user.Role != 5 && user.Role != 6)
+        {
+            Navigation.NavigateTo("/");
+            return;
+        }
+
+        isStaffRole = user.Role == 6; // BanquetStaff gets restricted view
+        companies = await ApiClient.GetActiveCompaniesAsync();
+        await LoadOutstanding();
+    }
+
+    private async Task SwitchTab(string tab)
+    {
+        activeTab = tab;
+        if (tab == "outstanding" && companyOutstanding == null) await LoadOutstanding();
+    }
+
+    private async Task LoadOutstanding()
+    {
+        outstandingLoading = true;
+        companyOutstanding = await ApiClient.GetCompanyOutstandingAsync(outstandingDate);
+        outstandingLoading = false;
+    }
+
+    private async Task LoadStatement()
+    {
+        if (selectedCompanyId == 0) return;
+        statementLoading = true;
+        statement = await ApiClient.GetCompanyStatementAsync(selectedCompanyId, statementFromDate, statementToDate);
+        statementLoading = false;
+    }
+
+    private async Task LoadAging()
+    {
+        agingLoading = true;
+        agingReport = await ApiClient.GetAgingReportAsync(agingDate);
+        agingLoading = false;
+    }
+
+    private async Task LoadSourceOutstanding()
+    {
+        sourceLoading = true;
+        sourceOutstanding = await ApiClient.GetBusinessSourceOutstandingAsync(sourceDate);
+        sourceLoading = false;
+    }
+}

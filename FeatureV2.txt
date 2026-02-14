@@ -1,0 +1,17 @@
+FeatureV2
+Not Showing Total rooms on dashboard.
+
+Check-Ins Option:
+Room Number should be Vacant room only. 
+Create Check-In giving error 401.
+
+Reservations Option:
+Is it required Room number or Room Type
+Create Reservation giving Error 401.
+
+Create another option for Guest Check-in from read image and fill the guest details. We have created in API.
+
+Rooms Option:
+Should show all room with status as per color with color.
+
+How to create new user and roll

@@ -47,8 +47,8 @@ public class GuestConfiguration : IEntityTypeConfiguration<Guest>
             .HasMaxLength(500);
 
         // Composite index on CheckInId and GuestNumber
-        builder.HasIndex(g => new { g.CheckInId, g.GuestNumber })
-            .IsUnique(); // Ensure guest numbers are unique within a check-in
+        // Note: Not unique to allow historical records when guests check out and new guests take the same slot
+        builder.HasIndex(g => new { g.CheckInId, g.GuestNumber });
 
         // Relationships
         builder.HasOne(g => g.CheckIn)

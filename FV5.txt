@@ -1,0 +1,2 @@
+Process OCR:
+In Aadhar: name and address is not picking properly. While selecting text show image and selected text. User will Submit Ok then take the Text in text box.

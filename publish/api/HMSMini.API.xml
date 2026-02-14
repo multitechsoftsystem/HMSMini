@@ -1,0 +1,1333 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>HMSMini.API</name>
+    </assembly>
+    <members>
+        <member name="T:HMSMini.API.Controllers.AuthController">
+            <summary>
+            Authentication and authorization controller
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.AuthController.Register(HMSMini.API.Models.DTOs.Auth.RegisterDto)">
+            <summary>
+            Register a new user
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.AuthController.Login(HMSMini.API.Models.DTOs.Auth.LoginDto)">
+            <summary>
+            Login and get JWT token
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.AuthController.GetCurrentUser">
+            <summary>
+            Get current user's information
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.AuthController.GetUser(System.Int32)">
+            <summary>
+            Get user by ID (Admin only)
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.AuthController.GetAllUsers">
+            <summary>
+            Get all users (Admin only)
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.AuthController.DeactivateUser(System.Int32)">
+            <summary>
+            Deactivate user (Admin only)
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Controllers.CheckInsController">
+            <summary>
+            Manages guest check-ins
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.CheckInsController.GetAll">
+            <summary>
+            Get all check-ins
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.CheckInsController.GetActive">
+            <summary>
+            Get active check-ins
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.CheckInsController.GetById(System.Int32)">
+            <summary>
+            Get check-in by ID with guest details
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.CheckInsController.Create(HMSMini.API.Models.DTOs.CheckIn.CreateCheckInDto)">
+            <summary>
+            Create a new check-in with guests
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.CheckInsController.CheckOut(System.Int32)">
+            <summary>
+            Check out a guest
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.CheckInsController.Delete(System.Int32)">
+            <summary>
+            Delete a check-in
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Controllers.GuestsController">
+            <summary>
+            Manages guest information
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.GuestsController.GetById(System.Int32)">
+            <summary>
+            Get guest by ID
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.GuestsController.GetByCheckInId(System.Int32)">
+            <summary>
+            Get all guests for a check-in
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.GuestsController.AddGuestToCheckIn(System.Int32,HMSMini.API.Models.DTOs.Guest.CreateGuestDto)">
+            <summary>
+            Add a new guest to an existing check-in
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.GuestsController.Update(System.Int32,HMSMini.API.Models.DTOs.Guest.CreateGuestDto)">
+            <summary>
+            Update guest information
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.GuestsController.CheckOutGuest(System.Int32)">
+            <summary>
+            Check out an individual guest
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.GuestsController.Delete(System.Int32)">
+            <summary>
+            Delete a guest
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.GuestsController.UploadPhoto(System.Int32,System.Int32,Microsoft.AspNetCore.Http.IFormFile)">
+            <summary>
+            Upload ID proof photo for a guest
+            </summary>
+            <param name="id">Guest ID</param>
+            <param name="photoNumber">Photo number (1 or 2)</param>
+            <param name="file">The image file</param>
+        </member>
+        <member name="M:HMSMini.API.Controllers.GuestsController.ProcessOcr(System.Int32,System.Int32)">
+            <summary>
+            Process OCR on uploaded ID proof photo
+            </summary>
+            <param name="id">Guest ID</param>
+            <param name="photoNumber">Photo number to process (1 or 2)</param>
+        </member>
+        <member name="M:HMSMini.API.Controllers.GuestsController.GetPhoto(System.Int32,System.Int32)">
+            <summary>
+            Retrieve uploaded photo for a guest
+            </summary>
+            <param name="id">Guest ID</param>
+            <param name="photoNumber">Photo number (1 or 2)</param>
+        </member>
+        <member name="T:HMSMini.API.Controllers.ReservationsController">
+            <summary>
+            Controller for managing hotel reservations
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.ReservationsController.GetAll">
+            <summary>
+            Get all reservations
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.ReservationsController.GetById(System.Int32)">
+            <summary>
+            Get reservation by ID
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.ReservationsController.GetByReservationNumber(System.String)">
+            <summary>
+            Get reservation by reservation number
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.ReservationsController.GetByStatus(HMSMini.API.Models.Enums.ReservationStatus)">
+            <summary>
+            Get reservations by status
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.ReservationsController.GetUpcoming">
+            <summary>
+            Get upcoming reservations
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.ReservationsController.Create(HMSMini.API.Models.DTOs.Reservation.CreateReservationDto)">
+            <summary>
+            Create a new reservation
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.ReservationsController.Update(System.Int32,HMSMini.API.Models.DTOs.Reservation.UpdateReservationDto)">
+            <summary>
+            Update a reservation
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.ReservationsController.Confirm(System.Int32)">
+            <summary>
+            Confirm a reservation
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.ReservationsController.AssignRoom(System.Int32,HMSMini.API.Models.DTOs.Reservation.AssignRoomDto)">
+            <summary>
+            Assign a room to a reservation
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.ReservationsController.Cancel(System.Int32)">
+            <summary>
+            Cancel a reservation
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.ReservationsController.Delete(System.Int32)">
+            <summary>
+            Delete a reservation
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Controllers.RoomsController">
+            <summary>
+            Manages hotel rooms
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.RoomsController.GetAll">
+            <summary>
+            Get all rooms
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.RoomsController.GetById(System.Int32)">
+            <summary>
+            Get room by ID
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.RoomsController.GetAvailable(System.DateTime,System.DateTime)">
+            <summary>
+            Get available rooms for date range
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.RoomsController.GetAvailability(System.DateTime,System.DateTime)">
+            <summary>
+            Get room availability for date range with daily status
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.RoomsController.GetOccupancyReport(System.Nullable{System.DateTime})">
+            <summary>
+            Get occupancy report for a specific date
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.RoomsController.ExportOccupancyReportToExcel(System.Nullable{System.DateTime})">
+            <summary>
+            Export occupancy report to Excel
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.RoomsController.Create(HMSMini.API.Models.DTOs.Room.CreateRoomDto)">
+            <summary>
+            Create a new room
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.RoomsController.UpdateStatus(System.Int32,HMSMini.API.Models.DTOs.Room.UpdateRoomStatusDto)">
+            <summary>
+            Update room status (Admin/Manager only - for blocking, maintenance, etc.)
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.RoomsController.UpdateCleaningStatus(System.Int32,HMSMini.API.Models.DTOs.Room.UpdateRoomStatusDto)">
+            <summary>
+            Mark room as clean (Housekeeping only - can only set to Available or Dirty)
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.RoomsController.UpdateMaintenanceStatus(System.Int32,HMSMini.API.Models.DTOs.Room.UpdateRoomStatusDto)">
+            <summary>
+            Set room maintenance status (Maintenance staff can set/release maintenance)
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.RoomsController.Delete(System.Int32)">
+            <summary>
+            Delete a room
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Controllers.RoomTypesController">
+            <summary>
+            Manages room types
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.RoomTypesController.GetAll">
+            <summary>
+            Get all room types
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.RoomTypesController.GetById(System.Int32)">
+            <summary>
+            Get room type by ID
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.RoomTypesController.Create(HMSMini.API.Models.DTOs.RoomType.CreateRoomTypeDto)">
+            <summary>
+            Create a new room type
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.RoomTypesController.Update(System.Int32,HMSMini.API.Models.DTOs.RoomType.UpdateRoomTypeDto)">
+            <summary>
+            Update a room type
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Controllers.RoomTypesController.Delete(System.Int32)">
+            <summary>
+            Delete a room type
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Data.ApplicationDbContext">
+            <summary>
+            Database context for HMS Mini application
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Data.ApplicationDbContextFactory">
+            <summary>
+            Factory for creating ApplicationDbContext at design time (for migrations)
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Data.Configurations.CheckInConfiguration">
+            <summary>
+            Entity configuration for CheckIn
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Data.Configurations.GuestConfiguration">
+            <summary>
+            Entity configuration for Guest
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Data.Configurations.ReservationConfiguration">
+            <summary>
+            Entity Framework configuration for Reservation entity
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Data.Configurations.RoomNoConfiguration">
+            <summary>
+            Entity configuration for RoomNo
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Data.Configurations.RoomTypeConfiguration">
+            <summary>
+            Entity configuration for MRoomType
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Data.Configurations.UserConfiguration">
+            <summary>
+            Entity configuration for User
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Data.DbInitializer">
+            <summary>
+            Initializes the database with seed data
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Exceptions.BusinessRuleException">
+            <summary>
+            Exception thrown when a business rule is violated
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Exceptions.ImageProcessingException">
+            <summary>
+            Exception thrown when image processing fails
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Exceptions.NotFoundException">
+            <summary>
+            Exception thrown when a requested resource is not found
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Extensions.ServiceExtensions">
+            <summary>
+            Extension methods for service registration
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Extensions.ServiceExtensions.AddApplicationServices(Microsoft.Extensions.DependencyInjection.IServiceCollection)">
+            <summary>
+            Add application services to DI container
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Extensions.ServiceExtensions.AddDatabaseServices(Microsoft.Extensions.DependencyInjection.IServiceCollection,Microsoft.Extensions.Configuration.IConfiguration)">
+            <summary>
+            Add database services to DI container
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Middleware.ExceptionHandlingMiddleware">
+            <summary>
+            Global exception handling middleware
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Migrations.InitialCreate">
+            <inheritdoc />
+        </member>
+        <member name="M:HMSMini.API.Migrations.InitialCreate.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:HMSMini.API.Migrations.InitialCreate.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:HMSMini.API.Migrations.InitialCreate.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:HMSMini.API.Migrations.AddAuditFieldsAndNewColumns">
+            <inheritdoc />
+        </member>
+        <member name="M:HMSMini.API.Migrations.AddAuditFieldsAndNewColumns.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:HMSMini.API.Migrations.AddAuditFieldsAndNewColumns.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:HMSMini.API.Migrations.AddAuditFieldsAndNewColumns.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:HMSMini.API.Migrations.AddUserAuthentication">
+            <inheritdoc />
+        </member>
+        <member name="M:HMSMini.API.Migrations.AddUserAuthentication.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:HMSMini.API.Migrations.AddUserAuthentication.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:HMSMini.API.Migrations.AddUserAuthentication.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:HMSMini.API.Migrations.AddReservationSystem">
+            <inheritdoc />
+        </member>
+        <member name="M:HMSMini.API.Migrations.AddReservationSystem.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:HMSMini.API.Migrations.AddReservationSystem.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:HMSMini.API.Migrations.AddReservationSystem.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:HMSMini.API.Migrations.UpdateReservationToUseRoomType">
+            <inheritdoc />
+        </member>
+        <member name="M:HMSMini.API.Migrations.UpdateReservationToUseRoomType.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:HMSMini.API.Migrations.UpdateReservationToUseRoomType.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:HMSMini.API.Migrations.UpdateReservationToUseRoomType.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:HMSMini.API.Migrations.AddGuestCheckInOutTracking">
+            <inheritdoc />
+        </member>
+        <member name="M:HMSMini.API.Migrations.AddGuestCheckInOutTracking.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:HMSMini.API.Migrations.AddGuestCheckInOutTracking.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:HMSMini.API.Migrations.AddGuestCheckInOutTracking.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:HMSMini.API.Migrations.RemoveGuestNumberUniqueConstraint">
+            <inheritdoc />
+        </member>
+        <member name="M:HMSMini.API.Migrations.RemoveGuestNumberUniqueConstraint.Up(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:HMSMini.API.Migrations.RemoveGuestNumberUniqueConstraint.Down(Microsoft.EntityFrameworkCore.Migrations.MigrationBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="M:HMSMini.API.Migrations.RemoveGuestNumberUniqueConstraint.BuildTargetModel(Microsoft.EntityFrameworkCore.ModelBuilder)">
+            <inheritdoc />
+        </member>
+        <member name="T:HMSMini.API.Models.DTOs.Auth.AuthResponseDto">
+            <summary>
+            DTO for authentication response containing JWT token and user info
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.DTOs.Auth.LoginDto">
+            <summary>
+            DTO for user login
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.DTOs.Auth.RegisterDto">
+            <summary>
+            DTO for user registration
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.DTOs.Auth.UserDto">
+            <summary>
+            DTO for user information
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.DTOs.CheckIn.CheckInDto">
+            <summary>
+            CheckIn data transfer object
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.DTOs.CheckIn.CheckInWithGuestsDto">
+            <summary>
+            CheckIn with guests information
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.DTOs.CheckIn.CreateCheckInDto">
+            <summary>
+            DTO for creating a new check-in
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.DTOs.Common.ApiResponse`1">
+            <summary>
+            Generic API response wrapper
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.DTOs.Common.ErrorResponse">
+            <summary>
+            Error response for API
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.DTOs.Common.OcrResult">
+            <summary>
+            Result of OCR processing
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.DTOs.Guest.CreateGuestDto">
+            <summary>
+            DTO for creating a guest
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.DTOs.Guest.GuestDto">
+            <summary>
+            Guest data transfer object
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.DTOs.Guest.GuestInfoDto">
+            <summary>
+            Guest information extracted from OCR
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.DTOs.Guest.OcrReviewDto">
+            <summary>
+            OCR review data including raw text and parsed guest information
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.DTOs.Guest.OcrReviewDto.RawText">
+            <summary>
+            Raw text extracted from OCR
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.DTOs.Guest.OcrReviewDto.Confidence">
+            <summary>
+            OCR confidence score (0-1)
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.DTOs.Guest.OcrReviewDto.GuestInfo">
+            <summary>
+            Parsed guest information from the extracted text
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.DTOs.Reservation.AssignRoomDto">
+            <summary>
+            Data transfer object for assigning a room to a reservation
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.DTOs.Reservation.CreateReservationDto">
+            <summary>
+            Data transfer object for creating a new reservation
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.DTOs.Reservation.ReservationDto">
+            <summary>
+            Data transfer object for reservation information
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.DTOs.Reservation.UpdateReservationDto">
+            <summary>
+            Data transfer object for updating a reservation
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.DTOs.RoomType.CreateRoomTypeDto">
+            <summary>
+            DTO for creating a new room type
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.DTOs.RoomType.RoomTypeDto">
+            <summary>
+            Room type data transfer object
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.DTOs.RoomType.UpdateRoomTypeDto">
+            <summary>
+            DTO for updating an existing room type
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.DTOs.Room.CreateRoomDto">
+            <summary>
+            DTO for creating a new room
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.DTOs.Room.OccupancyReportDto">
+            <summary>
+            Occupancy report for a specific date
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.DTOs.Room.RoomTypeOccupancyDto">
+            <summary>
+            Occupancy breakdown by room type
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.DTOs.Room.RoomAvailabilityDto">
+            <summary>
+            Data transfer object for room availability information
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.DTOs.Room.DailyAvailability">
+            <summary>
+            Represents availability status for a specific date
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.DTOs.Room.RoomDto">
+            <summary>
+            Room data transfer object
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.DTOs.Room.UpdateRoomStatusDto">
+            <summary>
+            DTO for updating room status
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.Entities.CheckIn">
+            <summary>
+            Represents a guest check-in record
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.CheckIn.Id">
+            <summary>
+            Primary key for check-in
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.CheckIn.RoomId">
+            <summary>
+            Foreign key to room
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.CheckIn.CheckInDate">
+            <summary>
+            Check-in date and time
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.CheckIn.CheckOutDate">
+            <summary>
+            Expected check-out date and time
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.CheckIn.ActualCheckInDate">
+            <summary>
+            Actual check-in date and time (when guest actually checked in)
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.CheckIn.ActualCheckOutDate">
+            <summary>
+            Actual check-out date (null until guest checks out)
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.CheckIn.RegistrationNo">
+            <summary>
+            Registration number for this check-in
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.CheckIn.Pax">
+            <summary>
+            Number of guests (Pax)
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.CheckIn.Status">
+            <summary>
+            Current status of the check-in
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.CheckIn.Remarks">
+            <summary>
+            Additional remarks or notes
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.CheckIn.CreatedAt">
+            <summary>
+            Record creation timestamp
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.CheckIn.UpdatedAt">
+            <summary>
+            Last update timestamp
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.CheckIn.CreatedBy">
+            <summary>
+            User who created the record
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.CheckIn.UpdatedBy">
+            <summary>
+            User who last updated the record
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.CheckIn.DeletedAt">
+            <summary>
+            Soft delete timestamp
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.CheckIn.DeletedBy">
+            <summary>
+            User who deleted the record
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.Entities.Guest">
+            <summary>
+            Represents individual guest information (normalized from original schema)
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Guest.Id">
+            <summary>
+            Primary key for guest
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Guest.CheckInId">
+            <summary>
+            Foreign key to check-in
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Guest.GuestNumber">
+            <summary>
+            Guest number within the check-in (1, 2, or 3)
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Guest.GuestName">
+            <summary>
+            Full name of the guest
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Guest.Address">
+            <summary>
+            Address of the guest
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Guest.City">
+            <summary>
+            City
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Guest.State">
+            <summary>
+            State
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Guest.Country">
+            <summary>
+            Country
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Guest.MobileNo">
+            <summary>
+            Mobile number
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Guest.PanOrAadharNo">
+            <summary>
+            PAN or Aadhaar number for identification
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Guest.Photo1Path">
+            <summary>
+            File path for first ID proof photo
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Guest.Photo2Path">
+            <summary>
+            File path for second ID proof photo
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Guest.ActualCheckInDate">
+            <summary>
+            Actual check-in date/time for this guest
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Guest.ActualCheckOutDate">
+            <summary>
+            Actual check-out date/time for this guest
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Guest.Status">
+            <summary>
+            Guest status (Active or CheckedOut)
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Guest.CreatedAt">
+            <summary>
+            Record creation timestamp
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Guest.UpdatedAt">
+            <summary>
+            Last update timestamp
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Guest.CreatedBy">
+            <summary>
+            User who created the record
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Guest.UpdatedBy">
+            <summary>
+            User who last updated the record
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Guest.DeletedAt">
+            <summary>
+            Soft delete timestamp
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Guest.DeletedBy">
+            <summary>
+            User who deleted the record
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.Entities.MRoomType">
+            <summary>
+            Master table for room types (Single, Double, Suite, etc.)
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.MRoomType.RoomTypeId">
+            <summary>
+            Primary key for room type
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.MRoomType.RoomType">
+            <summary>
+            Name of the room type (e.g., Single, Double, Suite)
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.MRoomType.RoomDescription">
+            <summary>
+            Description of the room type and amenities
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.MRoomType.CreatedAt">
+            <summary>
+            Record creation timestamp
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.MRoomType.UpdatedAt">
+            <summary>
+            Last update timestamp
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.MRoomType.CreatedBy">
+            <summary>
+            User who created the record
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.MRoomType.UpdatedBy">
+            <summary>
+            User who last updated the record
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.MRoomType.DeletedAt">
+            <summary>
+            Soft delete timestamp
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.MRoomType.DeletedBy">
+            <summary>
+            User who deleted the record
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.Entities.Reservation">
+            <summary>
+            Represents a future room reservation
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Reservation.ReservationNumber">
+            <summary>
+            Unique reservation confirmation number
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Reservation.RoomTypeId">
+            <summary>
+            Foreign key to RoomType (requested room type)
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Reservation.RoomType">
+            <summary>
+            Navigation property to RoomType
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Reservation.RoomId">
+            <summary>
+            Foreign key to RoomNo (assigned room, null until room is assigned)
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Reservation.Room">
+            <summary>
+            Navigation property to Room
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Reservation.CheckInDate">
+            <summary>
+            Expected check-in date
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Reservation.CheckOutDate">
+            <summary>
+            Expected check-out date
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Reservation.NumberOfGuests">
+            <summary>
+            Number of guests expected
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Reservation.GuestName">
+            <summary>
+            Primary guest name
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Reservation.GuestEmail">
+            <summary>
+            Primary guest email
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Reservation.GuestMobile">
+            <summary>
+            Primary guest mobile number
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Reservation.SpecialRequests">
+            <summary>
+            Special requests or notes
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Reservation.Status">
+            <summary>
+            Current status of the reservation
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Reservation.CheckInId">
+            <summary>
+            Foreign key to CheckIn (null until guest checks in)
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Reservation.CheckIn">
+            <summary>
+            Navigation property to CheckIn
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Reservation.CreatedAt">
+            <summary>
+            Date and time when reservation was created
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Reservation.UpdatedAt">
+            <summary>
+            Date and time when reservation was last updated
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Reservation.CreatedBy">
+            <summary>
+            User who created the reservation
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.Reservation.UpdatedBy">
+            <summary>
+            User who last updated the reservation
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.Entities.RoomNo">
+            <summary>
+            Represents individual room inventory
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.RoomNo.RoomId">
+            <summary>
+            Primary key for room
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.RoomNo.RoomNumber">
+            <summary>
+            Room number (e.g., 101, 202, etc.)
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.RoomNo.RoomTypeId">
+            <summary>
+            Foreign key to room type
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.RoomNo.RoomStatus">
+            <summary>
+            Current status of the room
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.RoomNo.RoomStatusFromDate">
+            <summary>
+            Start date when the room status becomes effective
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.RoomNo.RoomStatusToDate">
+            <summary>
+            End date when the room status expires
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.RoomNo.CreatedAt">
+            <summary>
+            Record creation timestamp
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.RoomNo.UpdatedAt">
+            <summary>
+            Last update timestamp
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.RoomNo.CreatedBy">
+            <summary>
+            User who created the record
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.RoomNo.UpdatedBy">
+            <summary>
+            User who last updated the record
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.RoomNo.DeletedAt">
+            <summary>
+            Soft delete timestamp
+            </summary>
+        </member>
+        <member name="P:HMSMini.API.Models.Entities.RoomNo.DeletedBy">
+            <summary>
+            User who deleted the record
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.Entities.User">
+            <summary>
+            User entity for authentication and authorization
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.Enums.CheckInStatus">
+            <summary>
+            Represents the status of a check-in record
+            </summary>
+        </member>
+        <member name="F:HMSMini.API.Models.Enums.CheckInStatus.Active">
+            <summary>
+            Guest is currently checked in
+            </summary>
+        </member>
+        <member name="F:HMSMini.API.Models.Enums.CheckInStatus.CheckedOut">
+            <summary>
+            Guest has checked out
+            </summary>
+        </member>
+        <member name="F:HMSMini.API.Models.Enums.CheckInStatus.Cancelled">
+            <summary>
+            Check-in was cancelled
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.Enums.GuestStatus">
+            <summary>
+            Status of individual guest
+            </summary>
+        </member>
+        <member name="F:HMSMini.API.Models.Enums.GuestStatus.Active">
+            <summary>
+            Guest is currently checked in and active
+            </summary>
+        </member>
+        <member name="F:HMSMini.API.Models.Enums.GuestStatus.CheckedOut">
+            <summary>
+            Guest has checked out
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.Enums.ReservationStatus">
+            <summary>
+            Status of a reservation
+            </summary>
+        </member>
+        <member name="F:HMSMini.API.Models.Enums.ReservationStatus.Pending">
+            <summary>
+            Reservation is pending confirmation
+            </summary>
+        </member>
+        <member name="F:HMSMini.API.Models.Enums.ReservationStatus.Confirmed">
+            <summary>
+            Reservation has been confirmed
+            </summary>
+        </member>
+        <member name="F:HMSMini.API.Models.Enums.ReservationStatus.CheckedIn">
+            <summary>
+            Guest has checked in (reservation fulfilled)
+            </summary>
+        </member>
+        <member name="F:HMSMini.API.Models.Enums.ReservationStatus.Cancelled">
+            <summary>
+            Reservation was cancelled
+            </summary>
+        </member>
+        <member name="F:HMSMini.API.Models.Enums.ReservationStatus.NoShow">
+            <summary>
+            Guest did not show up
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.Enums.RoomStatus">
+            <summary>
+            Represents the current status of a room
+            </summary>
+        </member>
+        <member name="F:HMSMini.API.Models.Enums.RoomStatus.Available">
+            <summary>
+            Room is available for check-in
+            </summary>
+        </member>
+        <member name="F:HMSMini.API.Models.Enums.RoomStatus.Occupied">
+            <summary>
+            Room is currently occupied by a guest
+            </summary>
+        </member>
+        <member name="F:HMSMini.API.Models.Enums.RoomStatus.Dirty">
+            <summary>
+            Room needs cleaning after checkout
+            </summary>
+        </member>
+        <member name="F:HMSMini.API.Models.Enums.RoomStatus.Maintenance">
+            <summary>
+            Room is under maintenance
+            </summary>
+        </member>
+        <member name="F:HMSMini.API.Models.Enums.RoomStatus.Blocked">
+            <summary>
+            Room is blocked and unavailable
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Models.Enums.UserRole">
+            <summary>
+            User roles for authorization
+            </summary>
+        </member>
+        <member name="F:HMSMini.API.Models.Enums.UserRole.Admin">
+            <summary>
+            Administrator - Full access to all features
+            </summary>
+        </member>
+        <member name="F:HMSMini.API.Models.Enums.UserRole.Manager">
+            <summary>
+            Manager - Can view reports and manage operations
+            </summary>
+        </member>
+        <member name="F:HMSMini.API.Models.Enums.UserRole.Receptionist">
+            <summary>
+            Receptionist - Can handle check-ins, check-outs, and guest management
+            </summary>
+        </member>
+        <member name="F:HMSMini.API.Models.Enums.UserRole.Housekeeping">
+            <summary>
+            Housekeeping - Can manage room cleaning and status updates
+            </summary>
+        </member>
+        <member name="F:HMSMini.API.Models.Enums.UserRole.Maintenance">
+            <summary>
+            Maintenance - Can manage room maintenance and repairs
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Services.Implementations.AuthService">
+            <summary>
+            Service for authentication and authorization
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Services.Implementations.ImageStorageService">
+            <summary>
+            Service for handling image storage operations
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Services.Implementations.OcrService">
+            <summary>
+            Service for OCR operations using Tesseract
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Services.Implementations.OcrService.CleanTextToEnglishOnly(System.String)">
+            <summary>
+            Cleans OCR text to keep only English/Latin characters, numbers, and common punctuation
+            Removes regional language characters (Hindi, Tamil, etc.) while preserving line structure
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Services.Implementations.ReservationService">
+            <summary>
+            Service implementation for reservation operations
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Services.Interfaces.IAuthService">
+            <summary>
+            Service interface for authentication and authorization
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Services.Interfaces.IAuthService.RegisterAsync(HMSMini.API.Models.DTOs.Auth.RegisterDto)">
+            <summary>
+            Register a new user
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Services.Interfaces.IAuthService.LoginAsync(HMSMini.API.Models.DTOs.Auth.LoginDto)">
+            <summary>
+            Authenticate user and return JWT token
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Services.Interfaces.IAuthService.GetUserByIdAsync(System.Int32)">
+            <summary>
+            Get user by ID
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Services.Interfaces.IAuthService.GetAllUsersAsync">
+            <summary>
+            Get all users (Admin only)
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Services.Interfaces.IAuthService.DeactivateUserAsync(System.Int32)">
+            <summary>
+            Deactivate user (Admin only)
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Services.Interfaces.IImageStorageService">
+            <summary>
+            Service for handling image storage operations
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Services.Interfaces.IImageStorageService.SaveImageAsync(Microsoft.AspNetCore.Http.IFormFile,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Saves an uploaded image file to storage
+            </summary>
+            <param name="file">The image file to save</param>
+            <param name="checkInId">The check-in ID</param>
+            <param name="guestNumber">The guest number (1-3)</param>
+            <param name="photoNumber">The photo number (1 or 2)</param>
+            <returns>The relative file path where the image was saved</returns>
+        </member>
+        <member name="M:HMSMini.API.Services.Interfaces.IImageStorageService.DeleteImageAsync(System.String)">
+            <summary>
+            Deletes an image file from storage
+            </summary>
+            <param name="filePath">The relative file path to delete</param>
+            <returns>True if deleted successfully, false otherwise</returns>
+        </member>
+        <member name="M:HMSMini.API.Services.Interfaces.IImageStorageService.GetImageAsync(System.String)">
+            <summary>
+            Retrieves an image file from storage
+            </summary>
+            <param name="filePath">The relative file path to retrieve</param>
+            <returns>The image file bytes</returns>
+        </member>
+        <member name="M:HMSMini.API.Services.Interfaces.IImageStorageService.GetPhysicalPath(System.String)">
+            <summary>
+            Gets the full physical path from a relative path
+            </summary>
+            <param name="relativePath">The relative file path</param>
+            <returns>The full physical path</returns>
+        </member>
+        <member name="T:HMSMini.API.Services.Interfaces.IOcrService">
+            <summary>
+            Service for OCR (Optical Character Recognition) operations
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Services.Interfaces.IOcrService.ProcessImageAsync(System.IO.Stream,System.String)">
+            <summary>
+            Processes an image and extracts text using OCR
+            </summary>
+            <param name="imageStream">The image stream to process</param>
+            <param name="fileName">The original file name</param>
+            <returns>OCR result with extracted text and confidence</returns>
+        </member>
+        <member name="M:HMSMini.API.Services.Interfaces.IOcrService.ExtractGuestInfoAsync(System.String)">
+            <summary>
+            Extracts guest information from OCR text
+            </summary>
+            <param name="extractedText">The text extracted from OCR</param>
+            <returns>Structured guest information</returns>
+        </member>
+        <member name="M:HMSMini.API.Services.Interfaces.IOcrService.ProcessImageFileAsync(System.String)">
+            <summary>
+            Processes an image file path and extracts guest information
+            </summary>
+            <param name="imageFilePath">The full path to the image file</param>
+            <returns>Structured guest information</returns>
+        </member>
+        <member name="T:HMSMini.API.Services.Interfaces.IReservationService">
+            <summary>
+            Service interface for reservation operations
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Services.Interfaces.IReservationService.GetAllAsync">
+            <summary>
+            Get all reservations
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Services.Interfaces.IReservationService.GetByIdAsync(System.Int32)">
+            <summary>
+            Get reservation by ID
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Services.Interfaces.IReservationService.GetByReservationNumberAsync(System.String)">
+            <summary>
+            Get reservation by reservation number
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Services.Interfaces.IReservationService.GetByStatusAsync(HMSMini.API.Models.Enums.ReservationStatus)">
+            <summary>
+            Get reservations by status
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Services.Interfaces.IReservationService.GetUpcomingReservationsAsync">
+            <summary>
+            Get upcoming reservations (check-in date in the future and status is Confirmed or Pending)
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Services.Interfaces.IReservationService.CreateAsync(HMSMini.API.Models.DTOs.Reservation.CreateReservationDto)">
+            <summary>
+            Create a new reservation
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Services.Interfaces.IReservationService.UpdateAsync(System.Int32,HMSMini.API.Models.DTOs.Reservation.UpdateReservationDto)">
+            <summary>
+            Update an existing reservation
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Services.Interfaces.IReservationService.ConfirmReservationAsync(System.Int32)">
+            <summary>
+            Confirm a reservation
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Services.Interfaces.IReservationService.AssignRoomAsync(System.Int32,HMSMini.API.Models.DTOs.Reservation.AssignRoomDto)">
+            <summary>
+            Assign a room to a reservation
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Services.Interfaces.IReservationService.CancelReservationAsync(System.Int32)">
+            <summary>
+            Cancel a reservation
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Services.Interfaces.IReservationService.MarkAsCheckedInAsync(System.Int32,System.Int32)">
+            <summary>
+            Mark reservation as checked in
+            </summary>
+        </member>
+        <member name="M:HMSMini.API.Services.Interfaces.IReservationService.DeleteAsync(System.Int32)">
+            <summary>
+            Delete a reservation
+            </summary>
+        </member>
+        <member name="T:HMSMini.API.Validators.CreateReservationDtoValidator">
+            <summary>
+            Validator for CreateReservationDto
+            </summary>
+        </member>
+    </members>
+</doc>

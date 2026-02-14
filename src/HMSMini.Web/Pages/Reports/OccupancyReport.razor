@@ -1,0 +1,305 @@
+@page "/reports/occupancy"
+@inject IApiClientService ApiClient
+@inject IJSRuntime JSRuntime
+@using HMSMini.Web.Services
+@using HMSMini.Web.Models
+
+<PageTitle>Occupancy Report - MSS</PageTitle>
+
+<div class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 no-print">
+        <h2>Occupancy Report</h2>
+        <div class="d-flex gap-2">
+            <input type="date" class="form-control" @bind="selectedDate" @bind:event="oninput" />
+            <button class="btn btn-primary" @onclick="LoadReport">
+                <i class="bi bi-search"></i> Load Report
+            </button>
+            <button class="btn btn-success" @onclick="LoadTodayReport">
+                <i class="bi bi-calendar-day"></i> Today
+            </button>
+        </div>
+    </div>
+
+    @if (loading)
+    {
+        <div class="text-center">
+            <div class="spinner-border"></div>
+            <p>Loading report...</p>
+        </div>
+    }
+    else if (report != null)
+    {
+        <!-- Debug Info - Remove after fixing -->
+        <div class="alert alert-success no-print">
+            <strong>✓ Debug Info:</strong> Report loaded successfully<br/>
+            Total Rooms: @report.TotalRooms<br/>
+            Occupied: @report.OccupiedRooms<br/>
+            Checked Out: @report.CheckedOutRooms<br/>
+            Available: @report.AvailableRooms<br/>
+            Dirty: @report.DirtyRooms<br/>
+            Maintenance: @report.MaintenanceRooms<br/>
+            Blocked: @report.BlockedRooms<br/>
+            Occupancy %: @report.OccupancyPercentage<br/>
+            Room Type Breakdown Count: @report.RoomTypeBreakdown.Count
+        </div>
+
+        <div id="printable-report">
+        <!-- Print Header - Only visible when printing -->
+        <div class="d-none d-print-block mb-4 text-center">
+            <h3>Hotel Management System</h3>
+            <h4>Occupancy Report</h4>
+            <p>Report Date: <strong>@report.ReportDate.ToString("MMMM dd, yyyy")</strong></p>
+            <hr />
+        </div>
+
+        <!-- Report Header - Screen only -->
+        <div class="alert alert-info mb-4 no-print">
+            <h5 class="mb-0">
+                <i class="bi bi-calendar3"></i>
+                Occupancy Report for <strong>@report.ReportDate.ToString("MMMM dd, yyyy")</strong>
+            </h5>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="row g-3 mb-4">
+            <div class="col-lg-2 col-md-4">
+                <div class="card text-center border-primary">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-2">Total Rooms</h6>
+                        <h2 class="mb-0 text-primary">@report.TotalRooms</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4">
+                <div class="card text-center border-danger">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-2">Occupied</h6>
+                        <h2 class="mb-0 text-danger">@report.OccupiedRooms</h2>
+                        <small class="text-muted">Active</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4">
+                <div class="card text-center border-warning">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-2">Checked Out</h6>
+                        <h2 class="mb-0 text-warning">@report.CheckedOutRooms</h2>
+                        <small class="text-muted">Today</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4">
+                <div class="card text-center border-success">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-2">Available</h6>
+                        <h2 class="mb-0 text-success">@report.AvailableRooms</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4">
+                <div class="card text-center border-info">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-2">Occupancy</h6>
+                        <h2 class="mb-0 text-info">@report.OccupancyPercentage%</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-2 col-md-4">
+                <div class="card text-center border-secondary">
+                    <div class="card-body">
+                        <h6 class="text-muted mb-2">Dirty</h6>
+                        <h2 class="mb-0 text-secondary">@report.DirtyRooms</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Additional Status Breakdown -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i class="bi bi-tools text-secondary" style="font-size: 2rem;"></i>
+                        <h6 class="mt-2 text-muted">Under Maintenance</h6>
+                        <h3>@report.MaintenanceRooms</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i class="bi bi-slash-circle text-info" style="font-size: 2rem;"></i>
+                        <h6 class="mt-2 text-muted">Blocked Rooms</h6>
+                        <h3>@report.BlockedRooms</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Room Type Breakdown -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Occupancy by Room Type</h5>
+            </div>
+            <div class="card-body">
+                @if (report.RoomTypeBreakdown.Any())
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Room Type</th>
+                                    <th>Total Rooms</th>
+                                    <th>Occupied</th>
+                                    <th>Checked Out</th>
+                                    <th>Available</th>
+                                    <th>Occupancy Rate</th>
+                                    <th>Visualization</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var typeData in report.RoomTypeBreakdown)
+                                {
+                                    <tr>
+                                        <td><strong>@typeData.RoomTypeName</strong></td>
+                                        <td>@typeData.TotalRooms</td>
+                                        <td>
+                                            <span class="badge bg-danger">@typeData.OccupiedRooms</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-warning">@typeData.CheckedOutRooms</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-success">@typeData.AvailableRooms</span>
+                                        </td>
+                                        <td>
+                                            <strong>@typeData.OccupancyPercentage%</strong>
+                                        </td>
+                                        <td>
+                                            <div class="progress" style="height: 25px;">
+                                                <div class="progress-bar bg-danger"
+                                                     role="progressbar"
+                                                     style="width: @(typeData.OccupancyPercentage)%"
+                                                     aria-valuenow="@typeData.OccupancyPercentage"
+                                                     aria-valuemin="0"
+                                                     aria-valuemax="100">
+                                                    @if (typeData.OccupancyPercentage > 15)
+                                                    {
+                                                        <span>@typeData.OccupancyPercentage%</span>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted">No room type data available</p>
+                }
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="mt-4 text-end no-print">
+            <button class="btn btn-success me-2" @onclick="ExportToExcel">
+                <i class="bi bi-file-earmark-excel"></i> Export to Excel
+            </button>
+            <button class="btn btn-primary" @onclick="PrintReport">
+                <i class="bi bi-printer"></i> Print Report
+            </button>
+        </div>
+        </div> <!-- End printable-report -->
+    }
+    else if (!loading)
+    {
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle"></i>
+            No data available. Please select a date and load the report.<br/>
+            <strong>Debug:</strong> report is null, loading is @loading
+        </div>
+    }
+
+    <!-- Debug - show state -->
+    <div class="alert alert-secondary no-print">
+        <strong>Current State:</strong><br/>
+        Loading: @loading<br/>
+        Report is null: @(report == null)<br/>
+        Selected Date: @selectedDate.ToString("yyyy-MM-dd")<br/>
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <strong class="text-danger">Error: @errorMessage</strong>
+        }
+    </div>
+</div>
+
+@code {
+    private OccupancyReportDto? report = null;
+    private DateTime selectedDate = DateTime.Today;
+    private bool loading = false;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTodayReport();
+    }
+
+    private async Task LoadReport()
+    {
+        loading = true;
+        errorMessage = string.Empty;
+        try
+        {
+            report = await ApiClient.GetOccupancyReportAsync(selectedDate);
+            if (report == null)
+            {
+                errorMessage = "API returned null - check browser console for errors";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading report: {ex.Message}";
+        }
+        loading = false;
+    }
+
+    private async Task LoadTodayReport()
+    {
+        selectedDate = DateTime.Today;
+        await LoadReport();
+    }
+
+    private async Task PrintReport()
+    {
+        // Trigger browser print
+        await JSRuntime.InvokeVoidAsync("window.print");
+    }
+
+    private async Task ExportToExcel()
+    {
+        try
+        {
+            var excelData = await ApiClient.ExportOccupancyReportToExcelAsync(selectedDate);
+
+            if (excelData != null && excelData.Length > 0)
+            {
+                var fileName = $"OccupancyReport_{selectedDate:yyyy-MM-dd}.xlsx";
+
+                // Convert byte array to base64 and trigger download
+                var base64 = Convert.ToBase64String(excelData);
+                await JSRuntime.InvokeVoidAsync("downloadFileFromBase64", base64, fileName);
+            }
+            else
+            {
+                errorMessage = "Failed to export Excel file";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error exporting to Excel: {ex.Message}";
+        }
+    }
+}

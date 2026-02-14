@@ -2,11 +2,11 @@
 @inject IAuthenticationService AuthService
 @inject NavigationManager Navigation
 
-<PageTitle>Login - HMS Mini</PageTitle>
+<PageTitle>Login - MSS</PageTitle>
 
 <div class="login-container">
     <div class="login-card">
-        <h2 class="text-center mb-4">HMS Mini</h2>
+        <h2 class="text-center mb-4">MSS</h2>
         <h5 class="text-center text-muted mb-4">Hotel Management System</h5>
 
         @if (isRegisterMode)
@@ -35,6 +35,8 @@
                         <option value="2">Receptionist</option>
                         <option value="1">Manager</option>
                         <option value="0">Admin</option>
+                        <option value="5">Banquet Manager</option>
+                        <option value="6">Banquet Staff</option>
                     </select>
                 </div>
 
@@ -114,10 +116,14 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // Redirect to dashboard if already authenticated
+        // Redirect to appropriate dashboard if already authenticated
         if (await AuthService.IsAuthenticatedAsync())
         {
-            Navigation.NavigateTo("/");
+            var user = await AuthService.GetCurrentUserAsync();
+            if (user != null && (user.Role == 5 || user.Role == 6))
+                Navigation.NavigateTo("/banquet");
+            else
+                Navigation.NavigateTo("/");
         }
     }
 
@@ -130,7 +136,10 @@
 
         if (response != null)
         {
-            Navigation.NavigateTo("/");
+            if (response.Role == 5 || response.Role == 6)
+                Navigation.NavigateTo("/banquet");
+            else
+                Navigation.NavigateTo("/");
         }
         else
         {
@@ -149,7 +158,10 @@
 
         if (response != null)
         {
-            Navigation.NavigateTo("/");
+            if (response.Role == 5 || response.Role == 6)
+                Navigation.NavigateTo("/banquet");
+            else
+                Navigation.NavigateTo("/");
         }
         else
         {

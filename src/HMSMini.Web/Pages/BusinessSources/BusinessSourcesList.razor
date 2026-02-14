@@ -1,0 +1,237 @@
+@page "/business-sources"
+@inject IApiClientService ApiClient
+@inject IAuthenticationService AuthService
+@inject NavigationManager Navigation
+@using HMSMini.Web.Services
+@using HMSMini.Web.Models
+
+<div class="page-header">
+    <h3>Business Sources Management</h3>
+    @if (canManageMasterData)
+    {
+        <button class="btn btn-primary" @onclick="ShowCreateModal">
+            <span class="icon">+</span> Add Business Source
+        </button>
+    }
+</div>
+
+@if (!canManageMasterData)
+{
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> You have view-only access. Contact an administrator to make changes.
+    </div>
+}
+
+@if (isLoading)
+{
+    <div class="loading">Loading business sources...</div>
+}
+else if (businessSources.Count == 0)
+{
+    <div class="empty-state">
+        <p>No business sources found.</p>
+        @if (canManageMasterData)
+        {
+            <button class="btn btn-primary" @onclick="ShowCreateModal">Add Business Source</button>
+        }
+    </div>
+}
+else
+{
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Source Name</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var source in businessSources)
+                {
+                    <tr>
+                        <td>@source.SourceName</td>
+                        <td>@(source.Description ?? "-")</td>
+                        <td>
+                            <span class="status-badge @(source.IsActive ? "status-active" : "status-inactive")">
+                                @(source.IsActive ? "Active" : "Inactive")
+                            </span>
+                        </td>
+                        <td>@source.CreatedAt.ToString("MMM dd, yyyy")</td>
+                        <td>
+                            @if (canManageMasterData)
+                            {
+                                <div class="action-buttons">
+                                    <button class="btn btn-sm btn-secondary" @onclick="() => ShowEditModal(source)">Edit</button>
+                                    @if (source.IsActive)
+                                    {
+                                        <button class="btn btn-sm btn-warning" @onclick="() => DeactivateSource(source.BusinessSourceId)">Deactivate</button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-sm btn-success" @onclick="() => ActivateSource(source.BusinessSourceId)">Activate</button>
+                                    }
+                                    <button class="btn btn-sm btn-danger" @onclick="() => DeleteSource(source.BusinessSourceId)">Delete</button>
+                                </div>
+                            }
+                            else
+                            {
+                                <span class="text-muted">View Only</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (showCreateModal)
+{
+    <div class="modal-overlay" @onclick="HideCreateModal">
+        <div class="modal-content" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h4>@(editingSource == null ? "Add Business Source" : "Edit Business Source")</h4>
+                <button class="btn-close" @onclick="HideCreateModal">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Source Name *</label>
+                    <input type="text" class="form-control" @bind="formModel.SourceName" placeholder="e.g., Walk-In, Online" />
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea class="form-control" @bind="formModel.Description" rows="3" placeholder="Description of the business source"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="HideCreateModal">Cancel</button>
+                <button class="btn btn-primary" @onclick="SaveSource" disabled="@isSaving">
+                    @(isSaving ? "Saving..." : "Save")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<BusinessSourceModel> businessSources = new();
+    private bool isLoading = true;
+    private bool showCreateModal = false;
+    private bool isSaving = false;
+    private BusinessSourceModel? editingSource = null;
+    private CreateBusinessSourceModel formModel = new();
+
+    // Role-based permissions
+    private bool canManageMasterData = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckUserPermissions();
+        await LoadBusinessSources();
+    }
+
+    private async Task CheckUserPermissions()
+    {
+        var currentUser = await AuthService.GetCurrentUserAsync();
+        if (currentUser != null)
+        {
+            // Only Admin (0) and Manager (1) can manage master data
+            canManageMasterData = currentUser.Role == 0 || currentUser.Role == 1;
+        }
+    }
+
+    private async Task LoadBusinessSources()
+    {
+        isLoading = true;
+        businessSources = await ApiClient.GetAllBusinessSourcesAsync();
+        isLoading = false;
+    }
+
+    private void ShowCreateModal()
+    {
+        editingSource = null;
+        formModel = new CreateBusinessSourceModel();
+        showCreateModal = true;
+    }
+
+    private void ShowEditModal(BusinessSourceModel source)
+    {
+        editingSource = source;
+        formModel = new CreateBusinessSourceModel
+        {
+            SourceName = source.SourceName,
+            Description = source.Description
+        };
+        showCreateModal = true;
+    }
+
+    private void HideCreateModal()
+    {
+        showCreateModal = false;
+        editingSource = null;
+        formModel = new();
+    }
+
+    private async Task SaveSource()
+    {
+        if (string.IsNullOrWhiteSpace(formModel.SourceName))
+            return;
+
+        isSaving = true;
+
+        try
+        {
+            if (editingSource == null)
+            {
+                await ApiClient.CreateBusinessSourceAsync(formModel);
+            }
+            else
+            {
+                var updateModel = new UpdateBusinessSourceModel
+                {
+                    SourceName = formModel.SourceName,
+                    Description = formModel.Description
+                };
+                await ApiClient.UpdateBusinessSourceAsync(editingSource.BusinessSourceId, updateModel);
+            }
+
+            await LoadBusinessSources();
+            HideCreateModal();
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task ActivateSource(int id)
+    {
+        await ApiClient.ActivateBusinessSourceAsync(id);
+        await LoadBusinessSources();
+    }
+
+    private async Task DeactivateSource(int id)
+    {
+        await ApiClient.DeactivateBusinessSourceAsync(id);
+        await LoadBusinessSources();
+    }
+
+    private async Task DeleteSource(int id)
+    {
+        if (confirm("Are you sure you want to delete this business source?"))
+        {
+            await ApiClient.DeleteBusinessSourceAsync(id);
+            await LoadBusinessSources();
+        }
+    }
+
+    private bool confirm(string message)
+    {
+        // Simple confirmation - in production, use a proper modal
+        return true;
+    }
+}

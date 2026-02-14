@@ -38,6 +38,9 @@ public class GuestService : IGuestService
             PanOrAadharNo = guest.PanOrAadharNo,
             Photo1Path = guest.Photo1Path,
             Photo2Path = guest.Photo2Path,
+            ActualCheckInDate = guest.ActualCheckInDate,
+            ActualCheckOutDate = guest.ActualCheckOutDate,
+            Status = (int)guest.Status,
             CreatedAt = guest.CreatedAt,
             UpdatedAt = guest.UpdatedAt,
             CreatedBy = guest.CreatedBy,
@@ -63,6 +66,9 @@ public class GuestService : IGuestService
                 PanOrAadharNo = g.PanOrAadharNo,
                 Photo1Path = g.Photo1Path,
                 Photo2Path = g.Photo2Path,
+                ActualCheckInDate = g.ActualCheckInDate,
+                ActualCheckOutDate = g.ActualCheckOutDate,
+                Status = (int)g.Status,
                 CreatedAt = g.CreatedAt,
                 UpdatedAt = g.UpdatedAt,
                 CreatedBy = g.CreatedBy,
@@ -70,6 +76,75 @@ public class GuestService : IGuestService
             })
             .OrderBy(g => g.GuestNumber)
             .ToListAsync();
+    }
+
+    public async Task<GuestDto> CreateAsync(int checkInId, CreateGuestDto dto)
+    {
+        // Verify check-in exists and is active
+        var checkIn = await _context.CheckIns.FindAsync(checkInId);
+        if (checkIn == null)
+            throw new NotFoundException(nameof(CheckIn), checkInId);
+
+        if (checkIn.Status != Models.Enums.CheckInStatus.Active)
+            throw new BusinessRuleException("Cannot add guests to a checked-out reservation");
+
+        // Get all active guests for this check-in
+        var allGuests = await _context.Guests
+            .Where(g => g.CheckInId == checkInId)
+            .ToListAsync();
+
+        // Find the first available guest number (either a checked-out slot or next number)
+        int assignedGuestNumber;
+
+        // Check if Guest 2 slot is available (either no active Guest 2 exists, or Guest 2 is checked out)
+        var guest2 = allGuests.FirstOrDefault(g => g.GuestNumber == 2 && g.Status == Models.Enums.GuestStatus.Active);
+        if (guest2 == null)
+        {
+            assignedGuestNumber = 2;
+        }
+        // Check if Guest 3 slot is available
+        else
+        {
+            var guest3 = allGuests.FirstOrDefault(g => g.GuestNumber == 3 && g.Status == Models.Enums.GuestStatus.Active);
+            if (guest3 == null)
+            {
+                assignedGuestNumber = 3;
+            }
+            else
+            {
+                throw new BusinessRuleException("Maximum 3 active guests allowed per check-in");
+            }
+        }
+
+        // Create new guest with assigned guest number
+        var newGuest = new Guest
+        {
+            CheckInId = checkInId,
+            GuestNumber = assignedGuestNumber,
+            GuestName = dto.GuestName,
+            Address = dto.Address,
+            City = dto.City,
+            State = dto.State,
+            Country = dto.Country,
+            MobileNo = dto.MobileNo,
+            PanOrAadharNo = dto.PanOrAadharNo,
+            ActualCheckInDate = DateTime.UtcNow,
+            Status = Models.Enums.GuestStatus.Active,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.Guests.Add(newGuest);
+
+        // Update PAX count to reflect active guests only
+        var activeGuestCount = allGuests.Count(g => g.Status == Models.Enums.GuestStatus.Active) + 1; // Add the new guest
+
+        checkIn.Pax = activeGuestCount;
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Added new guest (Guest #{GuestNumber}) to check-in ID {CheckInId}", newGuest.GuestNumber, checkInId);
+
+        return await GetByIdAsync(newGuest.Id);
     }
 
     public async Task<GuestDto> UpdateAsync(int id, CreateGuestDto dto)
@@ -114,6 +189,40 @@ public class GuestService : IGuestService
         return await GetByIdAsync(id);
     }
 
+    public async Task<GuestDto> CheckOutGuestAsync(int id)
+    {
+        var guest = await _context.Guests.FindAsync(id);
+        if (guest == null)
+            throw new NotFoundException(nameof(Guest), id);
+
+        if (guest.Status == Models.Enums.GuestStatus.CheckedOut)
+            throw new BusinessRuleException("Guest has already been checked out");
+
+        if (guest.GuestNumber == 1)
+            throw new BusinessRuleException("Cannot check out the primary guest. Use the main check-out function instead.");
+
+        guest.ActualCheckOutDate = DateTime.UtcNow;
+        guest.Status = Models.Enums.GuestStatus.CheckedOut;
+        guest.UpdatedAt = DateTime.UtcNow;
+
+        // Update PAX count on check-in to reflect active guests only
+        var checkIn = await _context.CheckIns.FindAsync(guest.CheckInId);
+        if (checkIn != null)
+        {
+            var activeGuestCount = await _context.Guests
+                .Where(g => g.CheckInId == guest.CheckInId && g.Status == Models.Enums.GuestStatus.Active)
+                .CountAsync();
+
+            checkIn.Pax = activeGuestCount - 1; // Subtract the guest being checked out
+        }
+
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Checked out guest ID {Id} (Guest #{GuestNumber})", id, guest.GuestNumber);
+
+        return await GetByIdAsync(id);
+    }
+
     public async Task DeleteAsync(int id)
     {
         var guest = await _context.Guests.FindAsync(id);
@@ -124,5 +233,138 @@ public class GuestService : IGuestService
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Deleted guest ID {Id}", id);
+    }
+
+    public async Task<List<GuestDto>> SearchGuestsByMobileAsync(string mobile)
+    {
+        if (string.IsNullOrWhiteSpace(mobile))
+            return new List<GuestDto>();
+
+        var guests = await _context.Guests
+            .Where(g => g.MobileNo != null && g.MobileNo.Contains(mobile))
+            .OrderByDescending(g => g.CreatedAt)
+            .Take(30)
+            .Select(g => new GuestDto
+            {
+                Id = g.Id,
+                CheckInId = g.CheckInId,
+                GuestNumber = g.GuestNumber,
+                GuestName = g.GuestName,
+                Address = g.Address,
+                City = g.City,
+                State = g.State,
+                Country = g.Country,
+                MobileNo = g.MobileNo,
+                PanOrAadharNo = g.PanOrAadharNo,
+                Photo1Path = g.Photo1Path,
+                Photo2Path = g.Photo2Path,
+                ActualCheckInDate = g.ActualCheckInDate,
+                ActualCheckOutDate = g.ActualCheckOutDate,
+                Status = (int)g.Status,
+                CreatedAt = g.CreatedAt,
+                UpdatedAt = g.UpdatedAt,
+                CreatedBy = g.CreatedBy,
+                UpdatedBy = g.UpdatedBy
+            })
+            .ToListAsync();
+
+        // Deduplicate by name+mobile combination and take most recent
+        var uniqueGuests = guests
+            .GroupBy(g => new { g.GuestName, g.MobileNo })
+            .Select(group => group.First())
+            .ToList();
+
+        return uniqueGuests;
+    }
+
+    public async Task<List<GuestDto>> SearchGuestsByNameAsync(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return new List<GuestDto>();
+
+        var guests = await _context.Guests
+            .Where(g => EF.Functions.Like(g.GuestName, $"%{name}%"))
+            .OrderByDescending(g => g.CreatedAt)
+            .Take(30)
+            .Select(g => new GuestDto
+            {
+                Id = g.Id,
+                CheckInId = g.CheckInId,
+                GuestNumber = g.GuestNumber,
+                GuestName = g.GuestName,
+                Address = g.Address,
+                City = g.City,
+                State = g.State,
+                Country = g.Country,
+                MobileNo = g.MobileNo,
+                PanOrAadharNo = g.PanOrAadharNo,
+                Photo1Path = g.Photo1Path,
+                Photo2Path = g.Photo2Path,
+                ActualCheckInDate = g.ActualCheckInDate,
+                ActualCheckOutDate = g.ActualCheckOutDate,
+                Status = (int)g.Status,
+                CreatedAt = g.CreatedAt,
+                UpdatedAt = g.UpdatedAt,
+                CreatedBy = g.CreatedBy,
+                UpdatedBy = g.UpdatedBy
+            })
+            .ToListAsync();
+
+        // Deduplicate by name+mobile combination and take most recent
+        var uniqueGuests = guests
+            .GroupBy(g => new { g.GuestName, g.MobileNo })
+            .Select(group => group.First())
+            .ToList();
+
+        return uniqueGuests;
+    }
+
+    public async Task<List<GuestDto>> SearchGuestsAsync(string query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+            return new List<GuestDto>();
+
+        // Try to determine if query looks like a mobile number (contains only digits)
+        var isNumeric = query.All(char.IsDigit);
+
+        var guests = await _context.Guests
+            .Where(g =>
+                (isNumeric && g.MobileNo != null && g.MobileNo.Contains(query)) ||
+                (!isNumeric && EF.Functions.Like(g.GuestName, $"%{query}%")) ||
+                (g.MobileNo != null && g.MobileNo.Contains(query)) ||
+                EF.Functions.Like(g.GuestName, $"%{query}%"))
+            .OrderByDescending(g => g.CreatedAt)
+            .Take(30)
+            .Select(g => new GuestDto
+            {
+                Id = g.Id,
+                CheckInId = g.CheckInId,
+                GuestNumber = g.GuestNumber,
+                GuestName = g.GuestName,
+                Address = g.Address,
+                City = g.City,
+                State = g.State,
+                Country = g.Country,
+                MobileNo = g.MobileNo,
+                PanOrAadharNo = g.PanOrAadharNo,
+                Photo1Path = g.Photo1Path,
+                Photo2Path = g.Photo2Path,
+                ActualCheckInDate = g.ActualCheckInDate,
+                ActualCheckOutDate = g.ActualCheckOutDate,
+                Status = (int)g.Status,
+                CreatedAt = g.CreatedAt,
+                UpdatedAt = g.UpdatedAt,
+                CreatedBy = g.CreatedBy,
+                UpdatedBy = g.UpdatedBy
+            })
+            .ToListAsync();
+
+        // Deduplicate by name+mobile combination and take most recent
+        var uniqueGuests = guests
+            .GroupBy(g => new { g.GuestName, g.MobileNo })
+            .Select(group => group.First())
+            .ToList();
+
+        return uniqueGuests;
     }
 }

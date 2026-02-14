@@ -57,6 +57,43 @@ public class RoomsController : ControllerBase
     }
 
     /// <summary>
+    /// Get room availability for date range with daily status
+    /// </summary>
+    [HttpGet("availability")]
+    [ProducesResponseType(typeof(List<RoomAvailabilityDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<RoomAvailabilityDto>>> GetAvailability([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
+    {
+        var availability = await _roomService.GetRoomAvailabilityAsync(startDate, endDate);
+        return Ok(availability);
+    }
+
+    /// <summary>
+    /// Get occupancy report for a specific date
+    /// </summary>
+    [HttpGet("occupancy-report")]
+    [ProducesResponseType(typeof(OccupancyReportDto), StatusCodes.Status200OK)]
+    public async Task<ActionResult<OccupancyReportDto>> GetOccupancyReport([FromQuery] DateTime? date)
+    {
+        var reportDate = date ?? DateTime.Today;
+        var report = await _roomService.GetOccupancyReportAsync(reportDate);
+        return Ok(report);
+    }
+
+    /// <summary>
+    /// Export occupancy report to Excel
+    /// </summary>
+    [HttpGet("occupancy-report/export")]
+    [ProducesResponseType(typeof(FileResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ExportOccupancyReportToExcel([FromQuery] DateTime? date)
+    {
+        var reportDate = date ?? DateTime.Today;
+        var excelData = await _roomService.ExportOccupancyReportToExcelAsync(reportDate);
+
+        var fileName = $"OccupancyReport_{reportDate:yyyy-MM-dd}.xlsx";
+        return File(excelData, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+    }
+
+    /// <summary>
     /// Create a new room
     /// </summary>
     [HttpPost]
@@ -70,7 +107,7 @@ public class RoomsController : ControllerBase
     }
 
     /// <summary>
-    /// Update room status
+    /// Update room status (Admin/Manager only - for blocking, maintenance, etc.)
     /// </summary>
     [HttpPut("{id}/status")]
     [Authorize(Roles = "Admin,Manager")]
@@ -78,6 +115,52 @@ public class RoomsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<RoomDto>> UpdateStatus(int id, [FromBody] UpdateRoomStatusDto dto)
     {
+        var room = await _roomService.UpdateStatusAsync(id, dto);
+        return Ok(room);
+    }
+
+    /// <summary>
+    /// Mark room as clean (Housekeeping only - can only set to Available or Dirty)
+    /// </summary>
+    [HttpPut("{id}/cleaning-status")]
+    [Authorize(Roles = "Admin,Manager,Housekeeping")]
+    [ProducesResponseType(typeof(RoomDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<RoomDto>> UpdateCleaningStatus(int id, [FromBody] UpdateRoomStatusDto dto)
+    {
+        // Housekeeping can only set rooms to Available (0) or Dirty (2)
+        if (dto.RoomStatus != Models.Enums.RoomStatus.Available &&
+            dto.RoomStatus != Models.Enums.RoomStatus.Dirty)
+        {
+            return BadRequest("Housekeeping can only mark rooms as Available or Dirty");
+        }
+
+        // Clear any date ranges when setting cleaning status
+        dto.RoomStatusFromDate = null;
+        dto.RoomStatusToDate = null;
+
+        var room = await _roomService.UpdateStatusAsync(id, dto);
+        return Ok(room);
+    }
+
+    /// <summary>
+    /// Set room maintenance status (Maintenance staff can set/release maintenance)
+    /// </summary>
+    [HttpPut("{id}/maintenance-status")]
+    [Authorize(Roles = "Admin,Manager,Maintenance")]
+    [ProducesResponseType(typeof(RoomDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<RoomDto>> UpdateMaintenanceStatus(int id, [FromBody] UpdateRoomStatusDto dto)
+    {
+        // Maintenance can only set rooms to Maintenance (3) or Available (0)
+        if (dto.RoomStatus != Models.Enums.RoomStatus.Maintenance &&
+            dto.RoomStatus != Models.Enums.RoomStatus.Available)
+        {
+            return BadRequest("Maintenance can only mark rooms as Maintenance or Available");
+        }
+
         var room = await _roomService.UpdateStatusAsync(id, dto);
         return Ok(room);
     }

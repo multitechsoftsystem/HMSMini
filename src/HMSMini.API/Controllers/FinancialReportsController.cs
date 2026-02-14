@@ -7,7 +7,7 @@ namespace HMSMini.API.Controllers;
 
 [ApiController]
 [Route("api/financial-reports")]
-[Authorize(Roles = "Admin,Manager")]
+[Authorize(Roles = "Admin,Manager,BanquetManager")]
 public class FinancialReportsController : ControllerBase
 {
     private readonly IFinancialReportService _reportService;

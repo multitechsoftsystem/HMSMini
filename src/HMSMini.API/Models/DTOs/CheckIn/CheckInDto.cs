@@ -18,6 +18,21 @@ public class CheckInDto
     public int Pax { get; set; }
     public CheckInStatus Status { get; set; }
     public string? Remarks { get; set; }
+    public int? CompanyId { get; set; }
+    public string? CompanyName { get; set; }
+    public string? CompanyGSTNumber { get; set; }
+    public int? BusinessSourceId { get; set; }
+    public string? BusinessSourceName { get; set; }
+    public int? MealPlanId { get; set; }
+    public string? MealPlanName { get; set; }
+    public int? GuestTypeId { get; set; }
+    public string? GuestTypeName { get; set; }
+    public decimal? MealPlanRate { get; set; }
+    public decimal? TariffApplied { get; set; }
+    public decimal DiscountPercentage { get; set; }
+    public decimal? FinalAmount { get; set; }
+    public TaxType TaxType { get; set; }
+    public string GuestNames { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public string? CreatedBy { get; set; }

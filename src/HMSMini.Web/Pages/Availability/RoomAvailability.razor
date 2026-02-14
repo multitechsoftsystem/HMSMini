@@ -1,0 +1,220 @@
+@page "/availability"
+@inject IApiClientService ApiClient
+@using HMSMini.Web.Services
+@using HMSMini.Web.Models
+
+<PageTitle>Room Availability - MSS</PageTitle>
+
+<div class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Room Availability</h2>
+    </div>
+
+    <!-- Date Range Selection -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row align-items-end">
+                <div class="col-md-4">
+                    <label>From Date</label>
+                    <input type="date" class="form-control" @bind="startDate" @bind:event="oninput" />
+                </div>
+                <div class="col-md-4">
+                    <label>To Date</label>
+                    <input type="date" class="form-control" @bind="endDate" @bind:event="oninput" />
+                </div>
+                <div class="col-md-4">
+                    <button class="btn btn-primary" @onclick="LoadAvailability">
+                        <i class="bi bi-search"></i> View Availability
+                    </button>
+                    <button class="btn btn-outline-secondary ms-2" @onclick="ResetToDefault">
+                        <i class="bi bi-arrow-clockwise"></i> Reset (7 days)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (loading)
+    {
+        <div class="text-center">
+            <div class="spinner-border"></div>
+            <p>Loading availability...</p>
+        </div>
+    }
+    else if (availability.Any())
+    {
+        <!-- Legend -->
+        <div class="card mb-3">
+            <div class="card-body">
+                <h6>Status Legend:</h6>
+                <div class="d-flex gap-3">
+                    <span><span class="badge bg-success">Available</span> - Room is available</span>
+                    <span><span class="badge bg-danger">Occupied</span> - Room is currently occupied</span>
+                    <span><span class="badge bg-warning text-dark">Reserved</span> - Room has a reservation</span>
+                    <span><span class="badge bg-secondary">Blocked/Maintenance</span> - Room is not available</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Availability Grid -->
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered availability-table">
+                        <thead>
+                            <tr>
+                                <th style="position: sticky; left: 0; background: white; z-index: 10;">Room</th>
+                                <th style="position: sticky; left: 0; background: white; z-index: 10; border-left: 2px solid #dee2e6;">Type</th>
+                                @foreach (var date in GetDateRange())
+                                {
+                                    <th class="text-center" style="min-width: 100px;">
+                                        <div>@date.ToString("ddd")</div>
+                                        <div><small>@date.ToString("MMM dd")</small></div>
+                                    </th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var room in availability)
+                            {
+                                <tr>
+                                    <td style="position: sticky; left: 0; background: white; z-index: 5;"><strong>@room.RoomNumber</strong></td>
+                                    <td style="position: sticky; left: 0; background: white; z-index: 5; border-left: 2px solid #dee2e6;">@room.RoomType</td>
+                                    @foreach (var dailyAvail in room.DailyAvailability)
+                                    {
+                                        <td class="text-center p-1" style="@GetCellStyle(dailyAvail)"
+                                            title="@GetTooltip(dailyAvail)">
+                                            <div class="availability-cell">
+                                                <small class="fw-bold">@GetStatusShort(dailyAvail.Status)</small>
+                                                @if (!string.IsNullOrEmpty(dailyAvail.GuestName))
+                                                {
+                                                    <div><small class="text-truncate d-block" style="max-width: 90px;">@dailyAvail.GuestName</small></div>
+                                                }
+                                            </div>
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="card mt-3">
+            <div class="card-body">
+                <h6>Summary:</h6>
+                <div class="row">
+                    <div class="col-md-3">
+                        <strong>Total Rooms:</strong> @availability.Count
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Date Range:</strong> @((endDate - startDate).Days + 1) days
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info">
+            Select a date range and click "View Availability" to see room availability.
+        </div>
+    }
+</div>
+
+<style>
+    .availability-table {
+        font-size: 0.875rem;
+    }
+
+    .availability-cell {
+        min-height: 50px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .table-responsive {
+        max-height: 600px;
+        overflow: auto;
+    }
+</style>
+
+@code {
+    private List<RoomAvailabilityDto> availability = new();
+    private DateTime startDate = DateTime.Today;
+    private DateTime endDate = DateTime.Today.AddDays(6); // Default 7 days
+    private bool loading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAvailability();
+    }
+
+    private async Task LoadAvailability()
+    {
+        loading = true;
+        availability = await ApiClient.GetRoomAvailabilityAsync(startDate, endDate);
+        loading = false;
+    }
+
+    private void ResetToDefault()
+    {
+        startDate = DateTime.Today;
+        endDate = DateTime.Today.AddDays(6);
+    }
+
+    private List<DateTime> GetDateRange()
+    {
+        var dates = new List<DateTime>();
+        for (var date = startDate; date <= endDate; date = date.AddDays(1))
+        {
+            dates.Add(date);
+        }
+        return dates;
+    }
+
+    private string GetCellStyle(DailyAvailability dailyAvail)
+    {
+        var backgroundColor = dailyAvail.Status switch
+        {
+            "Available" => "#d4edda",      // Light green
+            "Occupied" => "#f8d7da",       // Light red
+            "Reserved" => "#fff3cd",       // Light yellow
+            "Blocked" => "#e2e3e5",        // Light gray
+            "UnderMaintenance" => "#e2e3e5",
+            _ => "#ffffff"
+        };
+        return $"background-color: {backgroundColor};";
+    }
+
+    private string GetTooltip(DailyAvailability dailyAvail)
+    {
+        var tooltip = $"{dailyAvail.Date:MMM dd, yyyy} - {dailyAvail.Status}";
+        if (!string.IsNullOrEmpty(dailyAvail.GuestName))
+        {
+            tooltip += $"\nGuest: {dailyAvail.GuestName}";
+        }
+        if (!string.IsNullOrEmpty(dailyAvail.ReservationNumber))
+        {
+            tooltip += $"\nReservation: {dailyAvail.ReservationNumber}";
+        }
+        return tooltip;
+    }
+
+    private string GetStatusShort(string status)
+    {
+        return status switch
+        {
+            "Available" => "A",
+            "Occupied" => "O",
+            "Reserved" => "R",
+            "Blocked" => "B",
+            "UnderMaintenance" => "M",
+            _ => status.Substring(0, 1)
+        };
+    }
+}

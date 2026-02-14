@@ -10,6 +10,7 @@ using HMSMini.API.Data;
 using HMSMini.API.Extensions;
 using HMSMini.API.Middleware;
 using HMSMini.API.Validators;
+using HMSMini.API.Swagger;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,12 +27,12 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo
     {
-        Title = "HMS Mini API",
+        Title = "MSS API",
         Version = "v1",
         Description = "Hotel Management System API - Room management, check-in/check-out, and guest services",
         Contact = new OpenApiContact
         {
-            Name = "HMS Mini"
+            Name = "MSS"
         }
     });
 
@@ -42,6 +43,12 @@ builder.Services.AddSwaggerGen(c =>
     {
         c.IncludeXmlComments(xmlPath);
     }
+
+    // Add file upload operation filter for IFormFile parameters
+    c.OperationFilter<FileUploadOperationFilter>();
+
+    // Use full type names for schema IDs to avoid conflicts
+    c.CustomSchemaIds(type => type.FullName?.Replace("+", "."));
 
     // Add JWT authentication to Swagger
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -140,7 +147,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "HMS Mini API v1");
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "MSS API v1");
         c.RoutePrefix = string.Empty; // Set Swagger UI at app root
     });
 }
@@ -160,7 +167,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-Log.Information("HMS Mini API starting up...");
+Log.Information("MSS API starting up...");
 
 app.Run();
 

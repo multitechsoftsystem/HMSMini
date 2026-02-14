@@ -1,0 +1,228 @@
+@page "/housekeeping"
+@inject IApiClientService ApiClient
+@using HMSMini.Web.Services
+@using HMSMini.Web.Models
+
+<PageTitle>Housekeeping - MSS</PageTitle>
+
+<div class="container-fluid p-4">
+    <h2 class="mb-4">Housekeeping Management</h2>
+
+    @if (loading)
+    {
+        <div class="text-center">
+            <div class="spinner-border"></div>
+        </div>
+    }
+    else
+    {
+        <!-- Quick Status Summary -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card text-white bg-success">
+                    <div class="card-body text-center">
+                        <h3>@rooms.Count(r => r.RoomStatus == 0)</h3>
+                        <p class="mb-0">Clean & Available</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-white bg-warning">
+                    <div class="card-body text-center">
+                        <h3>@rooms.Count(r => r.RoomStatus == 2)</h3>
+                        <p class="mb-0">Needs Cleaning</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-white bg-danger">
+                    <div class="card-body text-center">
+                        <h3>@rooms.Count(r => r.RoomStatus == 1)</h3>
+                        <p class="mb-0">Occupied</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card text-white bg-secondary">
+                    <div class="card-body text-center">
+                        <h3>@rooms.Count(r => r.RoomStatus == 3)</h3>
+                        <p class="mb-0">Maintenance</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rooms Grid -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">All Rooms</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Room Number</th>
+                                <th>Room Type</th>
+                                <th>Current Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var room in rooms.OrderBy(r => r.RoomNumber))
+                            {
+                                <tr>
+                                    <td><strong class="fs-5">@room.RoomNumber</strong></td>
+                                    <td>@room.RoomTypeName</td>
+                                    <td>
+                                        <span class="badge bg-@GetStatusColor(room.RoomStatus) fs-6">
+                                            @room.RoomStatusName
+                                        </span>
+                                    </td>
+                                    <td>
+                                        @if (room.RoomStatus == 1) // Occupied
+                                        {
+                                            <button class="btn btn-sm btn-secondary" disabled>
+                                                Occupied
+                                            </button>
+                                        }
+                                        else if (room.RoomStatus == 2) // Dirty
+                                        {
+                                            <button class="btn btn-sm btn-success" @onclick="() => MarkAsClean(room)">
+                                                <i class="bi bi-check-circle"></i> Mark as Clean
+                                            </button>
+                                        }
+                                        else if (room.RoomStatus == 0) // Available
+                                        {
+                                            <button class="btn btn-sm btn-warning" @onclick="() => MarkAsDirty(room)">
+                                                <i class="bi bi-exclamation-triangle"></i> Mark as Dirty
+                                            </button>
+                                        }
+                                        else if (room.RoomStatus == 3) // Maintenance
+                                        {
+                                            <button class="btn btn-sm btn-secondary" disabled>
+                                                In Maintenance
+                                            </button>
+                                        }
+                                        else if (room.RoomStatus == 4) // Blocked
+                                        {
+                                            <button class="btn btn-sm btn-secondary" disabled>
+                                                Blocked
+                                            </button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(successMessage))
+        {
+            <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="bi bi-check-circle"></i> @successMessage
+                    <button type="button" class="btn-close" @onclick="ClearMessages"></button>
+                </div>
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="bi bi-exclamation-triangle"></i> @errorMessage
+                    <button type="button" class="btn-close" @onclick="ClearMessages"></button>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private List<RoomDto> rooms = new();
+    private bool loading = true;
+    private string successMessage = string.Empty;
+    private string errorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRooms();
+    }
+
+    private async Task LoadRooms()
+    {
+        loading = true;
+        rooms = await ApiClient.GetRoomsAsync();
+        loading = false;
+    }
+
+    private async Task MarkAsDirty(RoomDto room)
+    {
+        ClearMessages();
+        var updateDto = new UpdateRoomStatusDto
+        {
+            RoomStatus = 2, // Dirty
+            RoomStatusFromDate = null,
+            RoomStatusToDate = null
+        };
+
+        var result = await ApiClient.UpdateRoomStatusAsync(room.RoomId, updateDto);
+        if (result != null)
+        {
+            successMessage = $"Room {room.RoomNumber} marked as Dirty";
+            await LoadRooms();
+            await Task.Delay(3000);
+            ClearMessages();
+        }
+        else
+        {
+            errorMessage = $"Failed to update room {room.RoomNumber}";
+        }
+    }
+
+    private async Task MarkAsClean(RoomDto room)
+    {
+        ClearMessages();
+        var updateDto = new UpdateRoomStatusDto
+        {
+            RoomStatus = 0, // Available/Clean
+            RoomStatusFromDate = null,
+            RoomStatusToDate = null
+        };
+
+        var result = await ApiClient.UpdateRoomStatusAsync(room.RoomId, updateDto);
+        if (result != null)
+        {
+            successMessage = $"Room {room.RoomNumber} marked as Clean and Available";
+            await LoadRooms();
+            await Task.Delay(3000);
+            ClearMessages();
+        }
+        else
+        {
+            errorMessage = $"Failed to update room {room.RoomNumber}";
+        }
+    }
+
+    private void ClearMessages()
+    {
+        successMessage = string.Empty;
+        errorMessage = string.Empty;
+    }
+
+    private string GetStatusColor(int status)
+    {
+        return status switch
+        {
+            0 => "success",      // Available
+            1 => "danger",       // Occupied
+            2 => "warning",      // Dirty
+            3 => "secondary",    // Maintenance
+            4 => "pink",         // Blocked
+            _ => "secondary"
+        };
+    }
+}

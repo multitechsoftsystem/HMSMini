@@ -4,7 +4,7 @@ public class ReservationDto
 {
     public int Id { get; set; }
     public string ReservationNumber { get; set; } = string.Empty;
-    public string RoomNumber { get; set; } = string.Empty;
+    public string? RoomNumber { get; set; }
     public string RoomTypeName { get; set; } = string.Empty;
     public DateTime CheckInDate { get; set; }
     public DateTime CheckOutDate { get; set; }
@@ -16,12 +16,20 @@ public class ReservationDto
     public int Status { get; set; }
     public string StatusName => ((ReservationStatus)Status).ToString();
     public int? CheckInId { get; set; }
+    public int? CompanyId { get; set; }
+    public string? CompanyName { get; set; }
+    public string? CompanyGSTNumber { get; set; }
+    public int? BusinessSourceId { get; set; }
+    public string? BusinessSourceName { get; set; }
+    public int? MealPlanId { get; set; }
+    public string? MealPlanName { get; set; }
+    public decimal? EstimatedAmount { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 
 public class CreateReservationDto
 {
-    public string RoomNumber { get; set; } = string.Empty;
+    public string RoomType { get; set; } = string.Empty;
     public DateTime CheckInDate { get; set; } = DateTime.Today.AddDays(1);
     public DateTime CheckOutDate { get; set; } = DateTime.Today.AddDays(3);
     public int NumberOfGuests { get; set; } = 1;
@@ -29,6 +37,14 @@ public class CreateReservationDto
     public string? GuestEmail { get; set; }
     public string GuestMobile { get; set; } = string.Empty;
     public string? SpecialRequests { get; set; }
+    public int? CompanyId { get; set; }
+    public int? BusinessSourceId { get; set; }
+    public int? MealPlanId { get; set; }
+}
+
+public class AssignRoomDto
+{
+    public int RoomId { get; set; }
 }
 
 public enum ReservationStatus

@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using HMSMini.API.Models.Enums;
 
 namespace HMSMini.API.Models.Entities;
 
@@ -82,6 +83,22 @@ public class Guest
     /// </summary>
     [StringLength(500)]
     public string? Photo2Path { get; set; }
+
+    /// <summary>
+    /// Actual check-in date/time for this guest
+    /// </summary>
+    public DateTime? ActualCheckInDate { get; set; }
+
+    /// <summary>
+    /// Actual check-out date/time for this guest
+    /// </summary>
+    public DateTime? ActualCheckOutDate { get; set; }
+
+    /// <summary>
+    /// Guest status (Active or CheckedOut)
+    /// </summary>
+    [Required]
+    public GuestStatus Status { get; set; } = GuestStatus.Active;
 
     /// <summary>
     /// Record creation timestamp

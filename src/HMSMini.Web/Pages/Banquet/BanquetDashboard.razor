@@ -1,0 +1,201 @@
+@page "/banquet"
+@inject IApiClientService ApiClient
+@inject IAuthenticationService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Banquet Dashboard - MSS</PageTitle>
+
+@if (!isAuthenticated)
+{
+    <p>Redirecting to login...</p>
+}
+else
+{
+    <div class="dashboard">
+        <h3 class="mb-4">Banquet Dashboard</h3>
+
+        <div class="status-summary">
+            <div class="status-card" style="border-top-color: #17a2b8;">
+                <div class="status-label">Today's Events</div>
+                <div class="status-count">@todayEvents</div>
+            </div>
+            <div class="status-card" style="border-top-color: #28a745;">
+                <div class="status-label">Upcoming (7 days)</div>
+                <div class="status-count">@upcomingBookings</div>
+            </div>
+            <div class="status-card" style="border-top-color: #ffc107;">
+                <div class="status-label">Pending Enquiries</div>
+                <div class="status-count">@pendingEnquiries</div>
+            </div>
+            <div class="status-card" style="border-top-color: #6c757d;">
+                <div class="status-label">Total Bookings</div>
+                <div class="status-count">@totalBookings</div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Today's Events</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (todayBookings.Any())
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Booking #</th>
+                                            <th>Hall</th>
+                                            <th>Event</th>
+                                            <th>Time</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var b in todayBookings)
+                                        {
+                                            <tr style="cursor:pointer" @onclick="() => ViewBooking(b.Id)">
+                                                <td>@b.BookingNumber</td>
+                                                <td>@b.HallName</td>
+                                                <td>@b.EventTypeName</td>
+                                                <td>@b.EventStartTime.ToString(@"hh\:mm") - @b.EventEndTime.ToString(@"hh\:mm")</td>
+                                                <td><span class="badge bg-@GetStatusColor(b.Status)">@b.Status</span></td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="text-muted mb-0">No events today</p>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Upcoming Bookings</h5>
+                        <a href="/banquet/bookings" class="btn btn-sm btn-outline-primary">View All</a>
+                    </div>
+                    <div class="card-body">
+                        @if (upcomingList.Any())
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Hall</th>
+                                            <th>Contact</th>
+                                            <th>Guests</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var b in upcomingList.Take(10))
+                                        {
+                                            <tr style="cursor:pointer" @onclick="() => ViewBooking(b.Id)">
+                                                <td>@b.EventDate.ToString("MMM dd")</td>
+                                                <td>@b.HallName</td>
+                                                <td>@b.ContactPersonName</td>
+                                                <td>@b.ExpectedGuests</td>
+                                                <td><span class="badge bg-@GetStatusColor(b.Status)">@b.Status</span></td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="text-muted mb-0">No upcoming bookings</p>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Breakdown -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Bookings by Status</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex gap-4 flex-wrap">
+                            <div><strong class="text-info">Enquiry:</strong> @statusCounts.GetValueOrDefault(BanquetBookingStatus.Enquiry)</div>
+                            <div><strong class="text-primary">Confirmed:</strong> @statusCounts.GetValueOrDefault(BanquetBookingStatus.Confirmed)</div>
+                            <div><strong class="text-warning">In Progress:</strong> @statusCounts.GetValueOrDefault(BanquetBookingStatus.InProgress)</div>
+                            <div><strong class="text-success">Completed:</strong> @statusCounts.GetValueOrDefault(BanquetBookingStatus.Completed)</div>
+                            <div><strong class="text-danger">Cancelled:</strong> @statusCounts.GetValueOrDefault(BanquetBookingStatus.Cancelled)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool isAuthenticated = false;
+    private List<BanquetBookingListModel> allBookings = new();
+    private List<BanquetBookingListModel> todayBookings = new();
+    private List<BanquetBookingListModel> upcomingList = new();
+    private Dictionary<BanquetBookingStatus, int> statusCounts = new();
+    private int todayEvents = 0;
+    private int upcomingBookings = 0;
+    private int pendingEnquiries = 0;
+    private int totalBookings = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isAuthenticated = await AuthService.IsAuthenticatedAsync();
+        if (!isAuthenticated)
+        {
+            Navigation.NavigateTo("/login");
+            return;
+        }
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        allBookings = await ApiClient.GetAllBanquetBookingsAsync();
+        var today = DateTime.Today;
+        var nextWeek = today.AddDays(7);
+
+        todayBookings = allBookings.Where(b => b.EventDate.Date == today && b.Status != BanquetBookingStatus.Cancelled).ToList();
+        todayEvents = todayBookings.Count;
+
+        upcomingList = allBookings
+            .Where(b => b.EventDate.Date > today && b.EventDate.Date <= nextWeek && b.Status != BanquetBookingStatus.Cancelled)
+            .OrderBy(b => b.EventDate)
+            .ToList();
+        upcomingBookings = upcomingList.Count;
+
+        pendingEnquiries = allBookings.Count(b => b.Status == BanquetBookingStatus.Enquiry);
+        totalBookings = allBookings.Count;
+
+        statusCounts = allBookings
+            .GroupBy(b => b.Status)
+            .ToDictionary(g => g.Key, g => g.Count());
+    }
+
+    private void ViewBooking(int id) => Navigation.NavigateTo($"/banquet/bookings/{id}");
+
+    private string GetStatusColor(BanquetBookingStatus status) => status switch
+    {
+        BanquetBookingStatus.Enquiry => "info",
+        BanquetBookingStatus.Confirmed => "primary",
+        BanquetBookingStatus.InProgress => "warning",
+        BanquetBookingStatus.Completed => "success",
+        BanquetBookingStatus.Cancelled => "danger",
+        _ => "secondary"
+    };
+}

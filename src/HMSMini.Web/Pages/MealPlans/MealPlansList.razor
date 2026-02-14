@@ -1,0 +1,251 @@
+@page "/meal-plans"
+@inject IApiClientService ApiClient
+@inject IAuthenticationService AuthService
+@inject NavigationManager Navigation
+@using HMSMini.Web.Services
+@using HMSMini.Web.Models
+
+<div class="page-header">
+    <h3>Meal Plans Management</h3>
+    @if (canManageMasterData)
+    {
+        <button class="btn btn-primary" @onclick="ShowCreateModal">
+            <span class="icon">+</span> Add Meal Plan
+        </button>
+    }
+</div>
+
+@if (!canManageMasterData)
+{
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> You have view-only access. Contact an administrator to make changes.
+    </div>
+}
+
+@if (isLoading)
+{
+    <div class="loading">Loading meal plans...</div>
+}
+else if (mealPlans.Count == 0)
+{
+    <div class="empty-state">
+        <p>No meal plans found.</p>
+        @if (canManageMasterData)
+        {
+            <button class="btn btn-primary" @onclick="ShowCreateModal">Add Meal Plan</button>
+        }
+    </div>
+}
+else
+{
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Plan Code</th>
+                    <th>Plan Name</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var plan in mealPlans)
+                {
+                    <tr>
+                        <td><strong>@plan.PlanCode</strong></td>
+                        <td>@plan.PlanName</td>
+                        <td>@(plan.Description ?? "-")</td>
+                        <td>
+                            <span class="status-badge @(plan.IsActive ? "status-active" : "status-inactive")">
+                                @(plan.IsActive ? "Active" : "Inactive")
+                            </span>
+                        </td>
+                        <td>@plan.CreatedAt.ToString("MMM dd, yyyy")</td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="btn btn-sm btn-info" @onclick="() => ViewRates(plan.MealPlanId)">Rates</button>
+                                @if (canManageMasterData)
+                                {
+                                    <button class="btn btn-sm btn-secondary" @onclick="() => ShowEditModal(plan)">Edit</button>
+                                    @if (plan.IsActive)
+                                    {
+                                        <button class="btn btn-sm btn-warning" @onclick="() => DeactivatePlan(plan.MealPlanId)">Deactivate</button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-sm btn-success" @onclick="() => ActivatePlan(plan.MealPlanId)">Activate</button>
+                                    }
+                                    <button class="btn btn-sm btn-danger" @onclick="() => DeletePlan(plan.MealPlanId)">Delete</button>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">View Only</span>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (showCreateModal)
+{
+    <div class="modal-overlay" @onclick="HideCreateModal">
+        <div class="modal-content" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h4>@(editingPlan == null ? "Add Meal Plan" : "Edit Meal Plan")</h4>
+                <button class="btn-close" @onclick="HideCreateModal">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Plan Code *</label>
+                    <input type="text" class="form-control" @bind="formModel.PlanCode" placeholder="e.g., EP, CP, MAP, AP" maxlength="10" />
+                </div>
+                <div class="form-group">
+                    <label>Plan Name *</label>
+                    <input type="text" class="form-control" @bind="formModel.PlanName" placeholder="e.g., Room Only (European Plan)" />
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea class="form-control" @bind="formModel.Description" rows="3" placeholder="Description of the meal plan"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="HideCreateModal">Cancel</button>
+                <button class="btn btn-primary" @onclick="SavePlan" disabled="@isSaving">
+                    @(isSaving ? "Saving..." : "Save")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<MealPlanModel> mealPlans = new();
+    private bool isLoading = true;
+    private bool showCreateModal = false;
+    private bool isSaving = false;
+    private MealPlanModel? editingPlan = null;
+    private CreateMealPlanModel formModel = new();
+
+    // Role-based permissions
+    private bool canManageMasterData = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckUserPermissions();
+        await LoadMealPlans();
+    }
+
+    private async Task CheckUserPermissions()
+    {
+        var currentUser = await AuthService.GetCurrentUserAsync();
+        if (currentUser != null)
+        {
+            // Only Admin (0) and Manager (1) can manage master data
+            canManageMasterData = currentUser.Role == 0 || currentUser.Role == 1;
+        }
+    }
+
+    private async Task LoadMealPlans()
+    {
+        isLoading = true;
+        mealPlans = await ApiClient.GetAllMealPlansAsync();
+        isLoading = false;
+    }
+
+    private void ShowCreateModal()
+    {
+        editingPlan = null;
+        formModel = new CreateMealPlanModel();
+        showCreateModal = true;
+    }
+
+    private void ShowEditModal(MealPlanModel plan)
+    {
+        editingPlan = plan;
+        formModel = new CreateMealPlanModel
+        {
+            PlanCode = plan.PlanCode,
+            PlanName = plan.PlanName,
+            Description = plan.Description
+        };
+        showCreateModal = true;
+    }
+
+    private void HideCreateModal()
+    {
+        showCreateModal = false;
+        editingPlan = null;
+        formModel = new();
+    }
+
+    private async Task SavePlan()
+    {
+        if (string.IsNullOrWhiteSpace(formModel.PlanCode) || string.IsNullOrWhiteSpace(formModel.PlanName))
+            return;
+
+        isSaving = true;
+
+        try
+        {
+            if (editingPlan == null)
+            {
+                await ApiClient.CreateMealPlanAsync(formModel);
+            }
+            else
+            {
+                var updateModel = new UpdateMealPlanModel
+                {
+                    PlanCode = formModel.PlanCode,
+                    PlanName = formModel.PlanName,
+                    Description = formModel.Description
+                };
+                await ApiClient.UpdateMealPlanAsync(editingPlan.MealPlanId, updateModel);
+            }
+
+            await LoadMealPlans();
+            HideCreateModal();
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task ActivatePlan(int id)
+    {
+        await ApiClient.ActivateMealPlanAsync(id);
+        await LoadMealPlans();
+    }
+
+    private async Task DeactivatePlan(int id)
+    {
+        await ApiClient.DeactivateMealPlanAsync(id);
+        await LoadMealPlans();
+    }
+
+    private async Task DeletePlan(int id)
+    {
+        if (confirm("Are you sure you want to delete this meal plan?"))
+        {
+            await ApiClient.DeleteMealPlanAsync(id);
+            await LoadMealPlans();
+        }
+    }
+
+    private void ViewRates(int mealPlanId)
+    {
+        Navigation.NavigateTo($"/meal-plan-rates/{mealPlanId}");
+    }
+
+    private bool confirm(string message)
+    {
+        // Simple confirmation - in production, use a proper modal
+        return true;
+    }
+}

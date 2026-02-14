@@ -97,3 +97,5 @@ artifacts/
 # Logs
 Logs/
 *.log
+nul
+src/HMSMini.Web/nul

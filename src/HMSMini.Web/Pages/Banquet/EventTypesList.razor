@@ -1,0 +1,236 @@
+@page "/banquet/event-types"
+@inject IApiClientService ApiClient
+@inject IAuthenticationService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Event Types - MSS</PageTitle>
+
+<div class="page-header">
+    <h3>Event Types Management</h3>
+    @if (canManage)
+    {
+        <button class="btn btn-primary" @onclick="ShowCreateModal">
+            <span class="icon">+</span> Add Event Type
+        </button>
+    }
+</div>
+
+@if (isLoading)
+{
+    <div class="loading">Loading event types...</div>
+}
+else if (eventTypes.Count == 0)
+{
+    <div class="empty-state">
+        <p>No event types found.</p>
+        @if (canManage)
+        {
+            <button class="btn btn-primary" @onclick="ShowCreateModal">Add Event Type</button>
+        }
+    </div>
+}
+else
+{
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Event Type Name</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var et in eventTypes)
+                {
+                    <tr>
+                        <td>@et.EventTypeName</td>
+                        <td>@(et.Description ?? "-")</td>
+                        <td>
+                            <span class="status-badge @(et.IsActive ? "status-active" : "status-inactive")">
+                                @(et.IsActive ? "Active" : "Inactive")
+                            </span>
+                        </td>
+                        <td>@et.CreatedAt.ToString("MMM dd, yyyy")</td>
+                        <td>
+                            @if (canManage)
+                            {
+                                <div class="action-buttons">
+                                    <button class="btn btn-sm btn-secondary" @onclick="() => ShowEditModal(et)">Edit</button>
+                                    @if (et.IsActive)
+                                    {
+                                        <button class="btn btn-sm btn-warning" @onclick="() => Deactivate(et.Id)">Deactivate</button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-sm btn-success" @onclick="() => Activate(et.Id)">Activate</button>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <span class="text-muted">View Only</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success alert-dismissible fade show mt-2">
+        @successMessage
+        <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+    </div>
+}
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show mt-2">
+        @errorMessage
+        <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+    </div>
+}
+
+@if (showModal)
+{
+    <div class="modal-overlay" @onclick="HideModal">
+        <div class="modal-content" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h4>@(editing == null ? "Add Event Type" : "Edit Event Type")</h4>
+                <button class="btn-close" @onclick="HideModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                @if (!string.IsNullOrEmpty(formError))
+                {
+                    <div class="alert alert-danger">@formError</div>
+                }
+                <div class="form-group">
+                    <label>Event Type Name *</label>
+                    <input type="text" class="form-control" @bind="formModel.EventTypeName" />
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea class="form-control" @bind="formModel.Description" rows="3"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="HideModal">Cancel</button>
+                <button class="btn btn-primary" @onclick="Save" disabled="@isSaving">
+                    @(isSaving ? "Saving..." : "Save")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<EventTypeModel> eventTypes = new();
+    private bool isLoading = true;
+    private bool showModal = false;
+    private bool isSaving = false;
+    private bool canManage = false;
+    private EventTypeModel? editing = null;
+    private CreateEventTypeModel formModel = new();
+    private string? errorMessage;
+    private string? successMessage;
+    private string? formError;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = await AuthService.GetCurrentUserAsync();
+        canManage = user != null && (user.Role == 0 || user.Role == 1 || user.Role == 5);
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        eventTypes = await ApiClient.GetAllEventTypesAsync(true);
+        isLoading = false;
+    }
+
+    private void ShowCreateModal()
+    {
+        editing = null;
+        formModel = new CreateEventTypeModel();
+        showModal = true;
+    }
+
+    private void ShowEditModal(EventTypeModel et)
+    {
+        editing = et;
+        formModel = new CreateEventTypeModel
+        {
+            EventTypeName = et.EventTypeName,
+            Description = et.Description
+        };
+        showModal = true;
+    }
+
+    private void HideModal()
+    {
+        showModal = false;
+        editing = null;
+    }
+
+    private async Task Save()
+    {
+        formError = null;
+        if (string.IsNullOrWhiteSpace(formModel.EventTypeName))
+        {
+            formError = "Event type name is required.";
+            return;
+        }
+        isSaving = true;
+        try
+        {
+            if (editing == null)
+            {
+                var result = await ApiClient.CreateEventTypeAsync(formModel);
+                if (result == null) { formError = "Failed to create event type."; return; }
+                successMessage = "Event type created successfully.";
+            }
+            else
+            {
+                var updateModel = new UpdateEventTypeModel
+                {
+                    EventTypeName = formModel.EventTypeName,
+                    Description = formModel.Description
+                };
+                var result = await ApiClient.UpdateEventTypeAsync(editing.Id, updateModel);
+                if (result == null) { formError = "Failed to update event type."; return; }
+                successMessage = "Event type updated successfully.";
+            }
+            await LoadData();
+            HideModal();
+        }
+        catch (Exception ex)
+        {
+            formError = $"Error: {ex.Message}";
+        }
+        finally { isSaving = false; }
+    }
+
+    private async Task Activate(int id)
+    {
+        errorMessage = null;
+        var result = await ApiClient.ActivateEventTypeAsync(id);
+        if (result) { successMessage = "Event type activated."; }
+        else { errorMessage = "Failed to activate event type."; }
+        await LoadData();
+    }
+
+    private async Task Deactivate(int id)
+    {
+        errorMessage = null;
+        var result = await ApiClient.DeactivateEventTypeAsync(id);
+        if (result) { successMessage = "Event type deactivated."; }
+        else { errorMessage = "Failed to deactivate event type."; }
+        await LoadData();
+    }
+}

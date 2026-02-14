@@ -4,7 +4,7 @@
 @using HMSMini.Web.Services
 @using HMSMini.Web.Models
 
-<PageTitle>Reservations - HMS Mini</PageTitle>
+<PageTitle>Reservations - MSS</PageTitle>
 
 <div class="container-fluid p-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -38,6 +38,9 @@
                                 <th>Check-In</th>
                                 <th>Check-Out</th>
                                 <th>Guests</th>
+                                <th>Company/GST</th>
+                                <th>Business Source</th>
+                                <th>Meal Plan</th>
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
@@ -54,16 +57,66 @@
                                             <small class="text-muted">@reservation.GuestEmail</small>
                                         }
                                     </td>
-                                    <td>@reservation.RoomNumber (@reservation.RoomTypeName)</td>
+                                    <td>
+                                        @if (string.IsNullOrEmpty(reservation.RoomNumber))
+                                        {
+                                            <span>@reservation.RoomTypeName <span class="text-muted">(Room not assigned)</span></span>
+                                        }
+                                        else
+                                        {
+                                            <span>@reservation.RoomNumber (@reservation.RoomTypeName)</span>
+                                        }
+                                    </td>
                                     <td>@reservation.CheckInDate.ToShortDateString()</td>
                                     <td>@reservation.CheckOutDate.ToShortDateString()</td>
                                     <td>@reservation.NumberOfGuests</td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(reservation.CompanyName))
+                                        {
+                                            <span>@reservation.CompanyName</span>
+                                            @if (!string.IsNullOrEmpty(reservation.CompanyGSTNumber))
+                                            {
+                                                <br />
+                                                <small class="text-muted">GST: @reservation.CompanyGSTNumber</small>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">Walk-in</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(reservation.BusinessSourceName))
+                                        {
+                                            <span>@reservation.BusinessSourceName</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(reservation.MealPlanName))
+                                        {
+                                            <span>@reservation.MealPlanName</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
                                     <td>
                                         <span class="badge bg-@GetStatusColor(reservation.Status)">
                                             @reservation.StatusName
                                         </span>
                                     </td>
                                     <td>
+                                        @if (string.IsNullOrEmpty(reservation.RoomNumber) && reservation.Status <= 1)
+                                        {
+                                            <button class="btn btn-sm btn-primary" @onclick="() => ShowAssignRoomModal(reservation)">
+                                                <i class="bi bi-house-check"></i> Assign Room
+                                            </button>
+                                        }
                                         @if (reservation.Status == 0)
                                         {
                                             <button class="btn btn-sm btn-success" @onclick="() => ConfirmReservation(reservation.Id)">
@@ -103,67 +156,86 @@
                     <button type="button" class="btn-close" @onclick="HideCreateModal"></button>
                 </div>
                 <div class="modal-body">
+                    @if (!string.IsNullOrWhiteSpace(errorMessage))
+                    {
+                        <div class="alert alert-danger">
+                            @errorMessage
+                        </div>
+                    }
                     <EditForm Model="newReservation" OnValidSubmit="CreateReservation">
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label>Check-In Date</label>
-                                <InputDate @bind-Value="newReservation.CheckInDate" class="form-control" @onchange="OnDateChange" />
+                                <label>Check-In Date <span class="text-danger">*</span></label>
+                                <InputDate @bind-Value="newReservation.CheckInDate" class="form-control" />
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label>Check-Out Date</label>
-                                <InputDate @bind-Value="newReservation.CheckOutDate" class="form-control" @onchange="OnDateChange" />
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label>Room Type</label>
-                                <InputSelect @bind-Value="selectedRoomType" class="form-control" @onchange="OnRoomTypeChange">
-                                    <option value="">-- Select Room Type --</option>
-                                    @foreach (var roomType in roomTypes)
-                                    {
-                                        <option value="@roomType.RoomType">@roomType.RoomType</option>
-                                    }
-                                </InputSelect>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label>Available Room</label>
-                                <InputSelect @bind-Value="newReservation.RoomNumber" class="form-control">
-                                    <option value="">-- Select Room --</option>
-                                    @foreach (var room in filteredAvailableRooms)
-                                    {
-                                        <option value="@room.RoomNumber">@room.RoomNumber</option>
-                                    }
-                                </InputSelect>
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label>Number of Guests</label>
-                                <InputNumber @bind-Value="newReservation.NumberOfGuests" class="form-control" />
+                                <label>Check-Out Date <span class="text-danger">*</span></label>
+                                <InputDate @bind-Value="newReservation.CheckOutDate" class="form-control" />
                             </div>
                         </div>
 
                         <div class="mb-3">
-                            <label>Guest Name</label>
-                            <InputText @bind-Value="newReservation.GuestName" class="form-control" />
+                            <label>Room Type <span class="text-danger">*</span></label>
+                            <InputSelect @bind-Value="newReservation.RoomType" class="form-control">
+                                <option value="">-- Select Room Type --</option>
+                                @foreach (var roomType in roomTypes)
+                                {
+                                    <option value="@roomType.RoomType">@roomType.RoomType</option>
+                                }
+                            </InputSelect>
+                            <small class="text-muted">Specific room will be assigned at check-in</small>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label>Number of Guests (1-3) <span class="text-danger">*</span></label>
+                                <InputNumber @bind-Value="newReservation.NumberOfGuests" class="form-control" min="1" max="3" />
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label>Guest Name <span class="text-danger">*</span></label>
+                            <InputText @bind-Value="newReservation.GuestName" class="form-control" placeholder="Enter guest name" />
                         </div>
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label>Email</label>
-                                <InputText @bind-Value="newReservation.GuestEmail" type="email" class="form-control" />
+                                <InputText @bind-Value="newReservation.GuestEmail" type="email" class="form-control" placeholder="guest@example.com" />
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label>Mobile</label>
-                                <InputText @bind-Value="newReservation.GuestMobile" class="form-control" />
+                                <label>Mobile (10-15 digits) <span class="text-danger">*</span></label>
+                                <InputText @bind-Value="newReservation.GuestMobile" class="form-control" placeholder="9876543210" maxlength="15" />
+                                <small class="text-muted">Enter digits only, no spaces or dashes</small>
                             </div>
                         </div>
 
                         <div class="mb-3">
                             <label>Special Requests</label>
-                            <InputTextArea @bind-Value="newReservation.SpecialRequests" class="form-control" rows="3" />
+                            <InputTextArea @bind-Value="newReservation.SpecialRequests" class="form-control" rows="3" placeholder="Any special requirements..." />
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label>Business Source</label>
+                                <InputSelect @bind-Value="newReservation.BusinessSourceId" class="form-control">
+                                    <option value="">-- Select Business Source --</option>
+                                    @foreach (var source in businessSources)
+                                    {
+                                        <option value="@source.BusinessSourceId">@source.SourceName</option>
+                                    }
+                                </InputSelect>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label>Meal Plan</label>
+                                <InputSelect @bind-Value="newReservation.MealPlanId" class="form-control">
+                                    <option value="">-- Select Meal Plan --</option>
+                                    @foreach (var plan in mealPlans)
+                                    {
+                                        <option value="@plan.MealPlanId">@plan.PlanCode - @plan.PlanName</option>
+                                    }
+                                </InputSelect>
+                            </div>
                         </div>
 
                         <div class="modal-footer">
@@ -177,15 +249,86 @@
     </div>
 }
 
+<!-- Assign Room Modal -->
+@if (showAssignRoomModal && selectedReservation != null)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Assign Room to Reservation</h5>
+                    <button type="button" class="btn-close" @onclick="HideAssignRoomModal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrWhiteSpace(assignRoomErrorMessage))
+                    {
+                        <div class="alert alert-danger">
+                            @assignRoomErrorMessage
+                        </div>
+                    }
+                    <div class="mb-3">
+                        <p><strong>Reservation:</strong> @selectedReservation.ReservationNumber</p>
+                        <p><strong>Guest:</strong> @selectedReservation.GuestName</p>
+                        <p><strong>Room Type:</strong> @selectedReservation.RoomTypeName</p>
+                        <p><strong>Dates:</strong> @selectedReservation.CheckInDate.ToShortDateString() - @selectedReservation.CheckOutDate.ToShortDateString()</p>
+                    </div>
+
+                    @if (loadingAvailableRooms)
+                    {
+                        <div class="text-center">
+                            <div class="spinner-border spinner-border-sm"></div>
+                            <span class="ms-2">Loading available rooms...</span>
+                        </div>
+                    }
+                    else if (availableRoomsForAssignment.Any())
+                    {
+                        <div class="mb-3">
+                            <label>Select Room <span class="text-danger">*</span></label>
+                            <select class="form-control" @bind="selectedRoomId">
+                                <option value="0">-- Select Room --</option>
+                                @foreach (var room in availableRoomsForAssignment)
+                                {
+                                    <option value="@room.RoomId">@room.RoomNumber - @room.RoomTypeName</option>
+                                }
+                            </select>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-warning">
+                            No rooms of type '@selectedReservation.RoomTypeName' are available for the selected dates.
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideAssignRoomModal">Cancel</button>
+                    <button type="button" class="btn btn-primary" @onclick="AssignRoom" disabled="@(!availableRoomsForAssignment.Any() || selectedRoomId == 0)">
+                        Assign Room
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private List<ReservationDto> reservations = new();
     private CreateReservationDto newReservation = new();
     private List<RoomTypeDto> roomTypes = new();
-    private List<RoomDto> availableRooms = new();
-    private List<RoomDto> filteredAvailableRooms = new();
-    private string selectedRoomType = "";
+    private List<BusinessSourceModel> businessSources = new();
+    private List<MealPlanModel> mealPlans = new();
     private bool loading = true;
     private bool showCreateModal = false;
+    private string errorMessage = "";
+
+    // Assign Room Modal
+    private bool showAssignRoomModal = false;
+    private ReservationDto? selectedReservation = null;
+    private List<RoomDto> availableRoomsForAssignment = new();
+    private int selectedRoomId = 0;
+    private bool loadingAvailableRooms = false;
+    private string assignRoomErrorMessage = "";
 
     protected override async Task OnInitializedAsync()
     {
@@ -201,12 +344,12 @@
 
     private async Task ShowCreateModal()
     {
-        // Load room types and available rooms
+        errorMessage = "";
+
+        // Load room types, business sources, and meal plans
         roomTypes = await ApiClient.GetRoomTypesAsync();
-        var allRooms = await ApiClient.GetRoomsAsync();
-        availableRooms = allRooms.Where(r => r.RoomStatus == 0).ToList();
-        filteredAvailableRooms = new List<RoomDto>();
-        selectedRoomType = "";
+        businessSources = await ApiClient.GetActiveBusinessSourcesAsync();
+        mealPlans = await ApiClient.GetActiveMealPlansAsync();
 
         newReservation = new CreateReservationDto
         {
@@ -217,27 +360,6 @@
         showCreateModal = true;
     }
 
-    private void OnRoomTypeChange()
-    {
-        if (string.IsNullOrEmpty(selectedRoomType))
-        {
-            filteredAvailableRooms = new List<RoomDto>();
-        }
-        else
-        {
-            filteredAvailableRooms = availableRooms
-                .Where(r => r.RoomTypeName == selectedRoomType)
-                .ToList();
-        }
-        newReservation.RoomNumber = ""; // Reset room selection
-    }
-
-    private void OnDateChange()
-    {
-        // Could add logic to check room availability for selected dates
-        // For now, just refresh the available rooms
-    }
-
     private void HideCreateModal()
     {
         showCreateModal = false;
@@ -245,11 +367,56 @@
 
     private async Task CreateReservation()
     {
-        var result = await ApiClient.CreateReservationAsync(newReservation);
-        if (result != null)
+        errorMessage = "";
+
+        // Validate required fields
+        if (string.IsNullOrWhiteSpace(newReservation.RoomType))
         {
-            await LoadReservations();
-            HideCreateModal();
+            errorMessage = "Please select a room type";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(newReservation.GuestName))
+        {
+            errorMessage = "Guest name is required";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(newReservation.GuestMobile))
+        {
+            errorMessage = "Mobile number is required";
+            return;
+        }
+
+        // Validate mobile number format (10-15 digits only)
+        if (!System.Text.RegularExpressions.Regex.IsMatch(newReservation.GuestMobile, @"^\d{10,15}$"))
+        {
+            errorMessage = "Mobile number must be 10-15 digits only (no spaces or special characters)";
+            return;
+        }
+
+        if (newReservation.CheckOutDate <= newReservation.CheckInDate)
+        {
+            errorMessage = "Check-out date must be after check-in date";
+            return;
+        }
+
+        try
+        {
+            var result = await ApiClient.CreateReservationAsync(newReservation);
+            if (result != null)
+            {
+                await LoadReservations();
+                HideCreateModal();
+            }
+            else
+            {
+                errorMessage = "Failed to create reservation. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
         }
     }
 
@@ -263,6 +430,64 @@
     {
         await ApiClient.CancelReservationAsync(id);
         await LoadReservations();
+    }
+
+    private async Task ShowAssignRoomModal(ReservationDto reservation)
+    {
+        selectedReservation = reservation;
+        assignRoomErrorMessage = "";
+        selectedRoomId = 0;
+        availableRoomsForAssignment = new();
+        showAssignRoomModal = true;
+
+        // Load available rooms for the reservation's dates and room type
+        loadingAvailableRooms = true;
+        var allRooms = await ApiClient.GetAvailableRoomsAsync(reservation.CheckInDate, reservation.CheckOutDate);
+        availableRoomsForAssignment = allRooms
+            .Where(r => r.RoomTypeName == reservation.RoomTypeName)
+            .ToList();
+        loadingAvailableRooms = false;
+    }
+
+    private void HideAssignRoomModal()
+    {
+        showAssignRoomModal = false;
+        selectedReservation = null;
+        availableRoomsForAssignment = new();
+        selectedRoomId = 0;
+        assignRoomErrorMessage = "";
+    }
+
+    private async Task AssignRoom()
+    {
+        if (selectedReservation == null || selectedRoomId == 0)
+        {
+            assignRoomErrorMessage = "Please select a room";
+            return;
+        }
+
+        assignRoomErrorMessage = "";
+
+        try
+        {
+            var result = await ApiClient.AssignRoomToReservationAsync(
+                selectedReservation.Id,
+                new AssignRoomDto { RoomId = selectedRoomId });
+
+            if (result != null)
+            {
+                await LoadReservations();
+                HideAssignRoomModal();
+            }
+            else
+            {
+                assignRoomErrorMessage = "Failed to assign room. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            assignRoomErrorMessage = $"Error: {ex.Message}";
+        }
     }
 
     private string GetStatusColor(int status)

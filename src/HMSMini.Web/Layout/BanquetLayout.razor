@@ -1,0 +1,70 @@
+@inherits LayoutComponentBase
+@inject IAuthenticationService AuthService
+@inject NavigationManager Navigation
+
+<div class="page">
+    @if (isAuthenticated)
+    {
+        <div class="sidebar">
+            <BanquetNavMenu />
+        </div>
+
+        <main>
+            <div class="top-row px-4">
+                <div class="d-flex justify-content-end align-items-center w-100">
+                    <span class="me-3">@currentUser</span>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="Logout">
+                        <i class="bi bi-box-arrow-right"></i> Logout
+                    </button>
+                </div>
+            </div>
+
+            <article class="content px-4">
+                @Body
+            </article>
+        </main>
+    }
+    else
+    {
+        <article class="content">
+            @Body
+        </article>
+    }
+</div>
+
+@code {
+    private bool isAuthenticated = false;
+    private string currentUser = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            isAuthenticated = await AuthService.IsAuthenticatedAsync();
+
+            if (isAuthenticated)
+            {
+                var user = await AuthService.GetCurrentUserAsync();
+                currentUser = user?.FullName ?? user?.Username ?? "User";
+            }
+        }
+        catch (Exception)
+        {
+            isAuthenticated = false;
+            currentUser = "";
+        }
+    }
+
+    private async Task Logout()
+    {
+        try
+        {
+            await AuthService.LogoutAsync();
+            Navigation.NavigateTo("/login");
+        }
+        catch (Exception)
+        {
+            Navigation.NavigateTo("/login");
+        }
+    }
+}

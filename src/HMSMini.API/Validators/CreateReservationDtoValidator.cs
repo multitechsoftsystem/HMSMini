@@ -10,11 +10,11 @@ public class CreateReservationDtoValidator : AbstractValidator<CreateReservation
 {
     public CreateReservationDtoValidator()
     {
-        RuleFor(x => x.RoomNumber)
+        RuleFor(x => x.RoomType)
             .NotEmpty()
-            .WithMessage("Room number is required.")
-            .MaximumLength(20)
-            .WithMessage("Room number cannot exceed 20 characters.");
+            .WithMessage("Room type is required.")
+            .MaximumLength(100)
+            .WithMessage("Room type cannot exceed 100 characters.");
 
         RuleFor(x => x.CheckInDate)
             .NotEmpty()

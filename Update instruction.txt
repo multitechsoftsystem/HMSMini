@@ -1,0 +1,24 @@
+1) Make master for Guest Type. Ex: Normal, Complimentary, Family, Hotel2, Hotel3.
+2) Normal, Complimentary, Family, Hotel2, Hotel3 option While Check-in or after check-in 
+1) Use a Working Date and User will close each day.
+2) Vouchers are ledgers and we further will accounting. 
+3) Set voucher auto post daily flag. Example Tariff, GST, meal plan, any Extra voucher.
+4) While closing day voucher will post which has post daily flag true if amount > 0 . 
+5) As user close day date will increment by one day. Auto post voucher will post. 
+
+
+Working date should not greater than System Date
+If Room Check-out date is less than working date then extend checkout date.
+
+Guest check-in on 27-Jan-2026 and check-out on 31-Jan-2026. 
+While click on check-out it should show posted vouchers (Tariff, GST, etc ). Not All period of check-in to checkout. 
+After day close vouchers will post to each check-in rooms ( Tariff, GST, etc)
+
+
+Create Rate Plan code. Integrate Rate Plan code with Reservation, Check-in
+
+Create Show Order column in Meal Plan Master. User will set order number. While check-in guest less order should take in meal plan. No - will come.
+ 
+    
+
+

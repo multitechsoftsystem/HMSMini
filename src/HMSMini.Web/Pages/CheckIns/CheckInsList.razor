@@ -1,11 +1,12 @@
 @page "/checkins"
 @inject IApiClientService ApiClient
 @inject NavigationManager Navigation
+@inject IAuthenticationService AuthService
 @using HMSMini.Web.Services
 @using HMSMini.Web.Models
 @using Microsoft.AspNetCore.Components.Forms
 
-<PageTitle>Check-Ins - HMS Mini</PageTitle>
+<PageTitle>Check-Ins - MSS</PageTitle>
 
 <div class="container-fluid p-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -28,26 +29,171 @@
             }
             else if (checkIns.Any())
             {
-                <div class="table-responsive">
+                <div class="mb-3">
+                    <div class="input-group" style="max-width: 500px;">
+                        <span class="input-group-text">
+                            <i class="bi bi-search"></i>
+                        </span>
+                        <input type="text"
+                               class="form-control"
+                               placeholder="Search by room, guest name, company, or GST number..."
+                               @bind="checkInSearchFilter"
+                               @bind:event="oninput" />
+                        @if (!string.IsNullOrWhiteSpace(checkInSearchFilter))
+                        {
+                            <button class="btn btn-outline-secondary" type="button" @onclick="ClearCheckInSearch">
+                                <i class="bi bi-x"></i>
+                            </button>
+                        }
+                    </div>
+                    @if (FilteredCheckIns.Any())
+                    {
+                        <small class="text-muted">Showing @FilteredCheckIns.Count of @checkIns.Count check-ins</small>
+                    }
+                </div>
+                <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
                     <table class="table table-hover">
-                        <thead>
+                        <thead style="position: sticky; top: 0; background-color: white; z-index: 10;">
                             <tr>
                                 <th>Room</th>
                                 <th>Check-In Date</th>
                                 <th>Check-Out Date</th>
                                 <th>Guests</th>
+                                <th>Company/GST</th>
+                                <th>Business Source</th>
+                                <th>Meal Plan</th>
+                                <th>Guest Type</th>
+                                <th>Tariff</th>
+                                <th>Meal Plan Amt</th>
+                                <th>Total Advance Amt</th>
+                                <th>Bill Amt</th>
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (var checkIn in checkIns)
+                            @foreach (var checkIn in FilteredCheckIns)
                             {
                                 <tr>
                                     <td>@checkIn.RoomNumber</td>
-                                    <td>@checkIn.CheckInDate.ToShortDateString()</td>
-                                    <td>@checkIn.CheckOutDate.ToShortDateString()</td>
-                                    <td>@checkIn.Pax</td>
+                                    <td>@checkIn.CheckInDate.ToString("dd/MMM/yyyy")</td>
+                                    <td>@checkIn.CheckOutDate.ToString("dd/MMM/yyyy")</td>
+                                    <td>
+                                        @if (!string.IsNullOrWhiteSpace(checkIn.GuestNames))
+                                        {
+                                            <strong>@checkIn.GuestNames</strong>
+                                            <br />
+                                            <small class="text-muted">(@checkIn.Pax guest@(checkIn.Pax > 1 ? "s" : ""))</small>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">@checkIn.Pax guest@(checkIn.Pax > 1 ? "s" : "")</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(checkIn.CompanyName))
+                                        {
+                                            <span>@checkIn.CompanyName</span>
+                                            @if (!string.IsNullOrEmpty(checkIn.CompanyGSTNumber))
+                                            {
+                                                <br />
+                                                <small class="text-muted">GST: @checkIn.CompanyGSTNumber</small>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">Walk-in</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(checkIn.BusinessSourceName))
+                                        {
+                                            <span>@checkIn.BusinessSourceName</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(checkIn.MealPlanName))
+                                        {
+                                            <span>@checkIn.MealPlanName</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(checkIn.GuestTypeName))
+                                        {
+                                            <span>@checkIn.GuestTypeName</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    @* Tariff Column *@
+                                    <td>
+                                        @if (checkIn.TariffApplied.HasValue)
+                                        {
+                                            <text>₹@checkIn.TariffApplied.Value.ToString("N2")</text>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    @* Meal Plan Amt Column *@
+                                    <td>
+                                        @if (checkIn.MealPlanRate.HasValue)
+                                        {
+                                            <text>₹@checkIn.MealPlanRate.Value.ToString("N2")</text>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">-</span>
+                                        }
+                                    </td>
+                                    @* Total Advance Amt Column *@
+                                    <td>
+                                        @{
+                                            var financialData = GetFinancialData(checkIn.Id);
+                                        }
+                                        @if (financialData.IsLoading)
+                                        {
+                                            <div class="spinner-border spinner-border-sm" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                        }
+                                        else if (financialData.HasError)
+                                        {
+                                            <span class="text-danger" title="@financialData.ErrorMessage">Error</span>
+                                        }
+                                        else
+                                        {
+                                            <text>₹@financialData.TotalAdvanceAmount.ToString("N2")</text>
+                                        }
+                                    </td>
+                                    @* Bill Amt Column *@
+                                    <td>
+                                        @if (financialData.IsLoading)
+                                        {
+                                            <div class="spinner-border spinner-border-sm" role="status">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                        }
+                                        else if (financialData.HasError)
+                                        {
+                                            <span class="text-danger" title="@financialData.ErrorMessage">Error</span>
+                                        }
+                                        else
+                                        {
+                                            <text>₹@financialData.BillAmount.ToString("N2")</text>
+                                        }
+                                    </td>
                                     <td>
                                         <span class="badge bg-@(checkIn.Status == 0 ? "success" : "secondary")">
                                             @checkIn.StatusName
@@ -56,11 +202,20 @@
                                     <td>
                                         @if (checkIn.Status == 0)
                                         {
+                                            <button class="btn btn-sm btn-primary me-1" @onclick="() => ShowEditModal(checkIn)">
+                                                <i class="bi bi-pencil"></i> Edit
+                                            </button>
                                             <button class="btn btn-sm btn-info me-1" @onclick="() => ManageGuests(checkIn.Id)">
                                                 <i class="bi bi-person-badge"></i> Guests
                                             </button>
                                             <button class="btn btn-sm btn-warning" @onclick="() => CheckOut(checkIn.Id)">
                                                 Check Out
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn btn-sm btn-primary" @onclick="() => ViewBill(checkIn.Id)">
+                                                <i class="bi bi-printer"></i> View Bill
                                             </button>
                                         }
                                     </td>
@@ -83,18 +238,54 @@
 {
     <div class="modal-backdrop show"></div>
     <div class="modal show d-block" tabindex="-1">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-xl">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">New Check-In</h5>
                     <button type="button" class="btn-close" @onclick="HideCreateModal"></button>
                 </div>
                 <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(createErrorMessage))
+                    {
+                        <div class="alert alert-danger">
+                            <i class="bi bi-exclamation-triangle"></i> @createErrorMessage
+                        </div>
+                    }
+
+                    <!-- Tab Navigation -->
+                    <ul class="nav nav-tabs mb-3">
+                        <li class="nav-item">
+                            <button class="nav-link @(activeTab == GuestEntryTab.ManualEntry ? "active" : "")"
+                                    type="button"
+                                    @onclick="() => SwitchTab(GuestEntryTab.ManualEntry)">
+                                <i class="bi bi-keyboard"></i> Manual Entry
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link @(activeTab == GuestEntryTab.OcrScan ? "active" : "")"
+                                    type="button"
+                                    @onclick="() => SwitchTab(GuestEntryTab.OcrScan)">
+                                <i class="bi bi-card-image"></i> OCR Scan
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link @(activeTab == GuestEntryTab.GuestHistory ? "active" : "")"
+                                    type="button"
+                                    @onclick="() => SwitchTab(GuestEntryTab.GuestHistory)">
+                                <i class="bi bi-search"></i> Guest History
+                            </button>
+                        </li>
+                    </ul>
+
+                    <!-- Tab Content -->
                     <EditForm Model="newCheckIn" OnValidSubmit="CreateCheckIn">
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label>Room Number (Available Rooms Only)</label>
-                                <InputSelect @bind-Value="newCheckIn.RoomNumber" class="form-control">
+                        <DataAnnotationsValidator />
+
+                        <!-- Room Selection (Common across all tabs) -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label>Room Number <span class="text-danger">*</span></label>
+                                <InputSelect @bind-Value="newCheckIn.RoomNumber" class="form-control" @bind-Value:after="OnRoomOrDateChanged">
                                     <option value="">-- Select Room --</option>
                                     @foreach (var room in availableRooms)
                                     {
@@ -102,77 +293,400 @@
                                     }
                                 </InputSelect>
                             </div>
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-6">
                                 <label>Check-Out Date</label>
-                                <InputDate @bind-Value="newCheckIn.CheckOutDate" class="form-control" />
+                                <InputDate @bind-Value="newCheckIn.CheckOutDate" class="form-control" @bind-Value:after="OnRoomOrDateChanged" />
                             </div>
                         </div>
 
-                        <h6 class="mt-3">Guest Information</h6>
-                        @for (int i = 0; i < newCheckIn.Guests.Count; i++)
-                        {
-                            var index = i;
-                            <div class="border rounded p-3 mb-3">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <strong>Guest @(index + 1)</strong>
-                                    @if (newCheckIn.Guests.Count > 1)
+                        <!-- Company Selection -->
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label>Company (Optional)</label>
+                                <div class="input-group">
+                                    <select @bind="selectedCompanyId" class="form-control" @bind:after="OnCompanyChanged">
+                                        <option value="">-- Walk-in Guest --</option>
+                                        @foreach (var company in activeCompanies)
+                                        {
+                                            <option value="@company.Id">@company.CompanyName (@company.DiscountPercentage% discount)</option>
+                                        }
+                                    </select>
+                                    @if (canManageCompanies)
                                     {
-                                        <button type="button" class="btn btn-sm btn-danger"
-                                                @onclick="() => RemoveGuest(index)">Remove</button>
+                                        <button type="button" class="btn btn-outline-primary" @onclick="ShowQuickAddCompanyModal" title="Add New Company">
+                                            <i class="bi bi-plus-circle"></i>
+                                        </button>
                                     }
                                 </div>
-
-                                <div class="row">
-                                    <div class="col-md-6 mb-2">
-                                        <label>Name</label>
-                                        <InputText @bind-Value="newCheckIn.Guests[index].GuestName" class="form-control" />
-                                    </div>
-                                    <div class="col-md-6 mb-2">
-                                        <label>Mobile</label>
-                                        <InputText @bind-Value="newCheckIn.Guests[index].MobileNo" class="form-control" />
-                                    </div>
-                                </div>
-
-                                <div class="row">
-                                    <div class="col-md-6 mb-2">
-                                        <label>City</label>
-                                        <InputText @bind-Value="newCheckIn.Guests[index].City" class="form-control" />
-                                    </div>
-                                    <div class="col-md-6 mb-2">
-                                        <label>PAN/Aadhar No</label>
-                                        <InputText @bind-Value="newCheckIn.Guests[index].PanOrAadharNo" class="form-control" />
-                                    </div>
-                                </div>
-
-                                <div class="row">
-                                    <div class="col-12 mb-2">
-                                        <label><i class="bi bi-card-image"></i> ID Proof Documents (Optional)</label>
-                                        <div class="border rounded p-2 bg-light">
-                                            <small class="text-muted d-block mb-2">Upload ID proof after check-in is created</small>
-                                            <div class="d-flex gap-2">
-                                                <span class="badge bg-secondary">
-                                                    <i class="bi bi-file-earmark-image"></i> Photo 1: Available after check-in
-                                                </span>
-                                                <span class="badge bg-secondary">
-                                                    <i class="bi bi-file-earmark-image"></i> Photo 2: Available after check-in
-                                                </span>
-                                            </div>
+                                <small class="text-muted">Leave empty for walk-in guests@(canManageCompanies ? " or click + to add a new company" : "")</small>
+                                @if (!string.IsNullOrEmpty(selectedCompanyId))
+                                {
+                                    var selectedCompany = activeCompanies.FirstOrDefault(c => c.Id.ToString() == selectedCompanyId);
+                                    if (selectedCompany != null && !string.IsNullOrEmpty(selectedCompany.GSTNumber))
+                                    {
+                                        <div class="mt-2">
+                                            <strong>GST Number:</strong> <span class="text-primary">@selectedCompany.GSTNumber</span>
                                         </div>
+                                    }
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Tariff Calculation Display -->
+                        @if (calculatedTariff != null)
+                        {
+                            <div class="alert alert-info mb-3">
+                                <h6><i class="bi bi-calculator"></i> Tariff Details</h6>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <strong>Room Type:</strong> @calculatedTariff.RoomTypeName<br />
+                                        <strong>Occupancy:</strong> @calculatedTariff.OccupancyCount person(s)<br />
+                                        <strong>Nights:</strong> @calculatedTariff.NumberOfNights
+                                    </div>
+                                    <div class="col-md-6">
+                                        <strong>Base Rate:</strong> <text>Rs. </text>@calculatedTariff.BaseRate<text> per night</text><br />
+                                        @if (calculatedTariff.CompanyRate.HasValue)
+                                        {
+                                            <strong>Company Rate:</strong> <text>Rs. </text>@calculatedTariff.CompanyRate<text> per night</text><br />
+                                        }
+                                        @if (calculatedTariff.DiscountPercentage > 0)
+                                        {
+                                            <strong>Discount:</strong> @calculatedTariff.DiscountPercentage<text>%</text><br />
+                                        }
+                                        <strong>Final Rate:</strong> <text>Rs. </text>@calculatedTariff.FinalRate<text> per night</text>
                                     </div>
                                 </div>
+                                <hr />
+                                <h5 class="text-primary mb-0">Total Amount: Rs. @calculatedTariff.TotalAmount</h5>
                             </div>
                         }
 
-                        @if (newCheckIn.Guests.Count < 3)
+                        <!-- Tab 1: Manual Entry -->
+                        @if (activeTab == GuestEntryTab.ManualEntry)
                         {
-                            <button type="button" class="btn btn-secondary btn-sm mb-3" @onclick="AddGuest">
-                                <i class="bi bi-plus"></i> Add Guest
-                            </button>
+                            <div class="tab-content-manual">
+                                <h6 class="mb-3">Guest Information (Manual Entry)</h6>
+                                @for (int i = 0; i < newCheckIn.Guests.Count; i++)
+                                {
+                                    var index = i;
+                                    <div class="border rounded p-3 mb-3">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <strong>Guest @(index + 1)</strong>
+                                            @if (newCheckIn.Guests.Count > 1)
+                                            {
+                                                <button type="button" class="btn btn-sm btn-danger"
+                                                        @onclick="() => RemoveGuest(index)">Remove</button>
+                                            }
+                                        </div>
+
+                                        <div class="row">
+                                            <div class="col-md-6 mb-2">
+                                                <label>Name <span class="text-danger">*</span></label>
+                                                <InputText @bind-Value="newCheckIn.Guests[index].GuestName" class="form-control" placeholder="Required" />
+                                            </div>
+                                            <div class="col-md-6 mb-2">
+                                                <label>Mobile (10 digits)</label>
+                                                <InputText @bind-Value="newCheckIn.Guests[index].MobileNo" class="form-control" placeholder="e.g., 9876543210" maxlength="10" />
+                                            </div>
+                                        </div>
+
+                                        <div class="row">
+                                            <div class="col-md-12 mb-2">
+                                                <label>Address</label>
+                                                <InputText @bind-Value="newCheckIn.Guests[index].Address" class="form-control" />
+                                            </div>
+                                        </div>
+
+                                        <div class="row">
+                                            <div class="col-md-4 mb-2">
+                                                <label>City</label>
+                                                <InputText @bind-Value="newCheckIn.Guests[index].City" class="form-control" />
+                                            </div>
+                                            <div class="col-md-4 mb-2">
+                                                <label>State</label>
+                                                <InputText @bind-Value="newCheckIn.Guests[index].State" class="form-control" />
+                                            </div>
+                                            <div class="col-md-4 mb-2">
+                                                <label>Country</label>
+                                                <InputText @bind-Value="newCheckIn.Guests[index].Country" class="form-control" />
+                                            </div>
+                                        </div>
+
+                                        <div class="row">
+                                            <div class="col-md-12 mb-2">
+                                                <label>PAN/Aadhar No</label>
+                                                <InputText @bind-Value="newCheckIn.Guests[index].PanOrAadharNo" class="form-control" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+
+                                @if (newCheckIn.Guests.Count < 3)
+                                {
+                                    <button type="button" class="btn btn-secondary btn-sm mb-3" @onclick="AddGuest">
+                                        <i class="bi bi-plus"></i> Add Guest
+                                    </button>
+                                }
+                            </div>
                         }
+
+                        <!-- Tab 2: OCR Scan -->
+                        @if (activeTab == GuestEntryTab.OcrScan)
+                        {
+                            <div class="tab-content-ocr">
+                                <h6 class="mb-3">Scan ID Proof</h6>
+                                <div class="alert alert-info">
+                                    <i class="bi bi-info-circle"></i> Upload an ID proof image to automatically extract guest details
+                                </div>
+
+                                <div class="border rounded p-3 mb-3">
+                                    <label class="form-label">Upload ID Proof Image</label>
+                                    <InputFile OnChange="HandleOcrFileUpload"
+                                               accept="image/*"
+                                               class="form-control mb-2" />
+                                    @if (!string.IsNullOrEmpty(ocrFileName))
+                                    {
+                                        <div class="alert alert-success py-1 px-2">
+                                            <small><i class="bi bi-file-earmark"></i> Selected: @ocrFileName</small>
+                                        </div>
+                                    }
+
+                                    @if (processingOcr)
+                                    {
+                                        <div class="alert alert-info">
+                                            <span class="spinner-border spinner-border-sm me-2"></span>
+                                            Processing OCR...
+                                        </div>
+                                    }
+
+                                    @if (ocrFile != null && !processingOcr && createOcrResult == null)
+                                    {
+                                        <button type="button" class="btn btn-primary btn-sm" @onclick="ProcessCreateOcr">
+                                            <i class="bi bi-cpu"></i> Extract Information
+                                        </button>
+                                    }
+                                </div>
+
+                                <!-- Show extracted data and editable form if OCR processed -->
+                                @if (createOcrResult != null && newCheckIn.Guests.Any())
+                                {
+                                    <div class="alert alert-success">
+                                        <i class="bi bi-check-circle"></i> Information extracted! Review and edit below.
+                                        <small class="d-block mt-1">Confidence: @((createOcrResult.Confidence * 100).ToString("F1"))%</small>
+                                    </div>
+
+                                    <h6 class="mt-3">Guest Information (From OCR)</h6>
+                                    <div class="border rounded p-3 mb-3">
+                                        <div class="row">
+                                            <div class="col-md-6 mb-2">
+                                                <label>Name <span class="text-danger">*</span></label>
+                                                <InputText @bind-Value="newCheckIn.Guests[0].GuestName" class="form-control" placeholder="Required" />
+                                            </div>
+                                            <div class="col-md-6 mb-2">
+                                                <label>Mobile (10 digits)</label>
+                                                <InputText @bind-Value="newCheckIn.Guests[0].MobileNo" class="form-control" placeholder="e.g., 9876543210" maxlength="10" />
+                                            </div>
+                                        </div>
+
+                                        <div class="row">
+                                            <div class="col-md-12 mb-2">
+                                                <label>Address</label>
+                                                <InputText @bind-Value="newCheckIn.Guests[0].Address" class="form-control" />
+                                            </div>
+                                        </div>
+
+                                        <div class="row">
+                                            <div class="col-md-4 mb-2">
+                                                <label>City</label>
+                                                <InputText @bind-Value="newCheckIn.Guests[0].City" class="form-control" />
+                                            </div>
+                                            <div class="col-md-4 mb-2">
+                                                <label>State</label>
+                                                <InputText @bind-Value="newCheckIn.Guests[0].State" class="form-control" />
+                                            </div>
+                                            <div class="col-md-4 mb-2">
+                                                <label>Country</label>
+                                                <InputText @bind-Value="newCheckIn.Guests[0].Country" class="form-control" />
+                                            </div>
+                                        </div>
+
+                                        <div class="row">
+                                            <div class="col-md-12 mb-2">
+                                                <label>PAN/Aadhar No</label>
+                                                <InputText @bind-Value="newCheckIn.Guests[0].PanOrAadharNo" class="form-control" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+
+                        <!-- Tab 3: Guest History Search -->
+                        @if (activeTab == GuestEntryTab.GuestHistory)
+                        {
+                            <div class="tab-content-history">
+                                <h6 class="mb-3">Search Guest History</h6>
+
+                                <div class="input-group mb-3">
+                                    <input type="text"
+                                           class="form-control"
+                                           placeholder="Search by mobile number or guest name..."
+                                           @bind="searchQuery"
+                                           @bind:event="oninput"
+                                           @onkeypress="HandleSearchKeyPress" />
+                                    <button class="btn btn-primary" type="button" @onclick="SearchGuests">
+                                        <i class="bi bi-search"></i> Search
+                                    </button>
+                                </div>
+
+                                @if (searching)
+                                {
+                                    <div class="text-center my-3">
+                                        <div class="spinner-border spinner-border-sm"></div>
+                                        <span class="ms-2">Searching...</span>
+                                    </div>
+                                }
+
+                                @if (searchResults.Any())
+                                {
+                                    <div class="border rounded p-3 bg-light mb-3" style="max-height: 300px; overflow-y: auto;">
+                                        <h6 class="mb-2">Search Results (@searchResults.Count found)</h6>
+                                        @foreach (var guest in searchResults)
+                                        {
+                                            <div class="card mb-2">
+                                                <div class="card-body py-2">
+                                                    <div class="d-flex justify-content-between align-items-center">
+                                                        <div>
+                                                            <strong>@guest.GuestName</strong>
+                                                            @if (!string.IsNullOrEmpty(guest.MobileNo))
+                                                            {
+                                                                <span class="text-muted ms-2">
+                                                                    <i class="bi bi-phone"></i> @guest.MobileNo
+                                                                </span>
+                                                            }
+                                                            <div class="text-muted small">
+                                                                @if (!string.IsNullOrEmpty(guest.City) || !string.IsNullOrEmpty(guest.State) || !string.IsNullOrEmpty(guest.Country))
+                                                                {
+                                                                    <span>@guest.City@(!string.IsNullOrEmpty(guest.City) && (!string.IsNullOrEmpty(guest.State) || !string.IsNullOrEmpty(guest.Country)) ? ", " : "")@guest.State@(!string.IsNullOrEmpty(guest.State) && !string.IsNullOrEmpty(guest.Country) ? ", " : "")@guest.Country</span>
+                                                                }
+                                                            </div>
+                                                        </div>
+                                                        <button type="button"
+                                                                class="btn btn-sm btn-success"
+                                                                @onclick="() => UseGuestHistory(guest)">
+                                                            <i class="bi bi-arrow-right-circle"></i> Use This
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                                else if (!searching && !string.IsNullOrEmpty(searchQuery) && searchQuery.Length >= 3)
+                                {
+                                    <div class="alert alert-warning">
+                                        <i class="bi bi-info-circle"></i> No guests found matching "@searchQuery"
+                                    </div>
+                                }
+
+                                <!-- Show guest form after selecting from history -->
+                                @if (newCheckIn.Guests.Any() && !string.IsNullOrEmpty(newCheckIn.Guests[0].GuestName))
+                                {
+                                    <div class="alert alert-info">
+                                        <i class="bi bi-check-circle"></i> Guest information loaded from history. Review and edit below.
+                                    </div>
+
+                                    <h6 class="mt-3">Guest Information (From History)</h6>
+                                    <div class="border rounded p-3 mb-3">
+                                        <div class="row">
+                                            <div class="col-md-6 mb-2">
+                                                <label>Name <span class="text-danger">*</span></label>
+                                                <InputText @bind-Value="newCheckIn.Guests[0].GuestName" class="form-control" placeholder="Required" />
+                                            </div>
+                                            <div class="col-md-6 mb-2">
+                                                <label>Mobile (10 digits)</label>
+                                                <InputText @bind-Value="newCheckIn.Guests[0].MobileNo" class="form-control" placeholder="e.g., 9876543210" maxlength="10" />
+                                            </div>
+                                        </div>
+
+                                        <div class="row">
+                                            <div class="col-md-12 mb-2">
+                                                <label>Address</label>
+                                                <InputText @bind-Value="newCheckIn.Guests[0].Address" class="form-control" />
+                                            </div>
+                                        </div>
+
+                                        <div class="row">
+                                            <div class="col-md-4 mb-2">
+                                                <label>City</label>
+                                                <InputText @bind-Value="newCheckIn.Guests[0].City" class="form-control" />
+                                            </div>
+                                            <div class="col-md-4 mb-2">
+                                                <label>State</label>
+                                                <InputText @bind-Value="newCheckIn.Guests[0].State" class="form-control" />
+                                            </div>
+                                            <div class="col-md-4 mb-2">
+                                                <label>Country</label>
+                                                <InputText @bind-Value="newCheckIn.Guests[0].Country" class="form-control" />
+                                            </div>
+                                        </div>
+
+                                        <div class="row">
+                                            <div class="col-md-12 mb-2">
+                                                <label>PAN/Aadhar No</label>
+                                                <InputText @bind-Value="newCheckIn.Guests[0].PanOrAadharNo" class="form-control" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+
+                        <!-- Business Source and Meal Plan Selection -->
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label>Business Source</label>
+                                <select @bind="selectedBusinessSourceId" class="form-control">
+                                    <option value="">-- Select Business Source --</option>
+                                    @foreach (var source in businessSources)
+                                    {
+                                        <option value="@source.BusinessSourceId">@source.SourceName</option>
+                                    }
+                                </select>
+                                <small class="text-muted">Track where this booking came from</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label>Meal Plan</label>
+                                <select @bind="selectedMealPlanId" class="form-control" @bind:after="OnMealPlanChanged">
+                                    <option value="">-- Select Meal Plan --</option>
+                                    @foreach (var plan in mealPlans)
+                                    {
+                                        <option value="@plan.MealPlanId">@plan.PlanCode - @plan.PlanName</option>
+                                    }
+                                </select>
+                                <small class="text-muted">Select meal plan for tariff calculation</small>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label>Guest Type</label>
+                                <select @bind="selectedGuestTypeId" class="form-control">
+                                    <option value="">-- Select Guest Type --</option>
+                                    @foreach (var guestType in guestTypes)
+                                    {
+                                        <option value="@guestType.GuestTypeId">@guestType.TypeName</option>
+                                    }
+                                </select>
+                                <small class="text-muted">Classify guest type (Normal, Complimentary, etc.)</small>
+                            </div>
+                        </div>
 
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" @onclick="HideCreateModal">Cancel</button>
-                            <button type="submit" class="btn btn-primary">Create Check-In</button>
+                            <button type="submit" class="btn btn-primary" disabled="@(!HasGuestData())">
+                                Create Check-In
+                            </button>
                         </div>
                     </EditForm>
                 </div>
@@ -201,81 +715,188 @@
                     }
                     else if (managedGuests.Any())
                     {
-                        @foreach (var guest in managedGuests)
+                        <!-- All Guests - Guest 1 first, then others by guest number -->
+                        @foreach (var guest in managedGuests.OrderBy(g => g.GuestNumber))
                         {
-                            <div class="card mb-3">
-                                <div class="card-header">
-                                    <strong>Guest @guest.GuestNumber: @guest.GuestName</strong>
+                            <div class="card mb-3 @(guest.Status == 1 ? "border-secondary" : "")">
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>Guest @guest.GuestNumber: @guest.GuestName</strong>
+                                        @if (guest.Status == 0)
+                                        {
+                                            <span class="badge bg-success ms-2">Active</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary ms-2">Checked Out</span>
+                                        }
+                                    </div>
+                                    @if (guest.Status == 0 && guest.GuestNumber > 1)
+                                    {
+                                        <button class="btn btn-sm btn-warning" @onclick="() => CheckOutGuest(guest.Id)">
+                                            <i class="bi bi-box-arrow-right"></i> Check Out Guest
+                                        </button>
+                                    }
                                 </div>
                                 <div class="card-body">
+                                    <!-- Status Information -->
+                                    <div class="alert alert-info py-2 mb-3">
+                                        <small>
+                                            @if (guest.ActualCheckInDate.HasValue)
+                                            {
+                                                <strong>Checked In:</strong> @guest.ActualCheckInDate.Value.ToLocalTime().ToString("MM/dd/yyyy hh:mm tt")
+                                            }
+                                            @if (guest.ActualCheckOutDate.HasValue)
+                                            {
+                                                <span class="ms-3"><strong>Checked Out:</strong> @guest.ActualCheckOutDate.Value.ToLocalTime().ToString("MM/dd/yyyy hh:mm tt")</span>
+                                            }
+                                        </small>
+                                    </div>
+
                                     <div class="row">
                                         <!-- Guest Information -->
                                         <div class="col-md-6">
                                             <h6>Guest Information</h6>
                                             <div class="mb-2">
                                                 <label class="form-label">Name</label>
-                                                <InputText @bind-Value="guest.GuestName" class="form-control form-control-sm" />
+                                                <InputText @bind-Value="guest.GuestName" class="form-control form-control-sm" disabled="@(guest.Status == 1)" />
                                             </div>
                                             <div class="mb-2">
-                                                <label class="form-label">Mobile</label>
-                                                <InputText @bind-Value="guest.MobileNo" class="form-control form-control-sm" />
+                                                <label class="form-label">Address</label>
+                                                <InputText @bind-Value="guest.Address" class="form-control form-control-sm" disabled="@(guest.Status == 1)" />
                                             </div>
                                             <div class="mb-2">
                                                 <label class="form-label">City</label>
-                                                <InputText @bind-Value="guest.City" class="form-control form-control-sm" />
+                                                <InputText @bind-Value="guest.City" class="form-control form-control-sm" disabled="@(guest.Status == 1)" />
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label">State</label>
+                                                <InputText @bind-Value="guest.State" class="form-control form-control-sm" disabled="@(guest.Status == 1)" />
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label">Country</label>
+                                                <InputText @bind-Value="guest.Country" class="form-control form-control-sm" disabled="@(guest.Status == 1)" />
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label">Mobile</label>
+                                                <InputText @bind-Value="guest.MobileNo" class="form-control form-control-sm" disabled="@(guest.Status == 1)" />
                                             </div>
                                             <div class="mb-2">
                                                 <label class="form-label">PAN/Aadhar No</label>
-                                                <InputText @bind-Value="guest.PanOrAadharNo" class="form-control form-control-sm" />
+                                                <InputText @bind-Value="guest.PanOrAadharNo" class="form-control form-control-sm" disabled="@(guest.Status == 1)" />
                                             </div>
-                                            <button class="btn btn-sm btn-primary" @onclick="() => UpdateGuest(guest)">
-                                                <i class="bi bi-save"></i> Save Changes
-                                            </button>
+                                            @if (guest.Status == 0)
+                                            {
+                                                <button class="btn btn-sm btn-primary" @onclick="() => UpdateGuest(guest)">
+                                                    <i class="bi bi-save"></i> Save Changes
+                                                </button>
+                                            }
                                         </div>
 
                                         <!-- ID Proof Upload and OCR -->
                                         <div class="col-md-6">
                                             <h6>ID Proof Documents</h6>
 
-                                            <!-- Photo 1 -->
-                                            <div class="border rounded p-2 mb-2">
-                                                <strong>Photo 1:</strong>
-                                                @if (!string.IsNullOrEmpty(guest.Photo1Path))
-                                                {
-                                                    <span class="badge bg-success ms-2">Uploaded</span>
-                                                }
-                                                <div class="mt-2">
-                                                    <InputFile OnChange="@(e => HandlePhotoUpload(e, guest.Id, 1))"
-                                                               accept="image/*"
-                                                               class="form-control form-control-sm mb-2" />
+                                            @if (guest.Status == 0)
+                                            {
+                                                <!-- Photo 1 - Active Guest -->
+                                                <div class="border rounded p-2 mb-2">
+                                                    <strong>Photo 1:</strong>
                                                     @if (!string.IsNullOrEmpty(guest.Photo1Path))
                                                     {
-                                                        <button class="btn btn-sm btn-success" @onclick="() => ProcessOcr(guest, 1)">
-                                                            <i class="bi bi-cpu"></i> Process OCR
-                                                        </button>
+                                                        <span class="badge bg-success ms-2">Uploaded</span>
                                                     }
+                                                    <div class="mt-2">
+                                                        <InputFile OnChange="@(e => HandlePhotoUpload(e, guest.Id, 1))"
+                                                                   accept="image/*"
+                                                                   class="form-control form-control-sm mb-2" />
+                                                        @{
+                                                            var photo1Key = $"{guest.Id}_photo1";
+                                                            if (selectedFileNames.ContainsKey(photo1Key))
+                                                            {
+                                                                <div class="alert alert-info py-1 px-2 mb-2">
+                                                                    <small><i class="bi bi-file-earmark"></i> Selected: @selectedFileNames[photo1Key]</small>
+                                                                </div>
+                                                            }
+                                                        }
+                                                        @if (!string.IsNullOrEmpty(guest.Photo1Path))
+                                                        {
+                                                            <div class="mb-2">
+                                                                <img src="@GetPhotoUrl(guest.Id, 1)"
+                                                                     alt="Photo 1"
+                                                                     class="img-thumbnail"
+                                                                     style="max-width: 200px; max-height: 150px; object-fit: contain;" />
+                                                            </div>
+                                                            <button class="btn btn-sm btn-success" @onclick="() => ProcessOcr(guest, 1)">
+                                                                <i class="bi bi-cpu"></i> Process OCR
+                                                            </button>
+                                                        }
+                                                    </div>
                                                 </div>
-                                            </div>
 
-                                            <!-- Photo 2 -->
-                                            <div class="border rounded p-2 mb-2">
-                                                <strong>Photo 2:</strong>
-                                                @if (!string.IsNullOrEmpty(guest.Photo2Path))
-                                                {
-                                                    <span class="badge bg-success ms-2">Uploaded</span>
-                                                }
-                                                <div class="mt-2">
-                                                    <InputFile OnChange="@(e => HandlePhotoUpload(e, guest.Id, 2))"
-                                                               accept="image/*"
-                                                               class="form-control form-control-sm mb-2" />
+                                                <!-- Photo 2 - Active Guest -->
+                                                <div class="border rounded p-2 mb-2">
+                                                    <strong>Photo 2:</strong>
                                                     @if (!string.IsNullOrEmpty(guest.Photo2Path))
                                                     {
-                                                        <button class="btn btn-sm btn-success" @onclick="() => ProcessOcr(guest, 2)">
-                                                            <i class="bi bi-cpu"></i> Process OCR
-                                                        </button>
+                                                        <span class="badge bg-success ms-2">Uploaded</span>
                                                     }
+                                                    <div class="mt-2">
+                                                        <InputFile OnChange="@(e => HandlePhotoUpload(e, guest.Id, 2))"
+                                                                   accept="image/*"
+                                                                   class="form-control form-control-sm mb-2" />
+                                                        @{
+                                                            var photo2Key = $"{guest.Id}_photo2";
+                                                            if (selectedFileNames.ContainsKey(photo2Key))
+                                                            {
+                                                                <div class="alert alert-info py-1 px-2 mb-2">
+                                                                    <small><i class="bi bi-file-earmark"></i> Selected: @selectedFileNames[photo2Key]</small>
+                                                                </div>
+                                                            }
+                                                        }
+                                                        @if (!string.IsNullOrEmpty(guest.Photo2Path))
+                                                        {
+                                                            <div class="mb-2">
+                                                                <img src="@GetPhotoUrl(guest.Id, 2)"
+                                                                     alt="Photo 2"
+                                                                     class="img-thumbnail"
+                                                                     style="max-width: 200px; max-height: 150px; object-fit: contain;" />
+                                                            </div>
+                                                            <button class="btn btn-sm btn-success" @onclick="() => ProcessOcr(guest, 2)">
+                                                                <i class="bi bi-cpu"></i> Process OCR
+                                                            </button>
+                                                        }
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            }
+                                            else
+                                            {
+                                                <!-- Checked-out Guest - View Only -->
+                                                @if (!string.IsNullOrEmpty(guest.Photo1Path))
+                                                {
+                                                    <div class="border rounded p-2 mb-2">
+                                                        <strong>Photo 1:</strong>
+                                                        <div class="mt-2">
+                                                            <img src="@GetPhotoUrl(guest.Id, 1)"
+                                                                 alt="Photo 1"
+                                                                 class="img-thumbnail"
+                                                                 style="max-width: 200px; max-height: 150px; object-fit: contain;" />
+                                                        </div>
+                                                    </div>
+                                                }
+                                                @if (!string.IsNullOrEmpty(guest.Photo2Path))
+                                                {
+                                                    <div class="border rounded p-2 mb-2">
+                                                        <strong>Photo 2:</strong>
+                                                        <div class="mt-2">
+                                                            <img src="@GetPhotoUrl(guest.Id, 2)"
+                                                                 alt="Photo 2"
+                                                                 class="img-thumbnail"
+                                                                 style="max-width: 200px; max-height: 150px; object-fit: contain;" />
+                                                        </div>
+                                                    </div>
+                                                }
+                                            }
 
                                             @if (uploadingGuests.Contains(guest.Id))
                                             {
@@ -302,10 +923,740 @@
                                 </div>
                             </div>
                         }
+
+                        <!-- Add New Guest Section -->
+                        <div class="card mb-3 border-success">
+                            <div class="card-header bg-light">
+                                <strong><i class="bi bi-plus-circle"></i> Add New Guest</strong>
+                            </div>
+                            <div class="card-body">
+                                <EditForm Model="newGuest" OnValidSubmit="AddNewGuest">
+                                    <div class="row">
+                                        <!-- Guest Information -->
+                                        <div class="col-md-6">
+                                            <h6>Guest Information</h6>
+                                            <div class="mb-2">
+                                                <label class="form-label">Name <span class="text-danger">*</span></label>
+                                                <InputText @bind-Value="newGuest.GuestName" class="form-control form-control-sm" placeholder="Required" />
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label">Address</label>
+                                                <InputText @bind-Value="newGuest.Address" class="form-control form-control-sm" />
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label">City</label>
+                                                <InputText @bind-Value="newGuest.City" class="form-control form-control-sm" />
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label">State</label>
+                                                <InputText @bind-Value="newGuest.State" class="form-control form-control-sm" />
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label">Country</label>
+                                                <InputText @bind-Value="newGuest.Country" class="form-control form-control-sm" />
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label">Mobile (10 digits)</label>
+                                                <InputText @bind-Value="newGuest.MobileNo" class="form-control form-control-sm" placeholder="e.g., 9876543210" maxlength="10" />
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label">PAN/Aadhar No</label>
+                                                <InputText @bind-Value="newGuest.PanOrAadharNo" class="form-control form-control-sm" />
+                                            </div>
+                                        </div>
+
+                                        <!-- ID Proof Upload -->
+                                        <div class="col-md-6">
+                                            <h6>ID Proof Documents (Optional)</h6>
+
+                                            <!-- Photo 1 -->
+                                            <div class="border rounded p-2 mb-2">
+                                                <strong>Photo 1:</strong>
+                                                <div class="mt-2">
+                                                    <InputFile OnChange="@HandleNewGuestPhoto1Change"
+                                                               accept="image/*"
+                                                               class="form-control form-control-sm mb-2" />
+                                                    @if (!string.IsNullOrEmpty(newGuestPhoto1Name))
+                                                    {
+                                                        <div class="alert alert-info py-1 px-2 mb-2">
+                                                            <small><i class="bi bi-file-earmark"></i> Selected: @newGuestPhoto1Name</small>
+                                                        </div>
+                                                    }
+                                                </div>
+                                            </div>
+
+                                            <!-- Photo 2 -->
+                                            <div class="border rounded p-2 mb-2">
+                                                <strong>Photo 2:</strong>
+                                                <div class="mt-2">
+                                                    <InputFile OnChange="@HandleNewGuestPhoto2Change"
+                                                               accept="image/*"
+                                                               class="form-control form-control-sm mb-2" />
+                                                    @if (!string.IsNullOrEmpty(newGuestPhoto2Name))
+                                                    {
+                                                        <div class="alert alert-info py-1 px-2 mb-2">
+                                                            <small><i class="bi bi-file-earmark"></i> Selected: @newGuestPhoto2Name</small>
+                                                        </div>
+                                                    }
+                                                </div>
+                                            </div>
+
+                                            <div class="alert alert-warning py-1 px-2">
+                                                <small><i class="bi bi-info-circle"></i> Photos will be uploaded after guest is created</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(addGuestError))
+                                    {
+                                        <div class="alert alert-danger alert-sm py-1 px-2 mt-2">
+                                            <small>@addGuestError</small>
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrEmpty(addGuestSuccess))
+                                    {
+                                        <div class="alert alert-success alert-sm py-1 px-2 mt-2">
+                                            <small>@addGuestSuccess</small>
+                                        </div>
+                                    }
+                                    <div class="mt-3">
+                                        <button type="submit" class="btn btn-success btn-sm" disabled="@addingGuest">
+                                            @if (addingGuest)
+                                            {
+                                                <span class="spinner-border spinner-border-sm me-1"></span>
+                                            }
+                                            <i class="bi bi-plus-circle"></i> Add Guest
+                                        </button>
+                                    </div>
+                                </EditForm>
+                            </div>
+                        </div>
                     }
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" @onclick="HideGuestsModal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Edit Check-In Modal -->
+@if (showEditModal && selectedCheckInForEdit != null)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Check-In - Room @selectedCheckInForEdit.RoomNumber</h5>
+                    <button type="button" class="btn-close" @onclick="HideEditModal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrWhiteSpace(editErrorMessage))
+                    {
+                        <div class="alert alert-danger">
+                            @editErrorMessage
+                        </div>
+                    }
+
+                    <div class="mb-3">
+                        <p><strong>Room:</strong> @selectedCheckInForEdit.RoomNumber</p>
+                        <p><strong>Guest(s):</strong> @selectedCheckInForEdit.GuestNames</p>
+                        <p><strong>Dates:</strong> @selectedCheckInForEdit.CheckInDate.ToShortDateString() - @selectedCheckInForEdit.CheckOutDate.ToShortDateString()</p>
+                    </div>
+
+                    <div class="mb-3">
+                        <label>Company</label>
+                        <select class="form-control" @bind="editCheckInModel.CompanyId">
+                            <option value="">-- No Company --</option>
+                            @foreach (var company in editCompanies)
+                            {
+                                <option value="@company.Id">@company.CompanyName</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label>Business Source</label>
+                        <select class="form-control" @bind="editCheckInModel.BusinessSourceId">
+                            <option value="">-- No Business Source --</option>
+                            @foreach (var source in editBusinessSources)
+                            {
+                                <option value="@source.BusinessSourceId">@source.SourceName</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label>Meal Plan</label>
+                        <select class="form-control" @bind="editCheckInModel.MealPlanId">
+                            <option value="">-- No Meal Plan --</option>
+                            @foreach (var plan in editMealPlans)
+                            {
+                                <option value="@plan.MealPlanId">@plan.PlanCode - @plan.PlanName</option>
+                            }
+                        </select>
+                        <small class="text-muted">Changing meal plan will recalculate charges</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label>Guest Type</label>
+                        <select class="form-control" @bind="editCheckInModel.GuestTypeId">
+                            <option value="">-- No Guest Type --</option>
+                            @foreach (var guestType in editGuestTypes)
+                            {
+                                <option value="@guestType.GuestTypeId">@guestType.TypeName</option>
+                            }
+                        </select>
+                        <small class="text-muted">Classify guest type (Normal, Complimentary, etc.)</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideEditModal">Cancel</button>
+                    <button type="button" class="btn btn-primary" @onclick="UpdateCheckIn">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Bill Preview Modal (New - with day-by-day breakdown) -->
+@if (showBillPreviewModal)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header no-print">
+                    <h5 class="modal-title">Bill Preview - Room @(billPreview?.RoomNumber ?? "N/A")</h5>
+                    <button type="button" class="btn-close" @onclick="HideBillPreviewModal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (loadingBillPreview)
+                    {
+                        <div class="text-center py-5">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading bill...</span>
+                            </div>
+                            <p class="mt-2">Calculating charges...</p>
+                        </div>
+                    }
+                    else if (!string.IsNullOrEmpty(billErrorMessage))
+                    {
+                        <div class="alert alert-danger">@billErrorMessage</div>
+                    }
+                    else if (billPreview != null)
+                    {
+                        <div id="printable-bill-preview">
+                            <!-- Hotel Header -->
+                            <div class="text-center mb-4">
+                                <h3>Hotel Management System</h3>
+                                <p class="text-muted">Guest Bill Preview</p>
+                            </div>
+
+                            <!-- Guest Information -->
+                            <div class="card mb-4">
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <p><strong>Room Number:</strong> @billPreview.RoomNumber</p>
+                                            <p><strong>Guest Names:</strong> @billPreview.GuestNames</p>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <p><strong>Check-In:</strong> @billPreview.ActualCheckInDate.ToString("dd/MMM/yyyy")</p>
+                                            <p><strong>Check-Out:</strong> @billPreview.ProposedCheckOutDate.ToString("dd/MMM/yyyy")</p>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <p><strong>Total Nights:</strong> @billPreview.TotalNights</p>
+                                            <p><strong>Occupancy:</strong> @billPreview.Pax @(billPreview.Pax == 1 ? "Guest" : "Guests")</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Day-Wise Charges -->
+                            <h5 class="mb-3">Day-Wise Charges</h5>
+                            <div class="table-responsive mb-4">
+                                <table class="table table-bordered table-sm">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Date</th>
+                                            <th class="text-end">Room Rate</th>
+                                            <th class="text-end">Meal Rate</th>
+                                            <th class="text-end">Subtotal</th>
+                                            <th class="text-end">Discount</th>
+                                            <th class="text-end">After Discount</th>
+                                            <th class="text-end">Tax</th>
+                                            <th class="text-end">Day Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var day in billPreview.DailyCharges)
+                                        {
+                                            <tr>
+                                                <td>
+                                                    @day.Date.ToString("dd/MMM/yyyy")
+                                                    @if (!string.IsNullOrEmpty(day.RateChangeNote))
+                                                    {
+                                                        <br /><small class="text-info">@day.RateChangeNote</small>
+                                                    }
+                                                </td>
+                                                <td class="text-end">₹@day.RoomRate.ToString("N2")</td>
+                                                <td class="text-end">₹@day.MealPlanRate.ToString("N2")</td>
+                                                <td class="text-end">₹@day.SubtotalBeforeDiscount.ToString("N2")</td>
+                                                <td class="text-end">-₹@day.DiscountAmount.ToString("N2")</td>
+                                                <td class="text-end">₹@((day.SubtotalBeforeDiscount - day.DiscountAmount).ToString("N2"))</td>
+                                                <td class="text-end">₹@day.TotalTax.ToString("N2")</td>
+                                                <td class="text-end"><strong>₹@day.DayTotal.ToString("N2")</strong></td>
+                                            </tr>
+                                        }
+                                        <tr class="table-light">
+                                            <td colspan="7" class="text-end"><strong>Total Room & Meal Charges:</strong></td>
+                                            <td class="text-end"><strong>₹@billPreview.DailyCharges.Sum(d => d.DayTotal).ToString("N2")</strong></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Additional Charges -->
+                            <h5 class="mb-3">Additional Charges
+                                @if (!showAddChargeForm)
+                                {
+                                    <button class="btn btn-sm btn-success ms-2 no-print" @onclick="ShowAddChargeForm">
+                                        <i class="bi bi-plus-circle"></i> Add Charge
+                                    </button>
+                                }
+                            </h5>
+
+                            @if (showAddChargeForm)
+                            {
+                                <div class="card mb-3 no-print">
+                                    <div class="card-body">
+                                        <h6>New Charge</h6>
+                                        <div class="row g-2">
+                                            <div class="col-md-2">
+                                                <label class="form-label">Date</label>
+                                                <input type="date" class="form-control" @bind="newCharge.ChargeDate" />
+                                            </div>
+                                            <div class="col-md-2">
+                                                <label class="form-label">Type</label>
+                                                <select class="form-select" @bind="newCharge.ChargeType">
+                                                    <option value="">Select...</option>
+                                                    <option value="Room Service">Room Service</option>
+                                                    <option value="Minibar">Minibar</option>
+                                                    <option value="Laundry">Laundry</option>
+                                                    <option value="Phone">Phone</option>
+                                                    <option value="Restaurant">Restaurant</option>
+                                                    <option value="Other">Other</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label">Description</label>
+                                                <input type="text" class="form-control" @bind="newCharge.Description" placeholder="Enter description" />
+                                            </div>
+                                            <div class="col-md-2">
+                                                <label class="form-label">Amount</label>
+                                                <input type="number" step="0.01" class="form-control" @bind="newCharge.Amount" />
+                                            </div>
+                                            <div class="col-md-1">
+                                                <label class="form-label">Qty</label>
+                                                <input type="number" class="form-control" @bind="newCharge.Quantity" min="1" />
+                                            </div>
+                                            <div class="col-md-2 d-flex align-items-end">
+                                                <button class="btn btn-primary me-1" @onclick="AddCharge" disabled="@addingCharge">
+                                                    @if (addingCharge)
+                                                    {
+                                                        <span class="spinner-border spinner-border-sm"></span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <i class="bi bi-check"></i>
+                                                    }
+                                                    Add
+                                                </button>
+                                                <button class="btn btn-secondary" @onclick="CancelAddCharge">Cancel</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+
+                            @if (billPreview.AdditionalCharges.Any())
+                            {
+                                <div class="table-responsive mb-4">
+                                    <table class="table table-bordered table-sm">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Date</th>
+                                                <th>Type</th>
+                                                <th>Description</th>
+                                                <th class="text-end">Amount</th>
+                                                <th class="text-end">Qty</th>
+                                                <th class="text-end">Total</th>
+                                                <th class="no-print" style="width: 80px;">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var charge in billPreview.AdditionalCharges)
+                                            {
+                                                <tr>
+                                                    <td>@charge.ChargeDate.ToString("dd/MMM/yyyy")</td>
+                                                    <td>@charge.ChargeType</td>
+                                                    <td>@charge.Description</td>
+                                                    <td class="text-end">₹@charge.Amount.ToString("N2")</td>
+                                                    <td class="text-end">@charge.Quantity</td>
+                                                    <td class="text-end"><strong>₹@charge.TotalAmount.ToString("N2")</strong></td>
+                                                    <td class="text-center no-print">
+                                                        <button class="btn btn-sm btn-danger"
+                                                                @onclick="() => DeleteCharge(charge.Id)"
+                                                                disabled="@deletingCharges.Contains(charge.Id)">
+                                                            @if (deletingCharges.Contains(charge.Id))
+                                                            {
+                                                                <span class="spinner-border spinner-border-sm"></span>
+                                                            }
+                                                            else
+                                                            {
+                                                                <i class="bi bi-trash"></i>
+                                                            }
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            }
+                                            <tr class="table-light">
+                                                <td colspan="5" class="text-end"><strong>Total Additional Charges:</strong></td>
+                                                <td class="text-end"><strong>₹@billPreview.AdditionalChargesSubtotal.ToString("N2")</strong></td>
+                                                <td class="no-print"></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                            else
+                            {
+                                <p class="text-muted mb-4">No additional charges</p>
+                            }
+
+                            <!-- Summary -->
+                            <div class="card mb-4">
+                                <div class="card-body">
+                                    <h5 class="mb-3">Bill Summary</h5>
+                                    <div class="row">
+                                        <div class="col-md-8 offset-md-4">
+                                            <table class="table table-sm">
+                                                <tbody>
+                                                    <tr>
+                                                        <td>Room Charges (@billPreview.TotalNights @(billPreview.TotalNights == 1 ? "night" : "nights"))</td>
+                                                        <td class="text-end">₹@billPreview.RoomChargesSubtotal.ToString("N2")</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>Meal Charges</td>
+                                                        <td class="text-end">₹@billPreview.MealChargesSubtotal.ToString("N2")</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>Discount</td>
+                                                        <td class="text-end text-success">-₹@billPreview.DiscountAmount.ToString("N2")</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>Additional Charges</td>
+                                                        <td class="text-end">₹@billPreview.AdditionalChargesSubtotal.ToString("N2")</td>
+                                                    </tr>
+                                                    <tr class="table-light">
+                                                        <td><strong>Subtotal Before Tax</strong></td>
+                                                        <td class="text-end"><strong>₹@billPreview.SubtotalBeforeTax.ToString("N2")</strong></td>
+                                                    </tr>
+                                                    @foreach (var tax in billPreview.TaxBreakdown)
+                                                    {
+                                                        <tr>
+                                                            <td>@tax.TaxType (@tax.TaxPercentage%)</td>
+                                                            <td class="text-end">₹@tax.TotalTaxAmount.ToString("N2")</td>
+                                                        </tr>
+                                                    }
+                                                    <tr class="table-success">
+                                                        <td><h5 class="mb-0">GRAND TOTAL</h5></td>
+                                                        <td class="text-end"><h5 class="mb-0">₹@billPreview.GrandTotal.ToString("N2")</h5></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Footer -->
+                            <div class="text-center mt-4 text-muted">
+                                <small>Generated on @DateTime.Now.ToString("dd/MMM/yyyy hh:mm tt")</small>
+                            </div>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer no-print">
+                    <button type="button" class="btn btn-secondary" @onclick="HideBillPreviewModal">Cancel</button>
+                    @if (billPreview != null)
+                    {
+                        <button type="button" class="btn btn-info" onclick="window.print()">
+                            <i class="bi bi-printer"></i> Print Bill
+                        </button>
+                        <button type="button" class="btn btn-success" @onclick="FinalizeCheckout" disabled="@loadingBillPreview">
+                            @if (loadingBillPreview)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            <i class="bi bi-check-circle"></i> Confirm Checkout
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Bill View Modal -->
+@if (showBillModal && billCheckIn != null && billGuests.Any())
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header no-print">
+                    <h5 class="modal-title">Guest Bill - Room @billCheckIn.RoomNumber</h5>
+                    <button type="button" class="btn-close" @onclick="HideBillModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="printable-bill">
+                        <!-- Hotel Header -->
+                        <div class="text-center mb-4">
+                            <h3>Hotel Management System</h3>
+                            <p class="text-muted">Guest Bill</p>
+                        </div>
+
+                        <!-- Check-In Details -->
+                        <div class="card mb-4">
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p><strong>Room Number:</strong> @billCheckIn.RoomNumber</p>
+                                        <p><strong>Check-In Date:</strong> @billCheckIn.CheckInDate.ToString("MM/dd/yyyy")</p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <p><strong>Check-Out Date:</strong> @billCheckIn.CheckOutDate.ToString("MM/dd/yyyy")</p>
+                                        <p><strong>Status:</strong> <span class="badge bg-secondary">@billCheckIn.StatusName</span></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Guest Details -->
+                        <h5 class="mb-3">Guest Information</h5>
+
+                        @foreach (var guest in billGuests.OrderBy(g => g.GuestNumber))
+                        {
+                            <div class="card mb-3 @(guest.Status == 1 ? "border-secondary" : "border-success")">
+                                <div class="card-header">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <strong>Guest @guest.GuestNumber: @guest.GuestName</strong>
+                                        @if (guest.Status == 0)
+                                        {
+                                            <span class="badge bg-success">Active</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">Checked Out</span>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <p class="mb-1"><strong>Address:</strong> @guest.Address</p>
+                                            <p class="mb-1"><strong>City:</strong> @guest.City</p>
+                                            <p class="mb-1"><strong>State:</strong> @guest.State</p>
+                                            <p class="mb-1"><strong>Country:</strong> @guest.Country</p>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <p class="mb-1"><strong>Mobile:</strong> @guest.MobileNo</p>
+                                            <p class="mb-1"><strong>ID Number:</strong> @guest.PanOrAadharNo</p>
+                                            @if (guest.ActualCheckInDate.HasValue)
+                                            {
+                                                <p class="mb-1"><strong>Checked In:</strong> @guest.ActualCheckInDate.Value.ToLocalTime().ToString("MM/dd/yyyy hh:mm tt")</p>
+                                            }
+                                            @if (guest.ActualCheckOutDate.HasValue)
+                                            {
+                                                <p class="mb-1"><strong>Checked Out:</strong> @guest.ActualCheckOutDate.Value.ToLocalTime().ToString("MM/dd/yyyy hh:mm tt")</p>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
+                        <!-- Summary -->
+                        <div class="card mt-4">
+                            <div class="card-body">
+                                <h6>Summary</h6>
+                                <p><strong>Total Guests:</strong> @billGuests.Count</p>
+                                <p><strong>Active Guests:</strong> @billGuests.Count(g => g.Status == 0)</p>
+                                <p><strong>Checked Out Guests:</strong> @billGuests.Count(g => g.Status == 1)</p>
+                            </div>
+                        </div>
+
+                        <!-- Footer -->
+                        <div class="text-center mt-4 text-muted">
+                            <small>Generated on @DateTime.Now.ToString("MM/dd/yyyy hh:mm tt")</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer no-print">
+                    <button type="button" class="btn btn-secondary" @onclick="HideBillModal">Close</button>
+                    <button type="button" class="btn btn-primary" @onclick="PrintBill">
+                        <i class="bi bi-printer"></i> Print Bill
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- OCR Review Modal -->
+@if (showOcrReviewModal && currentOcrReview != null && currentReviewGuest != null)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">OCR Review - @currentReviewGuest.GuestName</h5>
+                    <button type="button" class="btn-close" @onclick="HideOcrReviewModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <!-- Left side: Image -->
+                        <div class="col-md-6">
+                            <h6>Uploaded Image</h6>
+                            <div class="border rounded p-2 bg-light">
+                                <img src="@GetPhotoUrl(currentReviewGuest.Id, currentReviewPhotoNumber)"
+                                     alt="ID Proof"
+                                     class="img-fluid"
+                                     style="max-height: 500px; width: 100%; object-fit: contain;" />
+                            </div>
+                        </div>
+
+                        <!-- Right side: OCR Text and Fields -->
+                        <div class="col-md-6">
+                            <h6>Raw OCR Text</h6>
+                            <div class="border rounded p-3 bg-light mb-3" style="max-height: 200px; overflow-y: auto;">
+                                <pre class="mb-0" style="white-space: pre-wrap; font-size: 0.85rem;">@currentOcrReview.RawText</pre>
+                            </div>
+                            <div class="alert alert-info">
+                                <small><i class="bi bi-info-circle"></i> Confidence: @((currentOcrReview.Confidence * 100).ToString("F1"))%</small>
+                            </div>
+
+                            <h6>Extracted Information</h6>
+                            <p class="text-muted small">Review and edit the information below, then click "Submit OK" to populate the guest fields.</p>
+
+                            <div class="mb-2">
+                                <label class="form-label">Name</label>
+                                <InputText @bind-Value="currentOcrReview.GuestInfo.GuestName" class="form-control form-control-sm" />
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label">Address</label>
+                                <InputText @bind-Value="currentOcrReview.GuestInfo.Address" class="form-control form-control-sm" />
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label">City</label>
+                                <InputText @bind-Value="currentOcrReview.GuestInfo.City" class="form-control form-control-sm" />
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label">State</label>
+                                <InputText @bind-Value="currentOcrReview.GuestInfo.State" class="form-control form-control-sm" />
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label">Country</label>
+                                <InputText @bind-Value="currentOcrReview.GuestInfo.Country" class="form-control form-control-sm" />
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label">Mobile</label>
+                                <InputText @bind-Value="currentOcrReview.GuestInfo.MobileNo" class="form-control form-control-sm" />
+                            </div>
+                            <div class="mb-2">
+                                <label class="form-label">ID Number (Aadhar/PAN)</label>
+                                <InputText @bind-Value="currentOcrReview.GuestInfo.IdNumber" class="form-control form-control-sm" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideOcrReviewModal">Cancel</button>
+                    <button type="button" class="btn btn-success" @onclick="SubmitOcrReview">
+                        <i class="bi bi-check-circle"></i> Submit OK
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Quick Add Company Modal -->
+@if (showQuickAddCompanyModal)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add New Company</h5>
+                    <button type="button" class="btn-close" @onclick="HideQuickAddCompanyModal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(quickAddCompanyError))
+                    {
+                        <div class="alert alert-danger">
+                            <i class="bi bi-exclamation-triangle"></i> @quickAddCompanyError
+                        </div>
+                    }
+                    <div class="mb-3">
+                        <label class="form-label">Company Name <span class="text-danger">*</span></label>
+                        <input type="text" @bind="newCompany.CompanyName" class="form-control" placeholder="Enter company name" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">GST Number</label>
+                        <input type="text" @bind="newCompany.GSTNumber" class="form-control" placeholder="Enter GST number" />
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">City</label>
+                            <input type="text" @bind="newCompany.City" class="form-control" placeholder="Enter city" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">State</label>
+                            <input type="text" @bind="newCompany.State" class="form-control" placeholder="Enter state" />
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Contact Person</label>
+                        <input type="text" @bind="newCompany.ContactPerson" class="form-control" placeholder="Enter contact person name" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Contact Number</label>
+                        <input type="text" @bind="newCompany.ContactNumber" class="form-control" placeholder="Enter contact number" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email" @bind="newCompany.Email" class="form-control" placeholder="Enter email" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Discount Percentage</label>
+                        <input type="number" @bind="newCompany.DiscountPercentage" class="form-control" min="0" max="100" step="0.01" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideQuickAddCompanyModal">Cancel</button>
+                    <button type="button" class="btn btn-primary" @onclick="QuickAddCompany" disabled="@savingCompany">
+                        @if (savingCompany)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        <i class="bi bi-check-circle"></i> Add Company
+                    </button>
                 </div>
             </div>
         </div>
@@ -318,6 +1669,28 @@
     private List<RoomDto> availableRooms = new();
     private bool loading = true;
     private bool showCreateModal = false;
+    private string createErrorMessage = string.Empty;
+    private Dictionary<int, CheckInFinancialData> financialDataCache = new();
+    private string checkInSearchFilter = string.Empty;
+
+    // Company and Tariff
+    private List<CompanyDto> activeCompanies = new();
+    private string selectedCompanyId = "";
+    private TariffCalculationDto? calculatedTariff = null;
+
+    // Quick Add Company
+    private bool showQuickAddCompanyModal = false;
+    private CreateCompanyDto newCompany = new();
+    private bool savingCompany = false;
+    private string quickAddCompanyError = string.Empty;
+
+    // Business Source, Meal Plan, and Guest Type
+    private List<BusinessSourceModel> businessSources = new();
+    private List<MealPlanModel> mealPlans = new();
+    private List<GuestTypeModel> guestTypes = new();
+    private string selectedBusinessSourceId = "";
+    private string selectedMealPlanId = "";
+    private string selectedGuestTypeId = "";
 
     // Guest management
     private bool showGuestsModal = false;
@@ -328,9 +1701,88 @@
     private HashSet<int> processingOcrGuests = new();
     private HashSet<int> ocrSuccessGuests = new();
 
+    // Add guest to existing check-in
+    private CreateGuestDto newGuest = new();
+    private bool addingGuest = false;
+    private string addGuestError = string.Empty;
+    private string addGuestSuccess = string.Empty;
+    private IBrowserFile? newGuestPhoto1 = null;
+    private IBrowserFile? newGuestPhoto2 = null;
+    private string newGuestPhoto1Name = string.Empty;
+    private string newGuestPhoto2Name = string.Empty;
+
+    // OCR Review Modal
+    private bool showOcrReviewModal = false;
+    private OcrReviewDto? currentOcrReview = null;
+    private GuestDto? currentReviewGuest = null;
+    private int currentReviewPhotoNumber = 0;
+
+    // Bill View Modal (legacy - for checked-out check-ins)
+    private bool showBillModal = false;
+    private CheckInDto? billCheckIn = null;
+    private List<GuestDto> billGuests = new();
+
+    // Bill Preview Modal (new - with day-by-day breakdown)
+    private bool showBillPreviewModal = false;
+    private BillPreviewModel? billPreview = null;
+    private bool loadingBillPreview = false;
+    private string billErrorMessage = string.Empty;
+    private bool showAddChargeForm = false;
+    private CreateAdditionalChargeModel newCharge = new();
+    private bool addingCharge = false;
+    private HashSet<int> deletingCharges = new();
+
+    // Edit Check-In Modal
+    private bool showEditModal = false;
+    private CheckInDto? selectedCheckInForEdit = null;
+    private UpdateCheckInModel editCheckInModel = new();
+    private List<CompanyDto> editCompanies = new();
+    private List<BusinessSourceModel> editBusinessSources = new();
+    private List<MealPlanModel> editMealPlans = new();
+    private List<GuestTypeModel> editGuestTypes = new();
+    private string editErrorMessage = "";
+
+    // Track selected file names for display
+    private Dictionary<string, string> selectedFileNames = new();
+
+    // Tab management for create check-in modal
+    private enum GuestEntryTab
+    {
+        ManualEntry,
+        OcrScan,
+        GuestHistory
+    }
+
+    private GuestEntryTab activeTab = GuestEntryTab.ManualEntry;
+
+    // Guest search
+    private string searchQuery = string.Empty;
+    private List<GuestDto> searchResults = new();
+    private bool searching = false;
+
+    // OCR during creation
+    private IBrowserFile? ocrFile = null;
+    private string ocrFileName = string.Empty;
+    private bool processingOcr = false;
+    private OcrReviewDto? createOcrResult = null;
+
+    // Role-based permissions
+    private bool canManageCompanies = false;
+
     protected override async Task OnInitializedAsync()
     {
+        await CheckUserPermissions();
         await LoadCheckIns();
+    }
+
+    private async Task CheckUserPermissions()
+    {
+        var currentUser = await AuthService.GetCurrentUserAsync();
+        if (currentUser != null)
+        {
+            // Only Admin (0) and Manager (1) can manage companies
+            canManageCompanies = currentUser.Role == 0 || currentUser.Role == 1;
+        }
     }
 
     private async Task LoadCheckIns()
@@ -338,6 +1790,94 @@
         loading = true;
         checkIns = await ApiClient.GetActiveCheckInsAsync();
         loading = false;
+
+        // Clear cache and load financial data
+        financialDataCache.Clear();
+        _ = LoadFinancialDataForAllCheckIns(); // Fire and forget
+    }
+
+    private List<CheckInDto> FilteredCheckIns
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(checkInSearchFilter))
+                return checkIns;
+
+            var filter = checkInSearchFilter.ToLower();
+            return checkIns.Where(c =>
+                c.RoomNumber.ToLower().Contains(filter) ||
+                c.GuestNames.ToLower().Contains(filter) ||
+                (c.CompanyName?.ToLower().Contains(filter) ?? false) ||
+                (c.CompanyGSTNumber?.ToLower().Contains(filter) ?? false) ||
+                (c.BusinessSourceName?.ToLower().Contains(filter) ?? false) ||
+                (c.MealPlanName?.ToLower().Contains(filter) ?? false) ||
+                (c.GuestTypeName?.ToLower().Contains(filter) ?? false)
+            ).ToList();
+        }
+    }
+
+    private void ClearCheckInSearch()
+    {
+        checkInSearchFilter = string.Empty;
+    }
+
+    private CheckInFinancialData GetFinancialData(int checkInId)
+    {
+        if (!financialDataCache.ContainsKey(checkInId))
+        {
+            financialDataCache[checkInId] = new CheckInFinancialData
+            {
+                CheckInId = checkInId,
+                IsLoading = true
+            };
+        }
+        return financialDataCache[checkInId];
+    }
+
+    private async Task LoadFinancialDataForAllCheckIns()
+    {
+        var tasks = checkIns.Select(ci => LoadFinancialDataForCheckIn(ci.Id)).ToList();
+
+        foreach (var task in tasks)
+        {
+            await task;
+            StateHasChanged(); // Update UI as each completes
+        }
+    }
+
+    private async Task LoadFinancialDataForCheckIn(int checkInId)
+    {
+        var financialData = GetFinancialData(checkInId);
+
+        try
+        {
+            // Fetch vouchers and bill preview concurrently
+            var vouchersTask = ApiClient.GetVouchersByCheckInIdAsync(checkInId);
+            var billPreviewTask = ApiClient.GetBillPreviewAsync(checkInId);
+
+            await Task.WhenAll(vouchersTask, billPreviewTask);
+
+            var vouchers = await vouchersTask;
+            var billPreview = await billPreviewTask;
+
+            // Calculate total advance (sum of Payment vouchers, excluding cancelled)
+            financialData.TotalAdvanceAmount = vouchers
+                .Where(v => v.VoucherType == "Payment" && v.PostingStatus != "Cancelled")
+                .Sum(v => v.Amount);
+
+            // Get bill amount (grand total including tax)
+            financialData.BillAmount = billPreview?.GrandTotal ?? 0;
+
+            financialData.IsLoading = false;
+            financialData.HasError = false;
+        }
+        catch (Exception ex)
+        {
+            financialData.IsLoading = false;
+            financialData.HasError = true;
+            financialData.ErrorMessage = "Failed to load financial data";
+            Console.WriteLine($"Error loading financial data for check-in {checkInId}: {ex.Message}");
+        }
     }
 
     private async Task ShowCreateModal()
@@ -346,52 +1886,436 @@
         var allRooms = await ApiClient.GetRoomsAsync();
         availableRooms = allRooms.Where(r => r.RoomStatus == 0).ToList(); // Only available rooms
 
+        // Load active companies
+        activeCompanies = await ApiClient.GetActiveCompaniesAsync();
+
+        // Load business sources, meal plans, and guest types
+        businessSources = await ApiClient.GetActiveBusinessSourcesAsync();
+        mealPlans = await ApiClient.GetActiveMealPlansAsync();
+        guestTypes = await ApiClient.GetActiveGuestTypesAsync();
+
         newCheckIn = new CreateCheckInDto
         {
             CheckInDate = DateTime.Today,
             CheckOutDate = DateTime.Today.AddDays(2),
             Guests = new List<CreateGuestDto> { new CreateGuestDto() }
         };
+        createErrorMessage = string.Empty;
+
+        // Reset company and tariff
+        selectedCompanyId = "";
+        selectedBusinessSourceId = "";
+        selectedMealPlanId = "";
+        selectedGuestTypeId = "";
+        calculatedTariff = null;
+
+        // Reset tab state
+        activeTab = GuestEntryTab.ManualEntry;
+        searchQuery = string.Empty;
+        searchResults.Clear();
+        searching = false;
+        ocrFile = null;
+        ocrFileName = string.Empty;
+        processingOcr = false;
+        createOcrResult = null;
+
         showCreateModal = true;
+    }
+
+    private async Task OnCompanyChanged()
+    {
+        await CalculateTariff();
+    }
+
+    private async Task OnMealPlanChanged()
+    {
+        await CalculateTariff();
+    }
+
+    private async Task OnRoomOrDateChanged()
+    {
+        await CalculateTariff();
+    }
+
+    private async Task CalculateTariff()
+    {
+        calculatedTariff = null;
+
+        // Need room, dates, and guests to calculate
+        if (string.IsNullOrWhiteSpace(newCheckIn.RoomNumber) ||
+            newCheckIn.CheckInDate >= newCheckIn.CheckOutDate ||
+            !newCheckIn.Guests.Any())
+        {
+            return;
+        }
+
+        // Get the room to find its room type
+        var selectedRoom = availableRooms.FirstOrDefault(r => r.RoomNumber == newCheckIn.RoomNumber);
+        if (selectedRoom == null) return;
+
+        // Parse company ID
+        int? companyId = null;
+        if (!string.IsNullOrWhiteSpace(selectedCompanyId) && int.TryParse(selectedCompanyId, out int parsedCompanyId))
+        {
+            companyId = parsedCompanyId;
+        }
+
+        // Parse meal plan ID
+        int? mealPlanId = null;
+        if (!string.IsNullOrWhiteSpace(selectedMealPlanId) && int.TryParse(selectedMealPlanId, out int parsedMealPlanId))
+        {
+            mealPlanId = parsedMealPlanId;
+        }
+
+        // Calculate tariff
+        try
+        {
+            calculatedTariff = await ApiClient.CalculateTariffAsync(
+                selectedRoom.RoomTypeId,
+                newCheckIn.Guests.Count,
+                newCheckIn.CheckInDate,
+                newCheckIn.CheckOutDate,
+                companyId,
+                mealPlanId);
+        }
+        catch
+        {
+            // Silently fail - tariff calculation is optional
+            calculatedTariff = null;
+        }
     }
 
     private void HideCreateModal()
     {
         showCreateModal = false;
+        createErrorMessage = string.Empty;
     }
 
-    private void AddGuest()
+    private void ShowQuickAddCompanyModal()
+    {
+        newCompany = new CreateCompanyDto();
+        quickAddCompanyError = string.Empty;
+        savingCompany = false;
+        showQuickAddCompanyModal = true;
+    }
+
+    private void HideQuickAddCompanyModal()
+    {
+        showQuickAddCompanyModal = false;
+        quickAddCompanyError = string.Empty;
+        newCompany = new CreateCompanyDto();
+    }
+
+    private async Task QuickAddCompany()
+    {
+        quickAddCompanyError = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(newCompany.CompanyName))
+        {
+            quickAddCompanyError = "Company name is required";
+            return;
+        }
+
+        savingCompany = true;
+        StateHasChanged();
+
+        try
+        {
+            var createdCompany = await ApiClient.CreateCompanyAsync(newCompany);
+
+            // Reload active companies
+            activeCompanies = await ApiClient.GetActiveCompaniesAsync();
+
+            // Select the newly created company
+            selectedCompanyId = createdCompany.Id.ToString();
+            await OnCompanyChanged();
+
+            // Close modal
+            HideQuickAddCompanyModal();
+        }
+        catch (Exception ex)
+        {
+            quickAddCompanyError = $"Failed to create company: {ex.Message}";
+        }
+        finally
+        {
+            savingCompany = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task AddGuest()
     {
         if (newCheckIn.Guests.Count < 3)
         {
             newCheckIn.Guests.Add(new CreateGuestDto());
+            await CalculateTariff();
         }
     }
 
-    private void RemoveGuest(int index)
+    private async Task RemoveGuest(int index)
     {
         if (newCheckIn.Guests.Count > 1)
         {
             newCheckIn.Guests.RemoveAt(index);
+            await CalculateTariff();
         }
     }
 
     private async Task CreateCheckIn()
     {
+        createErrorMessage = string.Empty;
+
+        // Validate required fields
+        if (string.IsNullOrWhiteSpace(newCheckIn.RoomNumber))
+        {
+            createErrorMessage = "Please select a room";
+            return;
+        }
+
+        if (!newCheckIn.Guests.Any())
+        {
+            createErrorMessage = "Please add at least one guest";
+            return;
+        }
+
+        // Validate all guests have names and valid mobile numbers
+        for (int i = 0; i < newCheckIn.Guests.Count; i++)
+        {
+            if (string.IsNullOrWhiteSpace(newCheckIn.Guests[i].GuestName))
+            {
+                createErrorMessage = $"Guest {i + 1}: Name is required";
+                return;
+            }
+
+            // Validate mobile number format (must be exactly 10 digits if provided)
+            if (!string.IsNullOrWhiteSpace(newCheckIn.Guests[i].MobileNo))
+            {
+                var mobileNo = newCheckIn.Guests[i].MobileNo?.Trim() ?? string.Empty;
+                if (!System.Text.RegularExpressions.Regex.IsMatch(mobileNo, @"^\d{10}$"))
+                {
+                    createErrorMessage = $"Guest {i + 1}: Mobile number must be exactly 10 digits";
+                    return;
+                }
+            }
+        }
+
+        if (newCheckIn.CheckOutDate <= newCheckIn.CheckInDate)
+        {
+            createErrorMessage = "Check-out date must be after check-in date";
+            return;
+        }
+
+        // Set company ID if selected
+        if (!string.IsNullOrWhiteSpace(selectedCompanyId) && int.TryParse(selectedCompanyId, out int parsedCompanyId))
+        {
+            newCheckIn.CompanyId = parsedCompanyId;
+        }
+        else
+        {
+            newCheckIn.CompanyId = null;
+        }
+
+        // Set business source ID if selected
+        if (!string.IsNullOrWhiteSpace(selectedBusinessSourceId) && int.TryParse(selectedBusinessSourceId, out int parsedBusinessSourceId))
+        {
+            newCheckIn.BusinessSourceId = parsedBusinessSourceId;
+        }
+        else
+        {
+            newCheckIn.BusinessSourceId = null;
+        }
+
+        // Set meal plan ID if selected
+        if (!string.IsNullOrWhiteSpace(selectedMealPlanId) && int.TryParse(selectedMealPlanId, out int parsedMealPlanId))
+        {
+            newCheckIn.MealPlanId = parsedMealPlanId;
+        }
+        else
+        {
+            newCheckIn.MealPlanId = null;
+        }
+
+        // Set guest type ID if selected
+        if (!string.IsNullOrWhiteSpace(selectedGuestTypeId) && int.TryParse(selectedGuestTypeId, out int parsedGuestTypeId))
+        {
+            newCheckIn.GuestTypeId = parsedGuestTypeId;
+        }
+        else
+        {
+            newCheckIn.GuestTypeId = null;
+        }
+
         var result = await ApiClient.CreateCheckInAsync(newCheckIn);
         if (result != null)
         {
             await LoadCheckIns();
             HideCreateModal();
         }
+        else
+        {
+            createErrorMessage = "Failed to create check-in. Please try again.";
+        }
     }
 
     private async Task CheckOut(int id)
     {
-        if (await ApiClient.CheckOutAsync(id))
+        // Show bill preview before checkout
+        await ShowBillPreview(id);
+    }
+
+    private async Task ShowBillPreview(int checkInId)
+    {
+        loadingBillPreview = true;
+        billErrorMessage = string.Empty;
+        showBillPreviewModal = true;
+
+        try
         {
-            await LoadCheckIns();
+            billPreview = await ApiClient.GetBillPreviewAsync(checkInId);
+            if (billPreview == null)
+            {
+                billErrorMessage = "Failed to load bill preview.";
+            }
         }
+        catch (Exception ex)
+        {
+            billErrorMessage = $"Error loading bill: {ex.Message}";
+        }
+        finally
+        {
+            loadingBillPreview = false;
+        }
+    }
+
+    private async Task RefreshBillPreview()
+    {
+        if (billPreview == null) return;
+
+        loadingBillPreview = true;
+        try
+        {
+            billPreview = await ApiClient.GetBillPreviewAsync(billPreview.CheckInId);
+        }
+        finally
+        {
+            loadingBillPreview = false;
+        }
+    }
+
+    private void HideBillPreviewModal()
+    {
+        showBillPreviewModal = false;
+        billPreview = null;
+        billErrorMessage = string.Empty;
+        showAddChargeForm = false;
+        newCharge = new();
+    }
+
+    private void ShowAddChargeForm()
+    {
+        showAddChargeForm = true;
+        newCharge = new CreateAdditionalChargeModel
+        {
+            ChargeDate = DateTime.Today,
+            Quantity = 1
+        };
+    }
+
+    private void CancelAddCharge()
+    {
+        showAddChargeForm = false;
+        newCharge = new();
+    }
+
+    private async Task AddCharge()
+    {
+        if (billPreview == null) return;
+
+        addingCharge = true;
+        billErrorMessage = string.Empty;
+
+        try
+        {
+            var result = await ApiClient.AddAdditionalChargeAsync(billPreview.CheckInId, newCharge);
+            if (result != null)
+            {
+                showAddChargeForm = false;
+                newCharge = new();
+                await RefreshBillPreview();
+            }
+            else
+            {
+                billErrorMessage = "Failed to add charge.";
+            }
+        }
+        catch (Exception ex)
+        {
+            billErrorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            addingCharge = false;
+        }
+    }
+
+    private async Task DeleteCharge(int chargeId)
+    {
+        if (billPreview == null) return;
+
+        deletingCharges.Add(chargeId);
+        try
+        {
+            if (await ApiClient.DeleteAdditionalChargeAsync(chargeId))
+            {
+                await RefreshBillPreview();
+            }
+        }
+        finally
+        {
+            deletingCharges.Remove(chargeId);
+        }
+    }
+
+    private async Task FinalizeCheckout()
+    {
+        if (billPreview == null) return;
+
+        loadingBillPreview = true;
+        billErrorMessage = string.Empty;
+
+        try
+        {
+            var dto = new FinalizeInvoiceModel
+            {
+                ActualCheckOutDate = DateTime.Now,
+                PaymentStatus = "Paid"
+            };
+
+            var invoice = await ApiClient.FinalizeCheckoutAsync(billPreview.CheckInId, dto);
+            if (invoice != null)
+            {
+                HideBillPreviewModal();
+                await LoadCheckIns();
+            }
+            else
+            {
+                billErrorMessage = "Failed to finalize checkout.";
+            }
+        }
+        catch (Exception ex)
+        {
+            billErrorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            loadingBillPreview = false;
+        }
+    }
+
+    private void PrintBillPreview()
+    {
+        Navigation.NavigateTo("javascript:window.print();", true);
     }
 
     private async Task ManageGuests(int checkInId)
@@ -408,6 +2332,15 @@
         ocrSuccessGuests.Clear();
         uploadingGuests.Clear();
         processingOcrGuests.Clear();
+
+        // Initialize add guest form
+        newGuest = new CreateGuestDto();
+        addGuestError = string.Empty;
+        addGuestSuccess = string.Empty;
+        newGuestPhoto1 = null;
+        newGuestPhoto2 = null;
+        newGuestPhoto1Name = string.Empty;
+        newGuestPhoto2Name = string.Empty;
     }
 
     private void HideGuestsModal()
@@ -419,12 +2352,18 @@
 
     private async Task HandlePhotoUpload(InputFileChangeEventArgs e, int guestId, int photoNumber)
     {
+        var file = e.File;
+
+        // Store selected file name for display
+        var fileKey = $"{guestId}_photo{photoNumber}";
+        selectedFileNames[fileKey] = file.Name;
+        StateHasChanged();
+
         uploadingGuests.Add(guestId);
         StateHasChanged();
 
         try
         {
-            var file = e.File;
             if (file.Size > 10 * 1024 * 1024) // 10MB limit
             {
                 return;
@@ -444,6 +2383,7 @@
                 if (guestIndex >= 0)
                 {
                     managedGuests[guestIndex] = result;
+                    StateHasChanged(); // Force UI refresh to show the uploaded image
                 }
             }
         }
@@ -466,16 +2406,11 @@
 
             if (ocrResult != null)
             {
-                // Auto-fill guest information from OCR
-                guest.GuestName = ocrResult.GuestName ?? guest.GuestName;
-                guest.Address = ocrResult.Address ?? guest.Address;
-                guest.City = ocrResult.City ?? guest.City;
-                guest.State = ocrResult.State ?? guest.State;
-                guest.Country = ocrResult.Country ?? guest.Country;
-                guest.MobileNo = ocrResult.MobileNo ?? guest.MobileNo;
-                guest.PanOrAadharNo = ocrResult.IdNumber ?? guest.PanOrAadharNo;
-
-                ocrSuccessGuests.Add(guest.Id);
+                // Show OCR review modal
+                currentOcrReview = ocrResult;
+                currentReviewGuest = guest;
+                currentReviewPhotoNumber = photoNumber;
+                showOcrReviewModal = true;
             }
         }
         finally
@@ -508,5 +2443,442 @@
                 managedGuests[guestIndex] = result;
             }
         }
+    }
+
+    private async Task CheckOutGuest(int guestId)
+    {
+        var result = await ApiClient.CheckOutGuestAsync(guestId);
+        if (result)
+        {
+            // Reload guests to show updated status
+            if (selectedCheckIn != null)
+            {
+                managedGuests = await ApiClient.GetGuestsByCheckInIdAsync(selectedCheckIn.Id);
+                StateHasChanged();
+            }
+        }
+    }
+
+    private string GetPhotoUrl(int guestId, int photoNumber)
+    {
+        return $"{ApiClient.GetBaseUrl()}/api/guests/{guestId}/photos/{photoNumber}";
+    }
+
+    private void HideOcrReviewModal()
+    {
+        showOcrReviewModal = false;
+        currentOcrReview = null;
+        currentReviewGuest = null;
+        currentReviewPhotoNumber = 0;
+    }
+
+    private void SubmitOcrReview()
+    {
+        if (currentOcrReview != null && currentReviewGuest != null)
+        {
+            // Populate guest information from reviewed OCR data
+            // Only update if extracted value is not blank, otherwise keep old value
+            currentReviewGuest.GuestName = !string.IsNullOrWhiteSpace(currentOcrReview.GuestInfo.GuestName)
+                ? currentOcrReview.GuestInfo.GuestName
+                : currentReviewGuest.GuestName;
+
+            currentReviewGuest.Address = !string.IsNullOrWhiteSpace(currentOcrReview.GuestInfo.Address)
+                ? currentOcrReview.GuestInfo.Address
+                : currentReviewGuest.Address;
+
+            currentReviewGuest.City = !string.IsNullOrWhiteSpace(currentOcrReview.GuestInfo.City)
+                ? currentOcrReview.GuestInfo.City
+                : currentReviewGuest.City;
+
+            currentReviewGuest.State = !string.IsNullOrWhiteSpace(currentOcrReview.GuestInfo.State)
+                ? currentOcrReview.GuestInfo.State
+                : currentReviewGuest.State;
+
+            currentReviewGuest.Country = !string.IsNullOrWhiteSpace(currentOcrReview.GuestInfo.Country)
+                ? currentOcrReview.GuestInfo.Country
+                : currentReviewGuest.Country;
+
+            currentReviewGuest.MobileNo = !string.IsNullOrWhiteSpace(currentOcrReview.GuestInfo.MobileNo)
+                ? currentOcrReview.GuestInfo.MobileNo
+                : currentReviewGuest.MobileNo;
+
+            currentReviewGuest.PanOrAadharNo = !string.IsNullOrWhiteSpace(currentOcrReview.GuestInfo.IdNumber)
+                ? currentOcrReview.GuestInfo.IdNumber
+                : currentReviewGuest.PanOrAadharNo;
+
+            // Show success notification
+            ocrSuccessGuests.Add(currentReviewGuest.Id);
+
+            // Hide the modal
+            HideOcrReviewModal();
+            StateHasChanged();
+        }
+    }
+
+    private void HandleNewGuestPhoto1Change(InputFileChangeEventArgs e)
+    {
+        newGuestPhoto1 = e.File;
+        newGuestPhoto1Name = e.File.Name;
+    }
+
+    private void HandleNewGuestPhoto2Change(InputFileChangeEventArgs e)
+    {
+        newGuestPhoto2 = e.File;
+        newGuestPhoto2Name = e.File.Name;
+    }
+
+    private async Task AddNewGuest()
+    {
+        if (selectedCheckIn == null) return;
+
+        addGuestError = string.Empty;
+        addGuestSuccess = string.Empty;
+
+        // Validate guest name is required
+        if (string.IsNullOrWhiteSpace(newGuest.GuestName))
+        {
+            addGuestError = "Guest name is required";
+            return;
+        }
+
+        // Validate mobile number format (must be exactly 10 digits if provided)
+        if (!string.IsNullOrWhiteSpace(newGuest.MobileNo))
+        {
+            var mobileNo = newGuest.MobileNo.Trim();
+            if (!System.Text.RegularExpressions.Regex.IsMatch(mobileNo, @"^\d{10}$"))
+            {
+                addGuestError = "Mobile number must be exactly 10 digits";
+                return;
+            }
+        }
+
+        addingGuest = true;
+        StateHasChanged();
+
+        try
+        {
+            // Step 1: Create the guest
+            var result = await ApiClient.AddGuestToCheckInAsync(selectedCheckIn.Id, newGuest);
+            if (result != null)
+            {
+                addGuestSuccess = $"Guest {result.GuestName} added successfully!";
+                managedGuests.Add(result);
+
+                // Update PAX count in the selected check-in
+                selectedCheckIn.Pax = managedGuests.Count;
+
+                // Step 2: Upload photos if selected
+                if (newGuestPhoto1 != null)
+                {
+                    try
+                    {
+                        using var stream1 = newGuestPhoto1.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+                        using var memoryStream1 = new MemoryStream();
+                        await stream1.CopyToAsync(memoryStream1);
+                        memoryStream1.Position = 0;
+
+                        var photoResult1 = await ApiClient.UploadGuestPhotoAsync(result.Id, 1, memoryStream1, newGuestPhoto1.Name);
+                        if (photoResult1 != null)
+                        {
+                            // Update guest in the list
+                            var guestIndex = managedGuests.FindIndex(g => g.Id == result.Id);
+                            if (guestIndex >= 0)
+                            {
+                                managedGuests[guestIndex] = photoResult1;
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // Photo upload failed, but guest was created
+                    }
+                }
+
+                if (newGuestPhoto2 != null)
+                {
+                    try
+                    {
+                        using var stream2 = newGuestPhoto2.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+                        using var memoryStream2 = new MemoryStream();
+                        await stream2.CopyToAsync(memoryStream2);
+                        memoryStream2.Position = 0;
+
+                        var photoResult2 = await ApiClient.UploadGuestPhotoAsync(result.Id, 2, memoryStream2, newGuestPhoto2.Name);
+                        if (photoResult2 != null)
+                        {
+                            // Update guest in the list
+                            var guestIndex = managedGuests.FindIndex(g => g.Id == result.Id);
+                            if (guestIndex >= 0)
+                            {
+                                managedGuests[guestIndex] = photoResult2;
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // Photo upload failed, but guest was created
+                    }
+                }
+
+                // Reset form
+                newGuest = new CreateGuestDto();
+                newGuestPhoto1 = null;
+                newGuestPhoto2 = null;
+                newGuestPhoto1Name = string.Empty;
+                newGuestPhoto2Name = string.Empty;
+
+                // Clear success message after 2 seconds
+                await Task.Delay(2000);
+                addGuestSuccess = string.Empty;
+            }
+            else
+            {
+                addGuestError = "Failed to add guest. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            addGuestError = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            addingGuest = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ViewBill(int checkInId)
+    {
+        // Load check-in details
+        billCheckIn = checkIns.FirstOrDefault(c => c.Id == checkInId);
+        if (billCheckIn == null) return;
+
+        // Load all guests for this check-in (both active and checked-out)
+        billGuests = await ApiClient.GetGuestsByCheckInIdAsync(checkInId);
+
+        showBillModal = true;
+    }
+
+    private void HideBillModal()
+    {
+        showBillModal = false;
+        billCheckIn = null;
+        billGuests.Clear();
+    }
+
+    private void PrintBill()
+    {
+        // Trigger browser print
+        Navigation.NavigateTo("javascript:window.print();", true);
+    }
+
+    // Edit Check-In methods
+    private async Task ShowEditModal(CheckInDto checkIn)
+    {
+        selectedCheckInForEdit = checkIn;
+        editErrorMessage = "";
+
+        // Load dropdown data
+        editCompanies = await ApiClient.GetActiveCompaniesAsync();
+        editBusinessSources = await ApiClient.GetActiveBusinessSourcesAsync();
+        editMealPlans = await ApiClient.GetActiveMealPlansAsync();
+        editGuestTypes = await ApiClient.GetActiveGuestTypesAsync();
+
+        // Populate form with current values
+        editCheckInModel = new UpdateCheckInModel
+        {
+            CompanyId = checkIn.CompanyId,
+            BusinessSourceId = checkIn.BusinessSourceId,
+            MealPlanId = checkIn.MealPlanId,
+            GuestTypeId = checkIn.GuestTypeId
+        };
+
+        showEditModal = true;
+    }
+
+    private void HideEditModal()
+    {
+        showEditModal = false;
+        selectedCheckInForEdit = null;
+        editCheckInModel = new();
+        editErrorMessage = "";
+    }
+
+    private async Task UpdateCheckIn()
+    {
+        if (selectedCheckInForEdit == null)
+            return;
+
+        editErrorMessage = "";
+
+        try
+        {
+            var result = await ApiClient.UpdateCheckInAsync(selectedCheckInForEdit.Id, editCheckInModel);
+            if (result != null)
+            {
+                await LoadCheckIns();
+                HideEditModal();
+            }
+            else
+            {
+                editErrorMessage = "Failed to update check-in. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            editErrorMessage = $"Error: {ex.Message}";
+        }
+    }
+
+    // Tab management methods
+    private void SwitchTab(GuestEntryTab tab)
+    {
+        activeTab = tab;
+        createErrorMessage = string.Empty;
+
+        // Clear tab-specific data when switching
+        if (tab != GuestEntryTab.GuestHistory)
+        {
+            searchResults.Clear();
+            searchQuery = string.Empty;
+        }
+        if (tab != GuestEntryTab.OcrScan)
+        {
+            ocrFile = null;
+            ocrFileName = string.Empty;
+            createOcrResult = null;
+        }
+    }
+
+    private async Task HandleSearchKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SearchGuests();
+        }
+    }
+
+    private async Task SearchGuests()
+    {
+        if (string.IsNullOrWhiteSpace(searchQuery) || searchQuery.Length < 3)
+        {
+            createErrorMessage = "Please enter at least 3 characters to search";
+            return;
+        }
+
+        searching = true;
+        searchResults.Clear();
+        createErrorMessage = string.Empty;
+        StateHasChanged();
+
+        try
+        {
+            searchResults = await ApiClient.SearchGuestsAsync(searchQuery);
+        }
+        finally
+        {
+            searching = false;
+            StateHasChanged();
+        }
+    }
+
+    private void UseGuestHistory(GuestDto guest)
+    {
+        // Auto-fill the form with guest history
+        var guestDto = new CreateGuestDto
+        {
+            GuestName = guest.GuestName,
+            Address = guest.Address,
+            City = guest.City,
+            State = guest.State,
+            Country = guest.Country,
+            MobileNo = guest.MobileNo,
+            PanOrAadharNo = guest.PanOrAadharNo
+        };
+
+        // Replace first guest or add new
+        if (newCheckIn.Guests.Any())
+        {
+            newCheckIn.Guests[0] = guestDto;
+        }
+        else
+        {
+            newCheckIn.Guests.Add(guestDto);
+        }
+
+        StateHasChanged();
+    }
+
+    private void HandleOcrFileUpload(InputFileChangeEventArgs e)
+    {
+        ocrFile = e.File;
+        ocrFileName = e.File.Name;
+        createOcrResult = null;
+        StateHasChanged();
+    }
+
+    private async Task ProcessCreateOcr()
+    {
+        if (ocrFile == null) return;
+
+        processingOcr = true;
+        createErrorMessage = string.Empty;
+        StateHasChanged();
+
+        try
+        {
+            if (ocrFile.Size > 10 * 1024 * 1024)
+            {
+                createErrorMessage = "File size must be less than 10MB";
+                return;
+            }
+
+            using var stream = ocrFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            using var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream);
+            memoryStream.Position = 0;
+
+            createOcrResult = await ApiClient.ProcessOcrDirectAsync(memoryStream, ocrFile.Name);
+
+            if (createOcrResult != null)
+            {
+                // Auto-fill form with OCR data
+                var guestDto = new CreateGuestDto
+                {
+                    GuestName = createOcrResult.GuestInfo.GuestName,
+                    Address = createOcrResult.GuestInfo.Address,
+                    City = createOcrResult.GuestInfo.City,
+                    State = createOcrResult.GuestInfo.State,
+                    Country = createOcrResult.GuestInfo.Country,
+                    MobileNo = createOcrResult.GuestInfo.MobileNo,
+                    PanOrAadharNo = createOcrResult.GuestInfo.IdNumber
+                };
+
+                if (newCheckIn.Guests.Any())
+                {
+                    newCheckIn.Guests[0] = guestDto;
+                }
+                else
+                {
+                    newCheckIn.Guests.Add(guestDto);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            createErrorMessage = $"OCR processing failed: {ex.Message}";
+        }
+        finally
+        {
+            processingOcr = false;
+            StateHasChanged();
+        }
+    }
+
+    private bool HasGuestData()
+    {
+        return !string.IsNullOrWhiteSpace(newCheckIn.RoomNumber) &&
+               newCheckIn.Guests.Any() &&
+               !string.IsNullOrWhiteSpace(newCheckIn.Guests[0].GuestName);
     }
 }

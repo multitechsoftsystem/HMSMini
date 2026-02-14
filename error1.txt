@@ -1,0 +1,20 @@
+blazor.webassembly.js:1 
+ crit: Microsoft.AspNetCore.Components.WebAssembly.Rendering.WebAssemblyRenderer[100]
+      Unhandled exception rendering component: The following routes are ambiguous:
+      '' in 'HMSMini.Web.Pages.Home'
+      '' in 'HMSMini.Web.Pages.Index'
+      
+System.InvalidOperationException: The following routes are ambiguous:
+'' in 'HMSMini.Web.Pages.Home'
+'' in 'HMSMini.Web.Pages.Index'
+
+   at Microsoft.AspNetCore.Components.RouteTableFactory.DetectAmbiguousRoutes(:5131/TreeRouteBuilder builder)
+   at Microsoft.AspNetCore.Components.RouteTableFactory.Create(:5131/Dictionary`2 t…der serviceProvider)
+   at Microsoft.AspNetCore.Components.RouteTableFactory.Create(:5131/List`1 compone…der serviceProvider)
+   at Microsoft.AspNetCore.Components.RouteTableFactory.Create(:5131/RouteKey route…der serviceProvider)
+   at Microsoft.AspNetCore.Components.Routing.Router.RefreshRouteTable((index))
+   at Microsoft.AspNetCore.Components.Routing.Router.Refresh(:5131/Boolean isNavigationIntercepted)
+   at Microsoft.AspNetCore.Components.Routing.Router.RunOnNavigateAsync(:5131/String path, B…vigationIntercepted)
+   at Microsoft.AspNetCore.Components.Routing.Router.<>c__DisplayClass76_0.<RunOnNavigateAsync>b__1(:5131/RenderTreeBuilder builder)
+   at Microsoft.AspNetCore.Components.Rendering.ComponentState.RenderIntoBatch(:5131/RenderBatchBui…erFragmentException)
+﻿

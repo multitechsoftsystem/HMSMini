@@ -1,0 +1,15 @@
+Required Blazer feature.
+Make more attractive and full screen size.
+
+Upcoming Reservation size is big as compared to other.
+ 
+In Active Check-Ins Guest Names in one line.
+
+Id Proof option is not there.
+
+Show full Rooms chart like rectangle buttons as per room type or floor wise.
+Chart include Status with color.
+If Room Occupied then Show Guest Name and checkout date
+
+Show Status count Summery on top. Dirty, Maintenance, etc
+

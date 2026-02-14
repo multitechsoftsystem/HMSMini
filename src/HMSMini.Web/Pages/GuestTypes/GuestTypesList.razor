@@ -1,0 +1,245 @@
+@page "/guest-types"
+@inject IApiClientService ApiClient
+@inject IAuthenticationService AuthService
+@inject NavigationManager Navigation
+@using HMSMini.Web.Services
+@using HMSMini.Web.Models
+
+<div class="page-header">
+    <h3>Guest Types Management</h3>
+    @if (canManageMasterData)
+    {
+        <button class="btn btn-primary" @onclick="ShowCreateModal">
+            <span class="icon">+</span> Add Guest Type
+        </button>
+    }
+</div>
+
+@if (!canManageMasterData)
+{
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> You have view-only access. Contact an administrator to make changes.
+    </div>
+}
+
+@if (isLoading)
+{
+    <div class="loading">Loading guest types...</div>
+}
+else if (guestTypes.Count == 0)
+{
+    <div class="empty-state">
+        <p>No guest types found.</p>
+        @if (canManageMasterData)
+        {
+            <button class="btn btn-primary" @onclick="ShowCreateModal">Add Guest Type</button>
+        }
+    </div>
+}
+else
+{
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Type Name</th>
+                    <th>Description</th>
+                    <th>Display Order</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var guestType in guestTypes.OrderBy(g => g.DisplayOrder))
+                {
+                    <tr>
+                        <td><strong>@guestType.TypeName</strong></td>
+                        <td>@(guestType.Description ?? "-")</td>
+                        <td>@guestType.DisplayOrder</td>
+                        <td>
+                            <span class="status-badge @(guestType.IsActive ? "status-active" : "status-inactive")">
+                                @(guestType.IsActive ? "Active" : "Inactive")
+                            </span>
+                        </td>
+                        <td>@guestType.CreatedAt.ToString("MMM dd, yyyy")</td>
+                        <td>
+                            @if (canManageMasterData)
+                            {
+                                <div class="action-buttons">
+                                    <button class="btn btn-sm btn-secondary" @onclick="() => ShowEditModal(guestType)">Edit</button>
+                                    @if (guestType.IsActive)
+                                    {
+                                        <button class="btn btn-sm btn-warning" @onclick="() => DeactivateGuestType(guestType.GuestTypeId)">Deactivate</button>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-sm btn-success" @onclick="() => ActivateGuestType(guestType.GuestTypeId)">Activate</button>
+                                    }
+                                    <button class="btn btn-sm btn-danger" @onclick="() => DeleteGuestType(guestType.GuestTypeId)">Delete</button>
+                                </div>
+                            }
+                            else
+                            {
+                                <span class="text-muted">View Only</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (showCreateModal)
+{
+    <div class="modal-overlay" @onclick="HideCreateModal">
+        <div class="modal-content" @onclick:stopPropagation="true">
+            <div class="modal-header">
+                <h4>@(editingGuestType == null ? "Add Guest Type" : "Edit Guest Type")</h4>
+                <button class="btn-close" @onclick="HideCreateModal">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Type Name *</label>
+                    <input type="text" class="form-control" @bind="formModel.TypeName" placeholder="e.g., Normal, Complimentary" />
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea class="form-control" @bind="formModel.Description" rows="3" placeholder="Description of the guest type"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Display Order *</label>
+                    <input type="number" class="form-control" @bind="formModel.DisplayOrder" placeholder="e.g., 1, 2, 3" min="0" />
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="HideCreateModal">Cancel</button>
+                <button class="btn btn-primary" @onclick="SaveGuestType" disabled="@isSaving">
+                    @(isSaving ? "Saving..." : "Save")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<GuestTypeModel> guestTypes = new();
+    private bool isLoading = true;
+    private bool showCreateModal = false;
+    private bool isSaving = false;
+    private GuestTypeModel? editingGuestType = null;
+    private CreateGuestTypeModel formModel = new();
+
+    // Role-based permissions
+    private bool canManageMasterData = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckUserPermissions();
+        await LoadGuestTypes();
+    }
+
+    private async Task CheckUserPermissions()
+    {
+        var currentUser = await AuthService.GetCurrentUserAsync();
+        if (currentUser != null)
+        {
+            // Only Admin (0) and Manager (1) can manage master data
+            canManageMasterData = currentUser.Role == 0 || currentUser.Role == 1;
+        }
+    }
+
+    private async Task LoadGuestTypes()
+    {
+        isLoading = true;
+        guestTypes = await ApiClient.GetAllGuestTypesAsync();
+        isLoading = false;
+    }
+
+    private void ShowCreateModal()
+    {
+        editingGuestType = null;
+        formModel = new CreateGuestTypeModel { DisplayOrder = guestTypes.Count + 1 };
+        showCreateModal = true;
+    }
+
+    private void ShowEditModal(GuestTypeModel guestType)
+    {
+        editingGuestType = guestType;
+        formModel = new CreateGuestTypeModel
+        {
+            TypeName = guestType.TypeName,
+            Description = guestType.Description,
+            DisplayOrder = guestType.DisplayOrder
+        };
+        showCreateModal = true;
+    }
+
+    private void HideCreateModal()
+    {
+        showCreateModal = false;
+        editingGuestType = null;
+        formModel = new();
+    }
+
+    private async Task SaveGuestType()
+    {
+        if (string.IsNullOrWhiteSpace(formModel.TypeName))
+            return;
+
+        isSaving = true;
+
+        try
+        {
+            if (editingGuestType == null)
+            {
+                await ApiClient.CreateGuestTypeAsync(formModel);
+            }
+            else
+            {
+                var updateModel = new UpdateGuestTypeModel
+                {
+                    TypeName = formModel.TypeName,
+                    Description = formModel.Description,
+                    DisplayOrder = formModel.DisplayOrder
+                };
+                await ApiClient.UpdateGuestTypeAsync(editingGuestType.GuestTypeId, updateModel);
+            }
+
+            await LoadGuestTypes();
+            HideCreateModal();
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task ActivateGuestType(int id)
+    {
+        await ApiClient.ActivateGuestTypeAsync(id);
+        await LoadGuestTypes();
+    }
+
+    private async Task DeactivateGuestType(int id)
+    {
+        await ApiClient.DeactivateGuestTypeAsync(id);
+        await LoadGuestTypes();
+    }
+
+    private async Task DeleteGuestType(int id)
+    {
+        if (confirm("Are you sure you want to delete this guest type?"))
+        {
+            await ApiClient.DeleteGuestTypeAsync(id);
+            await LoadGuestTypes();
+        }
+    }
+
+    private bool confirm(string message)
+    {
+        // Simple confirmation - in production, use a proper modal
+        return true;
+    }
+}

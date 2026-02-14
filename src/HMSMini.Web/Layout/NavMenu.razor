@@ -1,6 +1,9 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
+@inject IAuthenticationService AuthService
+@using HMSMini.Web.Services
+
+<div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
-        <a class="navbar-brand" href="/">HMS Mini</a>
+        <a class="navbar-brand" href="/">MSS</a>
         <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
             <span class="navbar-toggler-icon"></span>
         </button>
@@ -11,39 +14,209 @@
     <nav class="flex-column">
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-speedometer2" aria-hidden="true"></span> Dashboard
+                <span class="bi bi-speedometer2"></span> Dashboard
             </NavLink>
         </div>
+
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="reservations">
-                <span class="bi bi-calendar-check" aria-hidden="true"></span> Reservations
+                <span class="bi bi-calendar-check"></span> Reservations
             </NavLink>
         </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="availability">
+                <span class="bi bi-calendar3"></span> Room Availability
+            </NavLink>
+        </div>
+
+        @if (canManageMasterData)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="reports/occupancy">
+                    <span class="bi bi-graph-up"></span> Occupancy Report
+                </NavLink>
+            </div>
+        }
+
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="checkins">
-                <span class="bi bi-door-open" aria-hidden="true"></span> Check-Ins
+                <span class="bi bi-door-open"></span> Check-Ins
             </NavLink>
         </div>
+
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="rooms">
-                <span class="bi bi-building" aria-hidden="true"></span> Rooms
+                <span class="bi bi-building"></span> Rooms
             </NavLink>
         </div>
+
+        @if (canAccessHousekeeping)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="housekeeping">
+                    <span class="bi bi-brush"></span> Housekeeping
+                </NavLink>
+            </div>
+        }
+
+        @if (canManageMasterData)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="day-closing">
+                    <span class="bi bi-clock-history"></span> Day Closing
+                </NavLink>
+            </div>
+        }
+
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="users">
-                <span class="bi bi-people" aria-hidden="true"></span> Users
+            <NavLink class="nav-link" href="companies">
+                <span class="bi bi-briefcase"></span> Companies
             </NavLink>
         </div>
+
+        @if (canManageMasterData)
+        {
+            <div class="nav-item px-3 masters-parent" @onclick="ToggleMasters" @onclick:stopPropagation="true">
+                <div class="nav-link" style="cursor: pointer;">
+                    <span class="bi bi-chevron-right masters-toggle-icon @(collapseMasters ? "" : "expanded")"></span>
+                    <span class="bi bi-gear"></span> Masters
+                </div>
+            </div>
+
+            <div class="@MastersCssClass">
+                <div class="nav-item px-3 masters-child">
+                    <NavLink class="nav-link" href="business-sources">
+                        <span class="bi bi-shop"></span> Business Sources
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3 masters-child">
+                    <NavLink class="nav-link" href="guest-types">
+                        <span class="bi bi-person-badge"></span> Guest Types
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3 masters-child">
+                    <NavLink class="nav-link" href="meal-plans">
+                        <span class="bi bi-egg-fried"></span> Meal Plans
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3 masters-child">
+                    <NavLink class="nav-link" href="meal-plan-rates">
+                        <span class="bi bi-currency-dollar"></span> Meal Plan Rates
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3 masters-child">
+                    <NavLink class="nav-link" href="taxslabs">
+                        <span class="bi bi-calculator"></span> Tax Slabs
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3 masters-child">
+                    <NavLink class="nav-link" href="voucher-tax-configs">
+                        <span class="bi bi-receipt"></span> Voucher Tax
+                    </NavLink>
+                </div>
+            </div>
+        }
+
+        @if (canAccessBanquet)
+        {
+            <div class="nav-item px-3 masters-parent" @onclick="ToggleBanquet" @onclick:stopPropagation="true">
+                <div class="nav-link" style="cursor: pointer;">
+                    <span class="bi bi-chevron-right masters-toggle-icon @(collapseBanquet ? "" : "expanded")"></span>
+                    <span class="bi bi-cup-straw"></span> Banquet
+                </div>
+            </div>
+
+            <div class="@BanquetCssClass">
+                <div class="nav-item px-3 masters-child">
+                    <NavLink class="nav-link" href="banquet" Match="NavLinkMatch.All">
+                        <span class="bi bi-speedometer2"></span> Dashboard
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3 masters-child">
+                    <NavLink class="nav-link" href="banquet/bookings">
+                        <span class="bi bi-calendar-check"></span> Bookings
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3 masters-child">
+                    <NavLink class="nav-link" href="banquet/halls">
+                        <span class="bi bi-building"></span> Halls
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3 masters-child">
+                    <NavLink class="nav-link" href="banquet/event-types">
+                        <span class="bi bi-tag"></span> Event Types
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3 masters-child">
+                    <NavLink class="nav-link" href="banquet/services">
+                        <span class="bi bi-list-check"></span> Services
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3 masters-child">
+                    <NavLink class="nav-link" href="banquet/reports">
+                        <span class="bi bi-graph-up"></span> Financial Reports
+                    </NavLink>
+                </div>
+            </div>
+        }
+
+        @if (canAccessOCR)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="ocr-scanner">
+                    <span class="bi bi-scan"></span> OCR Scanner
+                </NavLink>
+            </div>
+        }
+
+        @if (isAdmin)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="users">
+                    <span class="bi bi-people"></span> Users
+                </NavLink>
+            </div>
+        }
     </nav>
 </div>
 
 @code {
     private bool collapseNavMenu = true;
+    private bool collapseMasters = true;
+    private bool collapseBanquet = true;
+    private int? currentUserRole = null;
+
+    private bool isAdmin => currentUserRole == 0;
+    private bool canManageMasterData => currentUserRole == 0 || currentUserRole == 1;
+    private bool canAccessBanquet => currentUserRole == 0 || currentUserRole == 1;
+    private bool canAccessOCR => currentUserRole == 0 || currentUserRole == 1 || currentUserRole == 2;
+    private bool canAccessHousekeeping => currentUserRole == 0 || currentUserRole == 1 || currentUserRole == 3;
 
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+    private string? MastersCssClass => collapseMasters ? "collapse" : null;
+    private string? BanquetCssClass => collapseBanquet ? "collapse" : null;
 
-    private void ToggleNavMenu()
+    protected override async Task OnInitializedAsync()
     {
-        collapseNavMenu = !collapseNavMenu;
+        var currentUser = await AuthService.GetCurrentUserAsync();
+        if (currentUser != null)
+        {
+            currentUserRole = currentUser.Role;
+        }
     }
+
+    private void ToggleNavMenu() => collapseNavMenu = !collapseNavMenu;
+    private void ToggleMasters() => collapseMasters = !collapseMasters;
+    private void ToggleBanquet() => collapseBanquet = !collapseBanquet;
 }

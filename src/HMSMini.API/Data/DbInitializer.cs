@@ -42,6 +42,26 @@ public static class DbInitializer
                 Role = UserRole.Receptionist,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow
+            },
+            new User
+            {
+                Username = "housekeeping",
+                Email = "housekeeping@hmsmini.com",
+                FullName = "Housekeeping Staff",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("House@123"),
+                Role = UserRole.Housekeeping,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            },
+            new User
+            {
+                Username = "maintenance",
+                Email = "maintenance@hmsmini.com",
+                FullName = "Maintenance Staff",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Maint@123"),
+                Role = UserRole.Maintenance,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
             }
         };
 
@@ -106,5 +126,137 @@ public static class DbInitializer
 
         context.Rooms.AddRange(rooms);
         context.SaveChanges();
+
+        // Seed Business Sources
+        var businessSources = new MBusinessSource[]
+        {
+            new MBusinessSource
+            {
+                SourceName = "Walk-In",
+                Description = "Guest walked in directly to the hotel",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            },
+            new MBusinessSource
+            {
+                SourceName = "Online",
+                Description = "Booking through online channels (website, OTA, etc.)",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            },
+            new MBusinessSource
+            {
+                SourceName = "Corporate",
+                Description = "Corporate booking through company agreement",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            },
+            new MBusinessSource
+            {
+                SourceName = "Travel Agent",
+                Description = "Booking through travel agent or agency",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            },
+            new MBusinessSource
+            {
+                SourceName = "Direct Call",
+                Description = "Guest called hotel directly for reservation",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            }
+        };
+
+        context.BusinessSources.AddRange(businessSources);
+        context.SaveChanges();
+
+        // Seed Meal Plans
+        var mealPlans = new MMealPlan[]
+        {
+            new MMealPlan
+            {
+                PlanCode = "EP",
+                PlanName = "Room Only (European Plan)",
+                Description = "Room only, no meals included",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            },
+            new MMealPlan
+            {
+                PlanCode = "CP",
+                PlanName = "Breakfast Included (Continental Plan)",
+                Description = "Room with breakfast",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            },
+            new MMealPlan
+            {
+                PlanCode = "MAP",
+                PlanName = "Half Board (Modified American Plan)",
+                Description = "Room with breakfast and dinner",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            },
+            new MMealPlan
+            {
+                PlanCode = "AP",
+                PlanName = "Full Board (American Plan)",
+                Description = "Room with breakfast, lunch, and dinner",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            }
+        };
+
+        context.MealPlans.AddRange(mealPlans);
+        context.SaveChanges();
+
+        // Seed Tax Configuration (CGST + SGST for India)
+        var taxConfigurations = new TaxConfiguration[]
+        {
+            new TaxConfiguration
+            {
+                TaxType = "CGST",
+                TaxPercentage = 9.00m,
+                ApplicableOn = "All",
+                EffectiveFrom = new DateTime(2020, 1, 1),
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = "System"
+            },
+            new TaxConfiguration
+            {
+                TaxType = "SGST",
+                TaxPercentage = 9.00m,
+                ApplicableOn = "All",
+                EffectiveFrom = new DateTime(2020, 1, 1),
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = "System"
+            }
+        };
+
+        context.TaxConfigurations.AddRange(taxConfigurations);
+        context.SaveChanges();
+
+        // Seed System Settings (including Working Date)
+        if (!context.SystemSettings.Any(s => s.SettingKey == "WorkingDate"))
+        {
+            var systemSettings = new SystemSetting[]
+            {
+                new SystemSetting
+                {
+                    SettingKey = "WorkingDate",
+                    SettingValue = DateTime.Today.ToString("yyyy-MM-dd"),
+                    DataType = "Date",
+                    Description = "Current business/working date for hotel operations",
+                    IsSystemLocked = true,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedBy = "System"
+                }
+            };
+
+            context.SystemSettings.AddRange(systemSettings);
+            context.SaveChanges();
+        }
     }
 }
