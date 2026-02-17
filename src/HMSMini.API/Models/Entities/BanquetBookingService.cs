@@ -29,6 +29,8 @@ public class BanquetBookingService
     [Column(TypeName = "decimal(10,2)")]
     public decimal TotalAmount { get; set; }
 
+    public DateTime ServiceDate { get; set; }
+
     public bool ApplyTax { get; set; } = true;
 
     public int? VoucherTaxConfigId { get; set; }

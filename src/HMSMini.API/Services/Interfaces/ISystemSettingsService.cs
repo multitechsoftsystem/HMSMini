@@ -1,3 +1,5 @@
+using HMSMini.API.Models.DTOs.SystemSetting;
+
 namespace HMSMini.API.Services.Interfaces;
 
 /// <summary>
@@ -5,6 +7,10 @@ namespace HMSMini.API.Services.Interfaces;
 /// </summary>
 public interface ISystemSettingsService
 {
+    /// <summary>
+    /// Gets all system settings
+    /// </summary>
+    Task<List<SystemSettingDto>> GetAllSettingsAsync();
     /// <summary>
     /// Gets the current business/working date
     /// </summary>
@@ -25,10 +31,15 @@ public interface ISystemSettingsService
     /// <summary>
     /// Updates a setting value
     /// </summary>
-    Task UpdateSettingAsync(string settingKey, string settingValue, string? updatedBy = null);
+    Task UpdateSettingAsync(string settingKey, string settingValue, string? updatedBy = null, bool bypassLock = false);
 
     /// <summary>
     /// Checks if a specific date has been closed
     /// </summary>
     Task<bool> IsDateClosedAsync(DateTime date);
+
+    /// <summary>
+    /// Checks if room sharing feature is enabled
+    /// </summary>
+    Task<bool> IsRoomSharingEnabledAsync();
 }

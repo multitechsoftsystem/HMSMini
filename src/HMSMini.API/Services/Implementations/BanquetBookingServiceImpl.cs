@@ -283,10 +283,13 @@ public class BanquetBookingServiceImpl : IBanquetBookingService
                 MenuPackageId = m.MenuPackageId,
                 PackageName = m.MenuPackage != null ? m.MenuPackage.PackageName : null,
                 MenuItemId = m.MenuItemId,
-                ItemName = m.MenuItem != null ? m.MenuItem.ItemName : null,
+                ItemName = m.ItemName ?? (m.MenuItem != null ? m.MenuItem.ItemName : null),
+                MenuDate = m.MenuDate,
                 Quantity = m.Quantity,
                 RatePerPlate = m.RatePerPlate,
                 TotalAmount = m.TotalAmount,
+                ApplyTax = m.ApplyTax,
+                VoucherTaxConfigId = m.VoucherTaxConfigId,
                 CreatedAt = m.CreatedAt
             }).ToListAsync();
     }
@@ -305,8 +308,12 @@ public class BanquetBookingServiceImpl : IBanquetBookingService
             BanquetBookingId = bookingId,
             MenuPackageId = dto.MenuPackageId,
             MenuItemId = dto.MenuItemId,
+            ItemName = dto.ItemName,
+            MenuDate = dto.MenuDate,
             Quantity = dto.Quantity,
-            RatePerPlate = dto.RatePerPlate
+            RatePerPlate = dto.RatePerPlate,
+            ApplyTax = dto.ApplyTax,
+            VoucherTaxConfigId = dto.VoucherTaxConfigId
         };
 
         _context.BanquetBookingMenus.Add(menu);
@@ -323,10 +330,13 @@ public class BanquetBookingServiceImpl : IBanquetBookingService
             MenuPackageId = menu.MenuPackageId,
             PackageName = menu.MenuPackage?.PackageName,
             MenuItemId = menu.MenuItemId,
-            ItemName = menu.MenuItem?.ItemName,
+            ItemName = menu.ItemName ?? menu.MenuItem?.ItemName,
+            MenuDate = menu.MenuDate,
             Quantity = menu.Quantity,
             RatePerPlate = menu.RatePerPlate,
             TotalAmount = menu.RatePerPlate * menu.Quantity,
+            ApplyTax = menu.ApplyTax,
+            VoucherTaxConfigId = menu.VoucherTaxConfigId,
             CreatedAt = menu.CreatedAt
         };
     }
@@ -357,10 +367,13 @@ public class BanquetBookingServiceImpl : IBanquetBookingService
             MenuPackageId = menu.MenuPackageId,
             PackageName = menu.MenuPackage?.PackageName,
             MenuItemId = menu.MenuItemId,
-            ItemName = menu.MenuItem?.ItemName,
+            ItemName = menu.ItemName ?? menu.MenuItem?.ItemName,
+            MenuDate = menu.MenuDate,
             Quantity = menu.Quantity,
             RatePerPlate = menu.RatePerPlate,
             TotalAmount = menu.TotalAmount,
+            ApplyTax = menu.ApplyTax,
+            VoucherTaxConfigId = menu.VoucherTaxConfigId,
             CreatedAt = menu.CreatedAt
         };
     }
@@ -390,6 +403,7 @@ public class BanquetBookingServiceImpl : IBanquetBookingService
                 BanquetBookingId = s.BanquetBookingId,
                 BanquetServiceId = s.BanquetServiceId,
                 ServiceName = s.ServiceName,
+                ServiceDate = s.ServiceDate,
                 Quantity = s.Quantity,
                 Rate = s.Rate,
                 TotalAmount = s.TotalAmount,
@@ -413,6 +427,7 @@ public class BanquetBookingServiceImpl : IBanquetBookingService
             BanquetBookingId = bookingId,
             BanquetServiceId = dto.BanquetServiceId,
             ServiceName = dto.ServiceName,
+            ServiceDate = dto.ServiceDate,
             Quantity = dto.Quantity,
             Rate = dto.Rate,
             ApplyTax = dto.ApplyTax,
@@ -428,6 +443,7 @@ public class BanquetBookingServiceImpl : IBanquetBookingService
             BanquetBookingId = service.BanquetBookingId,
             BanquetServiceId = service.BanquetServiceId,
             ServiceName = service.ServiceName,
+            ServiceDate = service.ServiceDate,
             Quantity = service.Quantity,
             Rate = service.Rate,
             TotalAmount = service.Rate * service.Quantity,
@@ -463,6 +479,7 @@ public class BanquetBookingServiceImpl : IBanquetBookingService
             BanquetBookingId = service.BanquetBookingId,
             BanquetServiceId = service.BanquetServiceId,
             ServiceName = service.ServiceName,
+            ServiceDate = service.ServiceDate,
             Quantity = service.Quantity,
             Rate = service.Rate,
             TotalAmount = service.TotalAmount,

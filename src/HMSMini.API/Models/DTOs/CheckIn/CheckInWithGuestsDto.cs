@@ -34,6 +34,8 @@ public class CheckInWithGuestsDto
     public decimal DiscountPercentage { get; set; }
     public decimal? FinalAmount { get; set; }
     public TaxType TaxType { get; set; }
+    public bool IsSharedRoom { get; set; }
+    public int? SharedGroupId { get; set; }
     public List<GuestDto> Guests { get; set; } = new();
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }

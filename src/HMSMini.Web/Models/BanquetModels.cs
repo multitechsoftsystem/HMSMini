@@ -218,9 +218,12 @@ public class BanquetBookingMenuModel
     public string? PackageName { get; set; }
     public int? MenuItemId { get; set; }
     public string? ItemName { get; set; }
+    public DateTime MenuDate { get; set; }
     public int Quantity { get; set; }
     public decimal RatePerPlate { get; set; }
     public decimal TotalAmount { get; set; }
+    public bool ApplyTax { get; set; }
+    public int? VoucherTaxConfigId { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 
@@ -228,8 +231,12 @@ public class CreateBanquetBookingMenuModel
 {
     public int? MenuPackageId { get; set; }
     public int? MenuItemId { get; set; }
+    public string? ItemName { get; set; }
+    public DateTime MenuDate { get; set; } = DateTime.Today;
     public int Quantity { get; set; } = 1;
     public decimal RatePerPlate { get; set; }
+    public bool ApplyTax { get; set; } = true;
+    public int? VoucherTaxConfigId { get; set; }
 }
 
 public class UpdateBanquetBookingMenuModel
@@ -245,6 +252,7 @@ public class BanquetBookingServiceModel
     public int BanquetBookingId { get; set; }
     public int? BanquetServiceId { get; set; }
     public string ServiceName { get; set; } = string.Empty;
+    public DateTime ServiceDate { get; set; }
     public int Quantity { get; set; }
     public decimal Rate { get; set; }
     public decimal TotalAmount { get; set; }
@@ -256,6 +264,7 @@ public class BanquetBookingServiceModel
 public class CreateBanquetBookingServiceModel
 {
     public int? BanquetServiceId { get; set; }
+    public DateTime ServiceDate { get; set; } = DateTime.Today;
     public string ServiceName { get; set; } = string.Empty;
     public int Quantity { get; set; } = 1;
     public decimal Rate { get; set; }
@@ -387,6 +396,14 @@ public class BanquetMenuChargeModel
     public int Quantity { get; set; }
     public decimal RatePerPlate { get; set; }
     public decimal TotalAmount { get; set; }
+    public bool ApplyTax { get; set; }
+    public int? VoucherTaxConfigId { get; set; }
+    public string? TaxConfigName { get; set; }
+    public string? SACCode { get; set; }
+    public decimal CgstPercentage { get; set; }
+    public decimal SgstPercentage { get; set; }
+    public decimal IgstPercentage { get; set; }
+    public decimal TaxAmount { get; set; }
 }
 
 public class BanquetServiceChargeModel
@@ -396,6 +413,13 @@ public class BanquetServiceChargeModel
     public decimal Rate { get; set; }
     public decimal TotalAmount { get; set; }
     public bool ApplyTax { get; set; }
+    public int? VoucherTaxConfigId { get; set; }
+    public string? TaxConfigName { get; set; }
+    public string? SACCode { get; set; }
+    public decimal CgstPercentage { get; set; }
+    public decimal SgstPercentage { get; set; }
+    public decimal IgstPercentage { get; set; }
+    public decimal TaxAmount { get; set; }
 }
 
 public class BanquetAdditionalChargeModel
@@ -406,6 +430,13 @@ public class BanquetAdditionalChargeModel
     public int Quantity { get; set; }
     public decimal TotalAmount { get; set; }
     public bool ApplyTax { get; set; }
+    public int? VoucherTaxConfigId { get; set; }
+    public string? TaxConfigName { get; set; }
+    public string? SACCode { get; set; }
+    public decimal CgstPercentage { get; set; }
+    public decimal SgstPercentage { get; set; }
+    public decimal IgstPercentage { get; set; }
+    public decimal TaxAmount { get; set; }
 }
 
 public class BanquetTaxSummaryModel
@@ -423,6 +454,26 @@ public class BanquetPaymentHistoryModel
     public string PaymentMode { get; set; } = string.Empty;
     public decimal Amount { get; set; }
     public string? ReferenceNumber { get; set; }
+}
+
+// Banquet Invoice List Model (lightweight for bill search)
+public class BanquetInvoiceListModel
+{
+    public int Id { get; set; }
+    public string InvoiceNumber { get; set; } = string.Empty;
+    public DateTime InvoiceDate { get; set; }
+    public int BanquetBookingId { get; set; }
+    public string BookingNumber { get; set; } = string.Empty;
+    public string HallName { get; set; } = string.Empty;
+    public string EventTypeName { get; set; } = string.Empty;
+    public DateTime EventDate { get; set; }
+    public string ContactPersonName { get; set; } = string.Empty;
+    public string? CompanyName { get; set; }
+    public decimal TotalTax { get; set; }
+    public decimal GrandTotal { get; set; }
+    public decimal TotalPaid { get; set; }
+    public decimal BalanceDue { get; set; }
+    public string PaymentStatus { get; set; } = "Unpaid";
 }
 
 // Legacy Banquet Payment Model (embedded in booking detail)

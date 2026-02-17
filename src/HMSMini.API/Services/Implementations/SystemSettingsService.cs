@@ -1,4 +1,5 @@
 using HMSMini.API.Data;
+using HMSMini.API.Models.DTOs.SystemSetting;
 using HMSMini.API.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,6 +19,22 @@ public class SystemSettingsService : ISystemSettingsService
     {
         _context = context;
         _logger = logger;
+    }
+
+    public async Task<List<SystemSettingDto>> GetAllSettingsAsync()
+    {
+        return await _context.SystemSettings
+            .AsNoTracking()
+            .Select(s => new SystemSettingDto
+            {
+                Id = s.Id,
+                SettingKey = s.SettingKey,
+                SettingValue = s.SettingValue,
+                DataType = s.DataType,
+                Description = s.Description,
+                IsSystemLocked = s.IsSystemLocked
+            })
+            .ToListAsync();
     }
 
     /// <summary>
@@ -86,7 +103,7 @@ public class SystemSettingsService : ISystemSettingsService
     /// <summary>
     /// Updates a setting value
     /// </summary>
-    public async Task UpdateSettingAsync(string settingKey, string settingValue, string? updatedBy = null)
+    public async Task UpdateSettingAsync(string settingKey, string settingValue, string? updatedBy = null, bool bypassLock = false)
     {
         var setting = await _context.SystemSettings
             .FirstOrDefaultAsync(s => s.SettingKey == settingKey);
@@ -96,7 +113,7 @@ public class SystemSettingsService : ISystemSettingsService
             throw new KeyNotFoundException($"Setting '{settingKey}' not found.");
         }
 
-        if (setting.IsSystemLocked)
+        if (setting.IsSystemLocked && !bypassLock)
         {
             throw new InvalidOperationException($"Setting '{settingKey}' is system-locked and cannot be modified.");
         }
@@ -122,5 +139,14 @@ public class SystemSettingsService : ISystemSettingsService
     {
         var workingDate = await GetWorkingDateAsync();
         return date.Date < workingDate.Date;
+    }
+
+    /// <summary>
+    /// Checks if the room sharing feature is enabled
+    /// </summary>
+    public async Task<bool> IsRoomSharingEnabledAsync()
+    {
+        var value = await GetSettingAsync("EnableRoomSharing");
+        return string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
     }
 }

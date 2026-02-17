@@ -75,7 +75,13 @@
                             @foreach (var checkIn in FilteredCheckIns)
                             {
                                 <tr>
-                                    <td>@checkIn.RoomNumber</td>
+                                    <td>
+                                        @checkIn.RoomNumber
+                                        @if (checkIn.IsSharedRoom)
+                                        {
+                                            <span class="badge bg-info ms-1" title="Room is shared with other check-ins">Shared</span>
+                                        }
+                                    </td>
                                     <td>@checkIn.CheckInDate.ToString("dd/MMM/yyyy")</td>
                                     <td>@checkIn.CheckOutDate.ToString("dd/MMM/yyyy")</td>
                                     <td>
@@ -208,6 +214,12 @@
                                             <button class="btn btn-sm btn-info me-1" @onclick="() => ManageGuests(checkIn.Id)">
                                                 <i class="bi bi-person-badge"></i> Guests
                                             </button>
+                                            @if (roomSharingEnabled && GetActiveCountForRoom(checkIn.RoomId) < 3)
+                                            {
+                                                <button class="btn btn-sm btn-success me-1" @onclick="() => ShowShareRoomModal(checkIn)">
+                                                    <i class="bi bi-people"></i> Share
+                                                </button>
+                                            }
                                             <button class="btn btn-sm btn-warning" @onclick="() => CheckOut(checkIn.Id)">
                                                 Check Out
                                             </button>
@@ -1663,6 +1675,152 @@
     </div>
 }
 
+<!-- Share Room Modal -->
+@if (showShareRoomModal && shareRoomCheckIn != null)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Share Room @shareRoomCheckIn.RoomNumber</h5>
+                    <button type="button" class="btn-close" @onclick="HideShareRoomModal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(shareRoomError))
+                    {
+                        <div class="alert alert-danger">
+                            <i class="bi bi-exclamation-triangle"></i> @shareRoomError
+                        </div>
+                    }
+
+                    <div class="alert alert-info mb-3">
+                        <i class="bi bi-info-circle"></i> Creating a new independent check-in in Room <strong>@shareRoomCheckIn.RoomNumber</strong>.
+                        Each shared check-in has its own tariff, billing, and payments.
+                    </div>
+
+                    <EditForm Model="shareRoomDto" OnValidSubmit="CreateSharedCheckIn">
+                        <DataAnnotationsValidator />
+
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label>Room Number</label>
+                                <input type="text" class="form-control" value="@shareRoomCheckIn.RoomNumber" disabled />
+                            </div>
+                            <div class="col-md-4">
+                                <label>Check-In Date</label>
+                                <InputDate @bind-Value="shareRoomDto.CheckInDate" class="form-control" />
+                            </div>
+                            <div class="col-md-4">
+                                <label>Check-Out Date</label>
+                                <InputDate @bind-Value="shareRoomDto.CheckOutDate" class="form-control" />
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label>Company (Optional)</label>
+                                <select @bind="shareSelectedCompanyId" class="form-control">
+                                    <option value="">-- Walk-in Guest --</option>
+                                    @foreach (var company in activeCompanies)
+                                    {
+                                        <option value="@company.Id">@company.CompanyName (@company.DiscountPercentage% discount)</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label>Business Source</label>
+                                <select @bind="shareSelectedBusinessSourceId" class="form-control">
+                                    <option value="">-- Select Business Source --</option>
+                                    @foreach (var source in businessSources)
+                                    {
+                                        <option value="@source.BusinessSourceId">@source.SourceName</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label>Meal Plan</label>
+                                <select @bind="shareSelectedMealPlanId" class="form-control">
+                                    <option value="">-- Select Meal Plan --</option>
+                                    @foreach (var plan in mealPlans)
+                                    {
+                                        <option value="@plan.MealPlanId">@plan.PlanCode - @plan.PlanName</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label>Guest Type</label>
+                                <select @bind="shareSelectedGuestTypeId" class="form-control">
+                                    <option value="">-- Select Guest Type --</option>
+                                    @foreach (var guestType in guestTypes)
+                                    {
+                                        <option value="@guestType.GuestTypeId">@guestType.TypeName</option>
+                                    }
+                                </select>
+                            </div>
+                        </div>
+
+                        <h6 class="mb-3">Guest Information</h6>
+                        @for (int i = 0; i < shareRoomDto.Guests.Count; i++)
+                        {
+                            var index = i;
+                            <div class="border rounded p-3 mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <strong>Guest @(index + 1)</strong>
+                                    @if (shareRoomDto.Guests.Count > 1)
+                                    {
+                                        <button type="button" class="btn btn-sm btn-danger"
+                                                @onclick="() => RemoveShareGuest(index)">Remove</button>
+                                    }
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6 mb-2">
+                                        <label>Name <span class="text-danger">*</span></label>
+                                        <InputText @bind-Value="shareRoomDto.Guests[index].GuestName" class="form-control" placeholder="Required" />
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <label>Mobile (10 digits)</label>
+                                        <InputText @bind-Value="shareRoomDto.Guests[index].MobileNo" class="form-control" placeholder="e.g., 9876543210" maxlength="10" />
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-12 mb-2">
+                                        <label>Address</label>
+                                        <InputText @bind-Value="shareRoomDto.Guests[index].Address" class="form-control" />
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
+                        @if (shareRoomDto.Guests.Count < 3)
+                        {
+                            <button type="button" class="btn btn-secondary btn-sm mb-3" @onclick="AddShareGuest">
+                                <i class="bi bi-plus"></i> Add Guest
+                            </button>
+                        }
+
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" @onclick="HideShareRoomModal">Cancel</button>
+                            <button type="submit" class="btn btn-success" disabled="@(sharingRoom || !shareRoomDto.Guests.Any(g => !string.IsNullOrWhiteSpace(g.GuestName)))">
+                                @if (sharingRoom)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1"></span>
+                                }
+                                <i class="bi bi-people"></i> Create Shared Check-In
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private List<CheckInDto> checkIns = new();
     private CreateCheckInDto newCheckIn = new();
@@ -1769,9 +1927,23 @@
     // Role-based permissions
     private bool canManageCompanies = false;
 
+    // Room sharing
+    private bool roomSharingEnabled = false;
+    private bool showShareRoomModal = false;
+    private CheckInDto? shareRoomCheckIn = null;
+    private ShareRoomDto shareRoomDto = new();
+    private bool sharingRoom = false;
+    private string shareRoomError = string.Empty;
+    private string shareSelectedCompanyId = "";
+    private string shareSelectedBusinessSourceId = "";
+    private string shareSelectedMealPlanId = "";
+    private string shareSelectedGuestTypeId = "";
+    private Dictionary<int, int> roomActiveCountCache = new();
+
     protected override async Task OnInitializedAsync()
     {
         await CheckUserPermissions();
+        roomSharingEnabled = await ApiClient.IsRoomSharingEnabledAsync();
         await LoadCheckIns();
     }
 
@@ -1790,6 +1962,12 @@
         loading = true;
         checkIns = await ApiClient.GetActiveCheckInsAsync();
         loading = false;
+
+        // Build room active count cache from loaded check-ins
+        roomActiveCountCache = checkIns
+            .Where(c => c.Status == 0)
+            .GroupBy(c => c.RoomId)
+            .ToDictionary(g => g.Key, g => g.Count());
 
         // Clear cache and load financial data
         financialDataCache.Clear();
@@ -2880,5 +3058,129 @@
         return !string.IsNullOrWhiteSpace(newCheckIn.RoomNumber) &&
                newCheckIn.Guests.Any() &&
                !string.IsNullOrWhiteSpace(newCheckIn.Guests[0].GuestName);
+    }
+
+    // Room sharing methods
+    private int GetActiveCountForRoom(int roomId)
+    {
+        return roomActiveCountCache.TryGetValue(roomId, out var count) ? count : 0;
+    }
+
+    private async Task ShowShareRoomModal(CheckInDto checkIn)
+    {
+        shareRoomCheckIn = checkIn;
+        shareRoomError = string.Empty;
+        shareSelectedCompanyId = "";
+        shareSelectedBusinessSourceId = "";
+        shareSelectedMealPlanId = "";
+        shareSelectedGuestTypeId = "";
+        shareRoomDto = new ShareRoomDto
+        {
+            CheckInDate = DateTime.Today,
+            CheckOutDate = DateTime.Today.AddDays(2),
+            Guests = new List<CreateGuestDto> { new CreateGuestDto() }
+        };
+
+        // Load dropdown data if not already loaded
+        if (!activeCompanies.Any())
+            activeCompanies = await ApiClient.GetActiveCompaniesAsync();
+        if (!businessSources.Any())
+            businessSources = await ApiClient.GetActiveBusinessSourcesAsync();
+        if (!mealPlans.Any())
+            mealPlans = await ApiClient.GetActiveMealPlansAsync();
+        if (!guestTypes.Any())
+            guestTypes = await ApiClient.GetActiveGuestTypesAsync();
+
+        showShareRoomModal = true;
+    }
+
+    private void HideShareRoomModal()
+    {
+        showShareRoomModal = false;
+        shareRoomCheckIn = null;
+        shareRoomError = string.Empty;
+    }
+
+    private void AddShareGuest()
+    {
+        if (shareRoomDto.Guests.Count < 3)
+        {
+            shareRoomDto.Guests.Add(new CreateGuestDto());
+        }
+    }
+
+    private void RemoveShareGuest(int index)
+    {
+        if (shareRoomDto.Guests.Count > 1)
+        {
+            shareRoomDto.Guests.RemoveAt(index);
+        }
+    }
+
+    private async Task CreateSharedCheckIn()
+    {
+        shareRoomError = string.Empty;
+
+        if (shareRoomCheckIn == null) return;
+
+        // Validate
+        if (!shareRoomDto.Guests.Any(g => !string.IsNullOrWhiteSpace(g.GuestName)))
+        {
+            shareRoomError = "At least one guest name is required.";
+            return;
+        }
+
+        if (shareRoomDto.CheckOutDate <= shareRoomDto.CheckInDate)
+        {
+            shareRoomError = "Check-out date must be after check-in date.";
+            return;
+        }
+
+        // Set optional IDs
+        if (!string.IsNullOrWhiteSpace(shareSelectedCompanyId) && int.TryParse(shareSelectedCompanyId, out int cid))
+            shareRoomDto.CompanyId = cid;
+        else
+            shareRoomDto.CompanyId = null;
+
+        if (!string.IsNullOrWhiteSpace(shareSelectedBusinessSourceId) && int.TryParse(shareSelectedBusinessSourceId, out int bsid))
+            shareRoomDto.BusinessSourceId = bsid;
+        else
+            shareRoomDto.BusinessSourceId = null;
+
+        if (!string.IsNullOrWhiteSpace(shareSelectedMealPlanId) && int.TryParse(shareSelectedMealPlanId, out int mpid))
+            shareRoomDto.MealPlanId = mpid;
+        else
+            shareRoomDto.MealPlanId = null;
+
+        if (!string.IsNullOrWhiteSpace(shareSelectedGuestTypeId) && int.TryParse(shareSelectedGuestTypeId, out int gtid))
+            shareRoomDto.GuestTypeId = gtid;
+        else
+            shareRoomDto.GuestTypeId = null;
+
+        sharingRoom = true;
+        StateHasChanged();
+
+        try
+        {
+            var result = await ApiClient.ShareRoomAsync(shareRoomCheckIn.Id, shareRoomDto);
+            if (result != null)
+            {
+                HideShareRoomModal();
+                await LoadCheckIns();
+            }
+            else
+            {
+                shareRoomError = "Failed to create shared check-in. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            shareRoomError = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            sharingRoom = false;
+            StateHasChanged();
+        }
     }
 }

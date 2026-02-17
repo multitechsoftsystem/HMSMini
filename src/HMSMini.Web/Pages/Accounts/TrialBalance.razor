@@ -1,0 +1,264 @@
+@page "/accounts/trial-balance"
+@inject IApiClientService ApiClient
+@inject IAuthenticationService AuthService
+@inject IJSRuntime JSRuntime
+@using HMSMini.Web.Services
+@using HMSMini.Web.Models
+@using Microsoft.JSInterop
+
+<PageTitle>Trial Balance - MSS</PageTitle>
+
+<div class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Trial Balance</h2>
+        @if (report != null)
+        {
+            <button class="btn btn-outline-secondary" @onclick="PrintReport">
+                <i class="bi bi-printer"></i> Print
+            </button>
+        }
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible">
+            @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+        </div>
+    }
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible">
+            @successMessage
+            <button type="button" class="btn-close" @onclick="() => successMessage = string.Empty"></button>
+        </div>
+    }
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">Financial Year</label>
+                    <select class="form-select" @bind="selectedFinancialYearId">
+                        <option value="">-- All --</option>
+                        @foreach (var fy in financialYears)
+                        {
+                            <option value="@fy.Id">@fy.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">From Date</label>
+                    <input type="date" class="form-control" @bind="fromDate" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">To Date</label>
+                    <input type="date" class="form-control" @bind="toDate" />
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-primary w-100" @onclick="GenerateReport">
+                        <i class="bi bi-bar-chart"></i> Generate
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report -->
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border"></div>
+        </div>
+    }
+    else if (report != null)
+    {
+        <div class="card" id="printable-report">
+            <div class="card-header">
+                <div class="text-center">
+                    <h4>Trial Balance</h4>
+                    <p class="text-muted mb-0">
+                        @if (!string.IsNullOrEmpty(report.FinancialYearName))
+                        {
+                            <text>Financial Year: @report.FinancialYearName</text>
+                        }
+                        @if (report.FromDate.HasValue && report.ToDate.HasValue)
+                        {
+                            <text> | Period: @report.FromDate.Value.ToString("dd-MMM-yyyy") to @report.ToDate.Value.ToString("dd-MMM-yyyy")</text>
+                        }
+                    </p>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th rowspan="2" class="align-middle">Account Code</th>
+                                <th rowspan="2" class="align-middle">Account Name</th>
+                                <th rowspan="2" class="align-middle">Account Type</th>
+                                <th colspan="2" class="text-center">Opening</th>
+                                <th colspan="2" class="text-center">Period</th>
+                                <th colspan="2" class="text-center">Closing</th>
+                            </tr>
+                            <tr>
+                                <th class="text-end">Debit</th>
+                                <th class="text-end">Credit</th>
+                                <th class="text-end">Debit</th>
+                                <th class="text-end">Credit</th>
+                                <th class="text-end">Debit</th>
+                                <th class="text-end">Credit</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var line in report.Lines)
+                            {
+                                <tr>
+                                    <td>@line.AccountCode</td>
+                                    <td>@line.AccountName</td>
+                                    <td>@line.AccountTypeName</td>
+                                    <td class="text-end">@(line.OpeningDebit != 0 ? line.OpeningDebit.ToString("N2") : "-")</td>
+                                    <td class="text-end">@(line.OpeningCredit != 0 ? line.OpeningCredit.ToString("N2") : "-")</td>
+                                    <td class="text-end">@(line.PeriodDebit != 0 ? line.PeriodDebit.ToString("N2") : "-")</td>
+                                    <td class="text-end">@(line.PeriodCredit != 0 ? line.PeriodCredit.ToString("N2") : "-")</td>
+                                    <td class="text-end">@(line.ClosingDebit != 0 ? line.ClosingDebit.ToString("N2") : "-")</td>
+                                    <td class="text-end">@(line.ClosingCredit != 0 ? line.ClosingCredit.ToString("N2") : "-")</td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot class="table-secondary fw-bold">
+                            @{
+                                var totalOpeningDebit = report.Lines.Sum(l => l.OpeningDebit);
+                                var totalOpeningCredit = report.Lines.Sum(l => l.OpeningCredit);
+                                var totalPeriodDebit = report.Lines.Sum(l => l.PeriodDebit);
+                                var totalPeriodCredit = report.Lines.Sum(l => l.PeriodCredit);
+                                var totalClosingDebit = report.Lines.Sum(l => l.ClosingDebit);
+                                var totalClosingCredit = report.Lines.Sum(l => l.ClosingCredit);
+                            }
+                            <tr>
+                                <td colspan="3" class="text-end">Totals:</td>
+                                <td class="text-end">@totalOpeningDebit.ToString("N2")</td>
+                                <td class="text-end">@totalOpeningCredit.ToString("N2")</td>
+                                <td class="text-end">@totalPeriodDebit.ToString("N2")</td>
+                                <td class="text-end">@totalPeriodCredit.ToString("N2")</td>
+                                <td class="text-end">@totalClosingDebit.ToString("N2")</td>
+                                <td class="text-end">@totalClosingCredit.ToString("N2")</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer text-muted text-center">
+                <small>
+                    Total Debit: @report.TotalDebit.ToString("N2") | Total Credit: @report.TotalCredit.ToString("N2")
+                    @if (report.TotalDebit == report.TotalCredit)
+                    {
+                        <span class="text-success ms-2"><i class="bi bi-check-circle"></i> Balanced</span>
+                    }
+                    else
+                    {
+                        <span class="text-danger ms-2"><i class="bi bi-exclamation-triangle"></i> Out of Balance (Difference: @Math.Abs(report.TotalDebit - report.TotalCredit).ToString("N2"))</span>
+                    }
+                </small>
+            </div>
+        </div>
+    }
+    else if (!isFirstLoad)
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> No data available for the selected filters. Please adjust your filters and try again.
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-light text-center">
+            <i class="bi bi-bar-chart"></i> Select filters and click <strong>Generate</strong> to view the trial balance report.
+        </div>
+    }
+</div>
+
+@code {
+    private List<FinancialYearModel> financialYears = new();
+    private TrialBalanceModel? report = null;
+    private bool isLoading = false;
+    private bool isFirstLoad = true;
+
+    private string errorMessage = "";
+    private string successMessage = "";
+
+    // Filters
+    private string selectedFinancialYearId = "";
+    private DateTime? fromDate;
+    private DateTime? toDate;
+
+    // Role-based permissions
+    private bool canManageMasterData = false;
+    private int currentUserRole = -1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckUserPermissions();
+        await LoadFinancialYears();
+    }
+
+    private async Task CheckUserPermissions()
+    {
+        var currentUser = await AuthService.GetCurrentUserAsync();
+        if (currentUser != null)
+        {
+            currentUserRole = currentUser.Role;
+            canManageMasterData = currentUserRole == 0 || currentUserRole == 1;
+        }
+    }
+
+    private async Task LoadFinancialYears()
+    {
+        try
+        {
+            financialYears = await ApiClient.GetFinancialYearsAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load financial years: {ex.Message}";
+        }
+    }
+
+    private async Task GenerateReport()
+    {
+        isLoading = true;
+        isFirstLoad = false;
+        errorMessage = "";
+        successMessage = "";
+        report = null;
+
+        try
+        {
+            int? fyId = null;
+            if (!string.IsNullOrEmpty(selectedFinancialYearId) && int.TryParse(selectedFinancialYearId, out var parsedId))
+            {
+                fyId = parsedId;
+            }
+
+            report = await ApiClient.GetTrialBalanceAsync(fyId, fromDate, toDate);
+
+            if (report != null && report.Lines.Any())
+            {
+                successMessage = $"Report generated with {report.Lines.Count} account(s).";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to generate trial balance: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task PrintReport()
+    {
+        await JSRuntime.InvokeVoidAsync("window.print");
+    }
+}

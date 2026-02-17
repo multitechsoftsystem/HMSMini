@@ -1,0 +1,263 @@
+@page "/banquet/bill-search"
+@inject IApiClientService ApiClient
+@inject NavigationManager Navigation
+
+<PageTitle>Bill Search - MSS</PageTitle>
+
+<div class="page-header">
+    <h3>Banquet Bill Search</h3>
+</div>
+
+<!-- Search Filters -->
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-2">
+                <label class="form-label">From Date</label>
+                <input type="date" class="form-control" @bind="dateFrom" @bind:event="oninput" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">To Date</label>
+                <input type="date" class="form-control" @bind="dateTo" @bind:event="oninput" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Search</label>
+                <input type="text" class="form-control" placeholder="Booking#, Invoice#, Hall, Contact, Company..."
+                       @bind="searchText" @bind:event="oninput" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Bill Status</label>
+                <div class="btn-group w-100" role="group">
+                    <button class="btn btn-sm @(billStatusFilter == "All" ? "btn-primary" : "btn-outline-primary")" @onclick='() => billStatusFilter = "All"'>All</button>
+                    <button class="btn btn-sm @(billStatusFilter == "Billed" ? "btn-primary" : "btn-outline-primary")" @onclick='() => billStatusFilter = "Billed"'>Billed</button>
+                    <button class="btn btn-sm @(billStatusFilter == "Unbilled" ? "btn-primary" : "btn-outline-primary")" @onclick='() => billStatusFilter = "Unbilled"'>Unbilled</button>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Payment Status</label>
+                <select class="form-select" @bind="paymentStatusFilter">
+                    <option value="All">All</option>
+                    <option value="Paid">Paid</option>
+                    <option value="Partial">Partially Paid</option>
+                    <option value="Unpaid">Unpaid</option>
+                </select>
+            </div>
+            <div class="col-md-1">
+                <button class="btn btn-outline-secondary w-100" @onclick="ClearFilters">Clear</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <div class="loading">Loading data...</div>
+}
+else
+{
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Results: @FilteredItems.Count()</span>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-sm table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Booking #</th>
+                        <th>Invoice #</th>
+                        <th>Hall</th>
+                        <th>Event Date</th>
+                        <th>Contact</th>
+                        <th>Company</th>
+                        <th class="text-end">Tax</th>
+                        <th class="text-end">Grand Total</th>
+                        <th class="text-end">Paid</th>
+                        <th class="text-end">Balance</th>
+                        <th>Bill Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in FilteredItems)
+                    {
+                        <tr>
+                            <td>@item.BookingNumber</td>
+                            <td>@(item.IsBilled ? item.InvoiceNumber : "-")</td>
+                            <td>@item.HallName</td>
+                            <td>@item.EventDate.ToString("MMM dd, yyyy")</td>
+                            <td>@item.ContactPersonName</td>
+                            <td>@(item.CompanyName ?? "-")</td>
+                            <td class="text-end">@(item.IsBilled ? item.TotalTax.ToString("N2") : "-")</td>
+                            <td class="text-end">@(item.IsBilled ? item.GrandTotal.ToString("N2") : "-")</td>
+                            <td class="text-end">@(item.IsBilled ? item.TotalPaid.ToString("N2") : "-")</td>
+                            <td class="text-end">
+                                @if (item.IsBilled)
+                                {
+                                    <span class="@(item.BalanceDue > 0 ? "text-danger" : "text-success")">@item.BalanceDue.ToString("N2")</span>
+                                }
+                                else
+                                {
+                                    <span>-</span>
+                                }
+                            </td>
+                            <td>
+                                @if (item.IsBilled)
+                                {
+                                    <span class="badge bg-success">Billed</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">Unbilled</span>
+                                }
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => ShowDetails(item.BookingId)" title="Show Details">
+                                    <i class="bi bi-eye"></i> Details
+                                </button>
+                                @if (item.IsBilled)
+                                {
+                                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => Reprint(item.BookingId)" title="Reprint Invoice">
+                                        <i class="bi bi-printer"></i> Reprint
+                                    </button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    @if (!FilteredItems.Any())
+                    {
+                        <tr><td colspan="12" class="text-center text-muted py-3">No results found.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private bool isLoading = true;
+    private List<BillSearchItem> allItems = new();
+
+    // Filters
+    private DateTime? dateFrom;
+    private DateTime? dateTo;
+    private string searchText = "";
+    private string billStatusFilter = "All";
+    private string paymentStatusFilter = "All";
+
+    private IEnumerable<BillSearchItem> FilteredItems => allItems.Where(item =>
+    {
+        // Date range filter on EventDate
+        if (dateFrom.HasValue && item.EventDate.Date < dateFrom.Value.Date)
+            return false;
+        if (dateTo.HasValue && item.EventDate.Date > dateTo.Value.Date)
+            return false;
+
+        // Text search
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            var term = searchText.Trim().ToLower();
+            var match = item.BookingNumber.ToLower().Contains(term)
+                || (item.InvoiceNumber ?? "").ToLower().Contains(term)
+                || item.HallName.ToLower().Contains(term)
+                || item.ContactPersonName.ToLower().Contains(term)
+                || (item.CompanyName ?? "").ToLower().Contains(term);
+            if (!match) return false;
+        }
+
+        // Bill status filter
+        if (billStatusFilter == "Billed" && !item.IsBilled) return false;
+        if (billStatusFilter == "Unbilled" && item.IsBilled) return false;
+
+        // Payment status filter (only applies to billed items)
+        if (paymentStatusFilter != "All")
+        {
+            if (!item.IsBilled) return false;
+            if (item.PaymentStatus != paymentStatusFilter) return false;
+        }
+
+        return true;
+    });
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+
+        var bookingsTask = ApiClient.GetAllBanquetBookingsAsync();
+        var invoicesTask = ApiClient.GetAllBanquetInvoicesAsync();
+        await Task.WhenAll(bookingsTask, invoicesTask);
+
+        var bookings = bookingsTask.Result;
+        var invoices = invoicesTask.Result;
+
+        // Build lookup of invoices by booking id
+        var invoiceLookup = invoices.ToDictionary(i => i.BanquetBookingId);
+
+        allItems = bookings.Select(b =>
+        {
+            invoiceLookup.TryGetValue(b.Id, out var inv);
+            return new BillSearchItem
+            {
+                BookingId = b.Id,
+                BookingNumber = b.BookingNumber,
+                HallName = b.HallName,
+                EventTypeName = b.EventTypeName,
+                EventDate = b.EventDate,
+                ContactPersonName = b.ContactPersonName,
+                CompanyName = b.CompanyName,
+                IsBilled = inv != null,
+                InvoiceNumber = inv?.InvoiceNumber,
+                TotalTax = inv?.TotalTax ?? 0,
+                GrandTotal = inv?.GrandTotal ?? 0,
+                TotalPaid = inv?.TotalPaid ?? 0,
+                BalanceDue = inv?.BalanceDue ?? 0,
+                PaymentStatus = inv?.PaymentStatus ?? ""
+            };
+        })
+        .OrderByDescending(x => x.EventDate)
+        .ToList();
+
+        isLoading = false;
+    }
+
+    private void ClearFilters()
+    {
+        dateFrom = null;
+        dateTo = null;
+        searchText = "";
+        billStatusFilter = "All";
+        paymentStatusFilter = "All";
+    }
+
+    private void ShowDetails(int bookingId)
+    {
+        Navigation.NavigateTo($"/banquet/bookings/{bookingId}?tab=billing");
+    }
+
+    private void Reprint(int bookingId)
+    {
+        Navigation.NavigateTo($"/banquet/bookings/{bookingId}?tab=billing&print=true");
+    }
+
+    private class BillSearchItem
+    {
+        public int BookingId { get; set; }
+        public string BookingNumber { get; set; } = string.Empty;
+        public string HallName { get; set; } = string.Empty;
+        public string EventTypeName { get; set; } = string.Empty;
+        public DateTime EventDate { get; set; }
+        public string ContactPersonName { get; set; } = string.Empty;
+        public string? CompanyName { get; set; }
+        public bool IsBilled { get; set; }
+        public string? InvoiceNumber { get; set; }
+        public decimal TotalTax { get; set; }
+        public decimal GrandTotal { get; set; }
+        public decimal TotalPaid { get; set; }
+        public decimal BalanceDue { get; set; }
+        public string PaymentStatus { get; set; } = "";
+    }
+}

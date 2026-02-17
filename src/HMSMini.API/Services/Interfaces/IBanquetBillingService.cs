@@ -8,4 +8,5 @@ public interface IBanquetBillingService
     Task<BanquetInvoiceDto> FinalizeInvoiceAsync(int bookingId, FinalizeBanquetInvoiceDto dto);
     Task<BanquetInvoiceDto?> GetInvoiceByIdAsync(int invoiceId);
     Task<BanquetInvoiceDto?> GetInvoiceByBookingIdAsync(int bookingId);
+    Task<List<BanquetInvoiceListDto>> GetAllInvoicesAsync();
 }

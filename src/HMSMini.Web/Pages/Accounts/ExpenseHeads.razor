@@ -1,0 +1,491 @@
+@page "/accounts/expense-heads"
+@inject IApiClientService ApiClient
+@inject IAuthenticationService AuthService
+@using HMSMini.Web.Services
+@using HMSMini.Web.Models
+
+<PageTitle>Expense Heads - MSS</PageTitle>
+
+<div class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-tags"></i> Expense Heads</h2>
+        <div>
+            <button class="btn btn-outline-primary me-2" @onclick="LoadExpenseHeads">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+            @if (canManageMasterData)
+            {
+                <button class="btn btn-primary" @onclick="ShowCreateModal">
+                    <i class="bi bi-plus-circle"></i> New Expense Head
+                </button>
+            }
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle"></i> @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle"></i> @successMessage
+            <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+        </div>
+    }
+
+    @if (!canManageMasterData)
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> You have view-only access. Contact an administrator to make changes.
+        </div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (expenseHeads.Any())
+    {
+        <div class="card shadow-sm">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0"><i class="bi bi-table"></i> Expense Heads</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Name</th>
+                                <th>Default Account</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var head in expenseHeads.OrderBy(h => h.Name))
+                            {
+                                <tr>
+                                    <td><strong>@head.Name</strong></td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(head.DefaultAccountName))
+                                        {
+                                            <span>@head.DefaultAccountName</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">Not assigned</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (head.IsActive)
+                                        {
+                                            <span class="badge bg-success">Active</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">Inactive</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (canManageMasterData)
+                                        {
+                                            <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => ShowEditModal(head)">
+                                                <i class="bi bi-pencil"></i> Edit
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-danger" @onclick="() => ShowDeleteConfirmation(head)">
+                                                <i class="bi bi-trash"></i> Delete
+                                            </button>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">View Only</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> No expense heads found. Click "New Expense Head" to create one.
+        </div>
+    }
+</div>
+
+@* Create Expense Head Modal *@
+@if (showCreateModal)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-plus-circle"></i> New Expense Head</h5>
+                    <button type="button" class="btn-close" @onclick="HideCreateModal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrWhiteSpace(modalErrorMessage))
+                    {
+                        <div class="alert alert-danger">@modalErrorMessage</div>
+                    }
+
+                    <div class="mb-3">
+                        <label class="form-label">Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" @bind="createForm.Name" placeholder="e.g., Electricity, Maintenance" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Default Expense Account</label>
+                        <select class="form-select" @bind="createForm.DefaultAccountId">
+                            <option value="">-- None --</option>
+                            @foreach (var acc in expenseAccountDropdown)
+                            {
+                                <option value="@acc.Id">@acc.DisplayName</option>
+                            }
+                        </select>
+                        <small class="text-muted">Select the default ledger account for this expense category.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideCreateModal">Cancel</button>
+                    <button type="button" class="btn btn-primary" @onclick="CreateExpenseHead" disabled="@isSaving">
+                        @if (isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Create
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* Edit Expense Head Modal *@
+@if (showEditModal)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-pencil"></i> Edit Expense Head</h5>
+                    <button type="button" class="btn-close" @onclick="HideEditModal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrWhiteSpace(modalErrorMessage))
+                    {
+                        <div class="alert alert-danger">@modalErrorMessage</div>
+                    }
+
+                    <div class="mb-3">
+                        <label class="form-label">Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" @bind="editForm.Name" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Default Expense Account</label>
+                        <select class="form-select" @bind="editForm.DefaultAccountId">
+                            <option value="">-- None --</option>
+                            @foreach (var acc in expenseAccountDropdown)
+                            {
+                                <option value="@acc.Id">@acc.DisplayName</option>
+                            }
+                        </select>
+                        <small class="text-muted">Select the default ledger account for this expense category.</small>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input type="checkbox" class="form-check-input" id="editIsActive" @bind="editForm.IsActive" />
+                        <label class="form-check-label" for="editIsActive">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideEditModal">Cancel</button>
+                    <button type="button" class="btn btn-primary" @onclick="UpdateExpenseHead" disabled="@isSaving">
+                        @if (isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Update
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* Delete Confirmation Modal *@
+@if (showDeleteConfirmation)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Confirm Delete</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="HideDeleteConfirmation"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete the expense head <strong>@deletingExpenseHead?.Name</strong>?</p>
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i> This action cannot be undone. Ensure no expense vouchers reference this expense head.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideDeleteConfirmation">Cancel</button>
+                    <button type="button" class="btn btn-danger" @onclick="DeleteExpenseHead" disabled="@isSaving">
+                        @if (isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<ExpenseHeadModel> expenseHeads = new();
+    private List<AccountDropdownModel> expenseAccountDropdown = new();
+    private bool isLoading = true;
+    private bool isSaving = false;
+    private string? errorMessage;
+    private string? successMessage;
+    private string? modalErrorMessage;
+
+    // Create modal
+    private bool showCreateModal = false;
+    private CreateExpenseHeadModel createForm = new();
+
+    // Edit modal
+    private bool showEditModal = false;
+    private ExpenseHeadModel? editingExpenseHead;
+    private UpdateExpenseHeadModel editForm = new();
+
+    // Delete confirmation
+    private bool showDeleteConfirmation = false;
+    private ExpenseHeadModel? deletingExpenseHead;
+
+    // Role-based permissions
+    private bool canManageMasterData = false;
+    private int currentUserRole = -1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckUserPermissions();
+        await LoadExpenseHeads();
+    }
+
+    private async Task CheckUserPermissions()
+    {
+        var currentUser = await AuthService.GetCurrentUserAsync();
+        if (currentUser != null)
+        {
+            currentUserRole = currentUser.Role;
+            // Only Admin (0) and Manager (1) can manage master data
+            canManageMasterData = currentUserRole == 0 || currentUserRole == 1;
+        }
+    }
+
+    private async Task LoadExpenseHeads()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            expenseHeads = await ApiClient.GetExpenseHeadsAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading expense heads: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadExpenseAccountDropdown()
+    {
+        try
+        {
+            expenseAccountDropdown = await ApiClient.GetAccountDropdownAsync(AccountType.Expense);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading expense accounts: {ex.Message}";
+        }
+    }
+
+    // Create
+    private async Task ShowCreateModal()
+    {
+        await LoadExpenseAccountDropdown();
+        createForm = new CreateExpenseHeadModel();
+        modalErrorMessage = null;
+        showCreateModal = true;
+    }
+
+    private void HideCreateModal()
+    {
+        showCreateModal = false;
+        createForm = new();
+        modalErrorMessage = null;
+    }
+
+    private async Task CreateExpenseHead()
+    {
+        modalErrorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(createForm.Name))
+        {
+            modalErrorMessage = "Name is required.";
+            return;
+        }
+
+        isSaving = true;
+
+        try
+        {
+            var result = await ApiClient.CreateExpenseHeadAsync(createForm);
+            if (result != null)
+            {
+                successMessage = $"Expense head '{result.Name}' created successfully.";
+                await LoadExpenseHeads();
+                HideCreateModal();
+            }
+            else
+            {
+                modalErrorMessage = "Failed to create expense head.";
+            }
+        }
+        catch (Exception ex)
+        {
+            modalErrorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    // Edit
+    private async Task ShowEditModal(ExpenseHeadModel head)
+    {
+        await LoadExpenseAccountDropdown();
+        editingExpenseHead = head;
+        editForm = new UpdateExpenseHeadModel
+        {
+            Name = head.Name,
+            DefaultAccountId = head.DefaultAccountId,
+            IsActive = head.IsActive
+        };
+        modalErrorMessage = null;
+        showEditModal = true;
+    }
+
+    private void HideEditModal()
+    {
+        showEditModal = false;
+        editingExpenseHead = null;
+        editForm = new();
+        modalErrorMessage = null;
+    }
+
+    private async Task UpdateExpenseHead()
+    {
+        if (editingExpenseHead == null) return;
+        modalErrorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(editForm.Name))
+        {
+            modalErrorMessage = "Name is required.";
+            return;
+        }
+
+        isSaving = true;
+
+        try
+        {
+            var result = await ApiClient.UpdateExpenseHeadAsync(editingExpenseHead.Id, editForm);
+            if (result != null)
+            {
+                successMessage = $"Expense head '{result.Name}' updated successfully.";
+                await LoadExpenseHeads();
+                HideEditModal();
+            }
+            else
+            {
+                modalErrorMessage = "Failed to update expense head.";
+            }
+        }
+        catch (Exception ex)
+        {
+            modalErrorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    // Delete
+    private void ShowDeleteConfirmation(ExpenseHeadModel head)
+    {
+        deletingExpenseHead = head;
+        showDeleteConfirmation = true;
+    }
+
+    private void HideDeleteConfirmation()
+    {
+        showDeleteConfirmation = false;
+        deletingExpenseHead = null;
+    }
+
+    private async Task DeleteExpenseHead()
+    {
+        if (deletingExpenseHead == null) return;
+
+        isSaving = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var result = await ApiClient.DeleteExpenseHeadAsync(deletingExpenseHead.Id);
+            if (result)
+            {
+                successMessage = $"Expense head '{deletingExpenseHead.Name}' deleted successfully.";
+                HideDeleteConfirmation();
+                await LoadExpenseHeads();
+            }
+            else
+            {
+                errorMessage = "Failed to delete expense head. It may be referenced by expense vouchers.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

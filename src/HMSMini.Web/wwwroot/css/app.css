@@ -400,24 +400,275 @@ main {
     padding: 4px 8px;
 }
 
+/* GST Invoice Styles */
+.gst-invoice {
+    background: #fff;
+    border: 2px solid #333;
+    padding: 0;
+    font-size: 13px;
+    color: #333;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.gst-invoice-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 15px 20px;
+    border-bottom: 2px solid #333;
+}
+
+.gst-invoice-header-left {
+    flex: 1;
+}
+
+.gst-invoice-header-left h3 {
+    margin: 0 0 5px 0;
+    font-size: 1.3rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.gst-invoice-header-left p {
+    margin: 2px 0;
+    font-size: 12px;
+    color: #555;
+}
+
+.gst-invoice-header-right {
+    text-align: right;
+    min-width: 220px;
+}
+
+.gst-invoice-header-right h4 {
+    margin: 0 0 8px 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #333;
+    border-bottom: 2px solid #333;
+    padding-bottom: 4px;
+    display: inline-block;
+}
+
+.gst-invoice-header-right p {
+    margin: 3px 0;
+    font-size: 12px;
+}
+
+.gst-invoice-parties {
+    display: flex;
+    border-bottom: 2px solid #333;
+}
+
+.gst-invoice-parties > div {
+    flex: 1;
+    padding: 12px 20px;
+}
+
+.gst-invoice-parties > div:first-child {
+    border-right: 1px solid #999;
+}
+
+.gst-invoice-parties h6 {
+    margin: 0 0 6px 0;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #666;
+    letter-spacing: 0.5px;
+}
+
+.gst-invoice-parties p {
+    margin: 2px 0;
+    font-size: 12px;
+}
+
+.gst-invoice-parties .party-name {
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.gst-invoice-items {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.gst-invoice-items th {
+    background: #f0f0f0;
+    border: 1px solid #999;
+    padding: 6px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.gst-invoice-items td {
+    border: 1px solid #ccc;
+    padding: 5px 8px;
+    font-size: 12px;
+    vertical-align: middle;
+}
+
+.gst-invoice-items td.text-end {
+    text-align: right;
+}
+
+.gst-invoice-items td.text-center {
+    text-align: center;
+}
+
+.gst-invoice-items tfoot td {
+    border: 1px solid #999;
+    font-size: 12px;
+    padding: 5px 8px;
+}
+
+.gst-invoice-items tfoot tr.grand-total td {
+    border-top: 3px double #333;
+    font-weight: 700;
+    font-size: 14px;
+    background: #f8f8f8;
+}
+
+.gst-invoice-amount-words {
+    padding: 10px 20px;
+    border-top: 1px solid #999;
+    border-bottom: 2px solid #333;
+    background: #fafafa;
+    font-style: italic;
+    font-size: 12px;
+}
+
+.gst-invoice-amount-words strong {
+    font-style: normal;
+}
+
+.gst-invoice-payments {
+    padding: 12px 20px;
+    border-bottom: 1px solid #999;
+}
+
+.gst-invoice-payments h6 {
+    margin: 0 0 8px 0;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #666;
+}
+
+.gst-invoice-payments table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 8px;
+}
+
+.gst-invoice-payments th {
+    background: #f5f5f5;
+    border: 1px solid #ccc;
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.gst-invoice-payments td {
+    border: 1px solid #ccc;
+    padding: 4px 8px;
+    font-size: 12px;
+}
+
+.gst-invoice-payments .payment-summary {
+    display: flex;
+    justify-content: flex-end;
+    gap: 30px;
+    font-size: 12px;
+    font-weight: 600;
+    padding-top: 5px;
+}
+
+.gst-invoice-footer {
+    padding: 12px 20px;
+    border-top: 1px solid #999;
+    font-size: 11px;
+    color: #555;
+}
+
+.gst-invoice-footer p {
+    margin: 3px 0;
+}
+
+.gst-invoice-signature {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding: 15px 20px;
+    border-top: 2px solid #333;
+    min-height: 80px;
+}
+
+.gst-invoice-signature-left {
+    font-size: 11px;
+    color: #777;
+    font-style: italic;
+}
+
+.gst-invoice-signature-right {
+    text-align: center;
+    min-width: 200px;
+}
+
+.gst-invoice-signature-right .hotel-name {
+    font-weight: 700;
+    font-size: 12px;
+    margin-bottom: 30px;
+}
+
+.gst-invoice-signature-right .sig-label {
+    font-size: 11px;
+    border-top: 1px solid #333;
+    padding-top: 4px;
+}
+
+.gst-invoice-heading-img {
+    text-align: center;
+    padding: 15px 20px 10px;
+    border-bottom: 1px solid #ccc;
+}
+
+.gst-invoice-heading-img img {
+    max-height: 100px;
+    max-width: 100%;
+}
+
 /* Print Styles for Bill */
 @media print {
+    @page {
+        size: A4;
+        margin: 15mm;
+    }
+
     /* Hide everything by default */
     body * {
         visibility: hidden;
     }
 
-    /* Show only the printable bill */
+    /* Show only the printable elements */
     #printable-bill,
     #printable-bill *,
     #printable-bill-preview,
-    #printable-bill-preview * {
+    #printable-bill-preview *,
+    #printable-invoice,
+    #printable-invoice * {
         visibility: visible;
     }
 
     /* Position the printable bill at the top */
     #printable-bill,
-    #printable-bill-preview {
+    #printable-bill-preview,
+    #printable-invoice {
         position: absolute;
         left: 0;
         top: 0;
@@ -439,11 +690,16 @@ main {
         padding: 20px;
     }
 
-    /* Hide modal elements */
+    /* Hide modal elements, nav, sidebar, buttons, alerts */
     .modal-backdrop,
     .modal-header,
     .modal-footer,
-    .no-print {
+    .no-print,
+    .sidebar,
+    .top-row,
+    .nav-tabs,
+    .btn,
+    .alert {
         display: none !important;
     }
 
@@ -461,6 +717,39 @@ main {
     /* Ensure badges print with proper colors */
     .badge {
         border: 1px solid #000;
+    }
+
+    /* GST Invoice print overrides */
+    .gst-invoice {
+        border: 2px solid #000;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+        max-width: 100%;
+    }
+
+    .gst-invoice-items th {
+        background: #f0f0f0 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    .gst-invoice-items tfoot tr.grand-total td {
+        background: #f8f8f8 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    .gst-invoice-amount-words {
+        background: #fafafa !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    .gst-invoice-signature,
+    .gst-invoice-parties,
+    .gst-invoice-items {
+        page-break-inside: avoid;
     }
 
     /* Occupancy Report Print Styles */
@@ -541,4 +830,129 @@ main {
 
 .masters-toggle-icon.expanded {
     transform: rotate(90deg);
+}
+
+/* Banquet Calendar Styles */
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+}
+
+.calendar-header-cell {
+    padding: 8px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.85rem;
+    background: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+    border-right: 1px solid #dee2e6;
+    color: #495057;
+}
+
+.calendar-header-cell:last-child {
+    border-right: none;
+}
+
+.calendar-cell {
+    min-height: 110px;
+    padding: 4px 6px;
+    border-bottom: 1px solid #dee2e6;
+    border-right: 1px solid #dee2e6;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    position: relative;
+    background: #fff;
+}
+
+.calendar-cell:nth-child(7n) {
+    border-right: none;
+}
+
+.calendar-cell.today {
+    background: #e8f4fd;
+}
+
+.calendar-cell.other-month {
+    background: #f9f9fb;
+    opacity: 0.5;
+}
+
+.calendar-day-number {
+    text-align: right;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #6c757d;
+    margin-bottom: 2px;
+}
+
+.calendar-cell.today .calendar-day-number {
+    color: #0d6efd;
+    font-weight: 700;
+}
+
+.calendar-booking {
+    padding: 3px 5px;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    line-height: 1.3;
+    cursor: pointer;
+    background: #f8f9fa;
+    border-left: 3px solid #6c757d;
+    overflow: hidden;
+    transition: background 0.15s;
+}
+
+.calendar-booking:hover {
+    background: #e9ecef;
+}
+
+.calendar-booking.status-enquiry {
+    border-left-color: #0dcaf0;
+}
+
+.calendar-booking.status-confirmed {
+    border-left-color: #0d6efd;
+}
+
+.calendar-booking.status-inprogress {
+    border-left-color: #ffc107;
+}
+
+.calendar-booking.status-completed {
+    border-left-color: #198754;
+}
+
+.calendar-booking.status-cancelled {
+    border-left-color: #dc3545;
+}
+
+.calendar-booking-hall {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.calendar-booking-contact {
+    color: #6c757d;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.calendar-booking-more {
+    font-size: 0.7rem;
+    color: #0d6efd;
+    cursor: pointer;
+    padding: 2px 5px;
+    font-weight: 500;
+}
+
+.calendar-booking-more:hover {
+    text-decoration: underline;
 }

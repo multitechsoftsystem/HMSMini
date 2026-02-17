@@ -1,0 +1,170 @@
+@page "/admin/settings"
+@inject IApiClientService ApiClient
+@inject IAuthenticationService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Settings - MSS</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>System Settings</h3>
+</div>
+
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible">@errorMessage
+        <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+    </div>
+}
+@if (!string.IsNullOrEmpty(successMessage))
+{
+    <div class="alert alert-success alert-dismissible">@successMessage
+        <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+    </div>
+}
+
+@if (isLoading)
+{
+    <div class="loading">Loading settings...</div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body">
+            <table class="table table-sm">
+                <thead><tr><th>Setting</th><th>Description</th><th>Value</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var setting in settings)
+                    {
+                        <tr>
+                            <td><strong>@setting.SettingKey</strong></td>
+                            <td>@(setting.Description ?? "-")</td>
+                            <td>
+                                @if (setting.DataType == "Bool")
+                                {
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox"
+                                               checked="@(setting.SettingValue == "true")"
+                                               @onchange="(e) => ToggleBoolSetting(setting, e)" />
+                                    </div>
+                                }
+                                else if (setting.DataType == "Image")
+                                {
+                                    @if (!string.IsNullOrEmpty(setting.SettingValue))
+                                    {
+                                        <img src="@($"{apiBaseUrl}{setting.SettingValue}")" alt="@setting.SettingKey"
+                                             style="max-height: 80px; max-width: 300px;" class="mb-2 d-block" />
+                                    }
+                                    <InputFile OnChange="(e) => UploadImage(setting, e)" accept="image/*" />
+                                }
+                                else if (setting.SettingKey == "DefaultBanquetTaxConfigId")
+                                {
+                                    <select class="form-select form-select-sm" style="max-width: 350px;"
+                                            value="@setting.SettingValue"
+                                            @onchange="async (e) => { UpdateStringSetting(setting, e.Value?.ToString()); await SaveSetting(setting); }">
+                                        <option value="">-- None (use first available) --</option>
+                                        @foreach (var tc in voucherTaxConfigs)
+                                        {
+                                            <option value="@tc.Id">@tc.VoucherType (CGST @tc.CgstPercentage% + SGST @tc.SgstPercentage%)</option>
+                                        }
+                                    </select>
+                                }
+                                else
+                                {
+                                    <div class="input-group input-group-sm" style="max-width: 300px;">
+                                        <input type="text" class="form-control" value="@setting.SettingValue"
+                                               @onchange="(e) => UpdateStringSetting(setting, e.Value?.ToString())" />
+                                    </div>
+                                }
+                            </td>
+                            <td>
+                                @if (setting.DataType != "Bool" && setting.DataType != "Image")
+                                {
+                                    <button class="btn btn-sm btn-outline-primary"
+                                            @onclick="() => SaveSetting(setting)">Save</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private List<SystemSettingModel> settings = new();
+    private List<VoucherTaxConfigModel> voucherTaxConfigs = new();
+    private bool isLoading = true;
+    private string? errorMessage;
+    private string? successMessage;
+    private string apiBaseUrl = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = await AuthService.GetCurrentUserAsync();
+        if (user == null || user.Role != 7) // Developer only
+        {
+            Navigation.NavigateTo("/");
+            return;
+        }
+        apiBaseUrl = ApiClient.GetBaseUrl();
+        voucherTaxConfigs = await ApiClient.GetVoucherTaxConfigsAsync(activeOnly: true);
+        await LoadSettings();
+    }
+
+    private async Task LoadSettings()
+    {
+        isLoading = true;
+        settings = await ApiClient.GetAllSystemSettingsAsync();
+        isLoading = false;
+    }
+
+    private async Task ToggleBoolSetting(SystemSettingModel setting, ChangeEventArgs e)
+    {
+        var newValue = (bool)(e.Value ?? false) ? "true" : "false";
+        var result = await ApiClient.UpdateSystemSettingAsync(setting.SettingKey, newValue);
+        if (result)
+        {
+            setting.SettingValue = newValue;
+            successMessage = $"'{setting.SettingKey}' updated.";
+        }
+        else
+            errorMessage = $"Failed to update '{setting.SettingKey}'.";
+    }
+
+    private void UpdateStringSetting(SystemSettingModel setting, string? newValue)
+    {
+        setting.SettingValue = newValue ?? string.Empty;
+    }
+
+    private async Task SaveSetting(SystemSettingModel setting)
+    {
+        var result = await ApiClient.UpdateSystemSettingAsync(setting.SettingKey, setting.SettingValue);
+        if (result)
+            successMessage = $"'{setting.SettingKey}' updated.";
+        else
+            errorMessage = $"Failed to update '{setting.SettingKey}'.";
+    }
+
+    private async Task UploadImage(SystemSettingModel setting, InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file == null) return;
+
+        if (file.Size > 5 * 1024 * 1024)
+        {
+            errorMessage = "File size must be less than 5 MB.";
+            return;
+        }
+
+        using var stream = file.OpenReadStream(5 * 1024 * 1024);
+        var result = await ApiClient.UploadBillHeadingImageAsync(stream, file.Name);
+        if (result)
+        {
+            successMessage = "Image uploaded successfully.";
+            await LoadSettings();
+        }
+        else
+            errorMessage = "Failed to upload image.";
+    }
+}

@@ -51,6 +51,7 @@ public class VoucherTaxConfigurationsController : ControllerBase
                 IgstPercentage = v.IgstPercentage,
                 IsActive = v.IsActive,
                 Description = v.Description,
+                SACCode = v.SACCode,
                 DisplayOrder = v.DisplayOrder
             }).ToList();
 
@@ -123,6 +124,7 @@ public class VoucherTaxConfigurationsController : ControllerBase
                 IgstPercentage = dto.IgstPercentage,
                 IsActive = dto.IsActive,
                 Description = dto.Description,
+                SACCode = dto.SACCode,
                 DisplayOrder = dto.DisplayOrder,
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = User.Identity?.Name ?? "System"
@@ -185,6 +187,7 @@ public class VoucherTaxConfigurationsController : ControllerBase
             config.IgstPercentage = dto.IgstPercentage;
             config.IsActive = dto.IsActive;
             config.Description = dto.Description;
+            config.SACCode = dto.SACCode;
             config.DisplayOrder = dto.DisplayOrder;
             config.UpdatedAt = DateTime.UtcNow;
             config.UpdatedBy = User.Identity?.Name ?? "System";

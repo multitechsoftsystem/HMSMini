@@ -6,6 +6,8 @@ public class CreateBanquetBookingServiceDto
 {
     public int? BanquetServiceId { get; set; }
 
+    public DateTime ServiceDate { get; set; }
+
     [Required]
     [StringLength(200)]
     public string ServiceName { get; set; } = string.Empty;

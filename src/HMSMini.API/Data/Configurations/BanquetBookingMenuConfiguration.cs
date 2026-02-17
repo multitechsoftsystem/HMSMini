@@ -15,6 +15,9 @@ public class BanquetBookingMenuConfiguration : IEntityTypeConfiguration<BanquetB
         builder.Property(m => m.BanquetBookingId)
             .IsRequired();
 
+        builder.Property(m => m.ItemName)
+            .HasMaxLength(200);
+
         builder.Property(m => m.Quantity)
             .IsRequired()
             .HasDefaultValue(1);
@@ -26,6 +29,10 @@ public class BanquetBookingMenuConfiguration : IEntityTypeConfiguration<BanquetB
         builder.Property(m => m.TotalAmount)
             .HasComputedColumnSql("[RatePerPlate] * [Quantity]", stored: true)
             .HasColumnType("decimal(10,2)");
+
+        builder.Property(m => m.ApplyTax)
+            .IsRequired()
+            .HasDefaultValue(true);
 
         builder.Property(m => m.CreatedAt)
             .IsRequired()
@@ -54,6 +61,11 @@ public class BanquetBookingMenuConfiguration : IEntityTypeConfiguration<BanquetB
         builder.HasOne(m => m.MenuItem)
             .WithMany()
             .HasForeignKey(m => m.MenuItemId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(m => m.VoucherTaxConfig)
+            .WithMany()
+            .HasForeignKey(m => m.VoucherTaxConfigId)
             .OnDelete(DeleteBehavior.Restrict);
 
         // Indexes

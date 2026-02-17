@@ -245,12 +245,36 @@ public class BillingService : IBillingService
         checkIn.Status = CheckInStatus.CheckedOut;
         checkIn.UpdatedAt = DateTime.UtcNow;
 
-        // Update room status to Dirty
-        if (checkIn.Room != null)
+        // Check for other active check-ins on the same room (shared room logic)
+        var otherActiveCheckIns = await _context.CheckIns
+            .Where(c => c.RoomId == checkIn.RoomId && c.Status == CheckInStatus.Active && c.Id != checkInId)
+            .ToListAsync();
+
+        if (otherActiveCheckIns.Any())
         {
-            checkIn.Room.RoomStatus = RoomStatus.Dirty;
-            checkIn.Room.RoomStatusFromDate = null;
-            checkIn.Room.RoomStatusToDate = null;
+            // Room stays Occupied, update date range to cover remaining check-ins
+            if (checkIn.Room != null)
+            {
+                checkIn.Room.RoomStatusFromDate = otherActiveCheckIns.Min(c => c.CheckInDate);
+                checkIn.Room.RoomStatusToDate = otherActiveCheckIns.Max(c => c.CheckOutDate);
+            }
+
+            // If only 1 remains, un-share it
+            if (otherActiveCheckIns.Count == 1)
+            {
+                otherActiveCheckIns[0].IsSharedRoom = false;
+                otherActiveCheckIns[0].SharedGroupId = null;
+            }
+        }
+        else
+        {
+            // No other active check-ins: set room to Dirty
+            if (checkIn.Room != null)
+            {
+                checkIn.Room.RoomStatus = RoomStatus.Dirty;
+                checkIn.Room.RoomStatusFromDate = null;
+                checkIn.Room.RoomStatusToDate = null;
+            }
         }
 
         await _context.SaveChangesAsync();

@@ -16,6 +16,9 @@ public class BanquetBookingMenu
 
     public int? MenuItemId { get; set; }
 
+    [StringLength(200)]
+    public string? ItemName { get; set; }
+
     [Required]
     public int Quantity { get; set; } = 1;
 
@@ -26,6 +29,12 @@ public class BanquetBookingMenu
     [DatabaseGenerated(DatabaseGeneratedOption.Computed)]
     [Column(TypeName = "decimal(10,2)")]
     public decimal TotalAmount { get; set; }
+
+    public DateTime MenuDate { get; set; }
+
+    public bool ApplyTax { get; set; } = true;
+
+    public int? VoucherTaxConfigId { get; set; }
 
     // Audit fields
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
@@ -51,4 +60,7 @@ public class BanquetBookingMenu
 
     [ForeignKey(nameof(MenuItemId))]
     public virtual MMenuItem? MenuItem { get; set; }
+
+    [ForeignKey(nameof(VoucherTaxConfigId))]
+    public virtual VoucherTaxConfiguration? VoucherTaxConfig { get; set; }
 }

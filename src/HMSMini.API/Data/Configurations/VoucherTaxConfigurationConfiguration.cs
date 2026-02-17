@@ -35,6 +35,9 @@ public class VoucherTaxConfigurationConfiguration : IEntityTypeConfiguration<Vou
         builder.Property(v => v.Description)
             .HasMaxLength(500);
 
+        builder.Property(v => v.SACCode)
+            .HasMaxLength(20);
+
         builder.Property(v => v.CreatedAt)
             .IsRequired()
             .HasDefaultValueSql("GETUTCDATE()");

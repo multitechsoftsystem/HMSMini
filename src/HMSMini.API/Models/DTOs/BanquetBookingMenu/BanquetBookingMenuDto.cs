@@ -8,8 +8,11 @@ public class BanquetBookingMenuDto
     public string? PackageName { get; set; }
     public int? MenuItemId { get; set; }
     public string? ItemName { get; set; }
+    public DateTime MenuDate { get; set; }
     public int Quantity { get; set; }
     public decimal RatePerPlate { get; set; }
     public decimal TotalAmount { get; set; }
+    public bool ApplyTax { get; set; }
+    public int? VoucherTaxConfigId { get; set; }
     public DateTime CreatedAt { get; set; }
 }

@@ -25,5 +25,8 @@ public class CreateVoucherTaxConfigDto
     [StringLength(500)]
     public string? Description { get; set; }
 
+    [StringLength(20)]
+    public string? SACCode { get; set; }
+
     public int DisplayOrder { get; set; }
 }

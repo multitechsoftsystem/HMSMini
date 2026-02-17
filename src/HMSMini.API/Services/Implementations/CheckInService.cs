@@ -78,6 +78,8 @@ public class CheckInService : ICheckInService
             TariffApplied = checkIn.TariffApplied,
             DiscountPercentage = checkIn.DiscountPercentage,
             FinalAmount = checkIn.FinalAmount,
+            IsSharedRoom = checkIn.IsSharedRoom,
+            SharedGroupId = checkIn.SharedGroupId,
             Guests = checkIn.Guests.Select(g => new GuestDto
             {
                 Id = g.Id,
@@ -140,6 +142,8 @@ public class CheckInService : ICheckInService
                 TariffApplied = c.TariffApplied,
                 DiscountPercentage = c.DiscountPercentage,
                 FinalAmount = c.FinalAmount,
+                IsSharedRoom = c.IsSharedRoom,
+                SharedGroupId = c.SharedGroupId,
                 CreatedAt = c.CreatedAt,
                 UpdatedAt = c.UpdatedAt,
                 CreatedBy = c.CreatedBy,
@@ -187,6 +191,8 @@ public class CheckInService : ICheckInService
                 TariffApplied = c.TariffApplied,
                 DiscountPercentage = c.DiscountPercentage,
                 FinalAmount = c.FinalAmount,
+                IsSharedRoom = c.IsSharedRoom,
+                SharedGroupId = c.SharedGroupId,
                 CreatedAt = c.CreatedAt,
                 UpdatedAt = c.UpdatedAt,
                 CreatedBy = c.CreatedBy,
@@ -354,10 +360,18 @@ public class CheckInService : ICheckInService
         checkIn.CheckOutDate = dto.NewCheckOutDate;
         checkIn.UpdatedAt = DateTime.UtcNow;
 
-        // Update room status dates if room is occupied
+        // Update room status dates - take max of ALL active check-ins' checkout dates
         if (checkIn.Room != null && checkIn.Room.RoomStatus == RoomStatus.Occupied)
         {
-            checkIn.Room.RoomStatusToDate = dto.NewCheckOutDate;
+            var otherMaxCheckOut = await _context.CheckIns
+                .Where(c => c.RoomId == checkIn.RoomId && c.Status == CheckInStatus.Active && c.Id != checkIn.Id)
+                .Select(c => (DateTime?)c.CheckOutDate)
+                .MaxAsync();
+            // Compare with the in-memory updated value for the current check-in
+            var maxCheckOutDate = otherMaxCheckOut.HasValue && otherMaxCheckOut.Value > dto.NewCheckOutDate
+                ? otherMaxCheckOut.Value
+                : dto.NewCheckOutDate;
+            checkIn.Room.RoomStatusToDate = maxCheckOutDate;
         }
 
         await _context.SaveChangesAsync();
@@ -394,6 +408,8 @@ public class CheckInService : ICheckInService
             TariffApplied = checkIn.TariffApplied,
             DiscountPercentage = checkIn.DiscountPercentage,
             FinalAmount = checkIn.FinalAmount,
+            IsSharedRoom = checkIn.IsSharedRoom,
+            SharedGroupId = checkIn.SharedGroupId,
             CreatedAt = checkIn.CreatedAt,
             UpdatedAt = checkIn.UpdatedAt,
             CreatedBy = checkIn.CreatedBy,
@@ -418,12 +434,36 @@ public class CheckInService : ICheckInService
         checkIn.ActualCheckOutDate = DateTime.UtcNow;
         checkIn.UpdatedAt = DateTime.UtcNow;
 
-        // Update room status to Dirty (needs cleaning after checkout)
-        if (checkIn.Room != null)
+        // Check for other active check-ins on the same room
+        var otherActiveCheckIns = await _context.CheckIns
+            .Where(c => c.RoomId == checkIn.RoomId && c.Status == CheckInStatus.Active && c.Id != id)
+            .ToListAsync();
+
+        if (otherActiveCheckIns.Any())
         {
-            checkIn.Room.RoomStatus = RoomStatus.Dirty;
-            checkIn.Room.RoomStatusFromDate = null;
-            checkIn.Room.RoomStatusToDate = null;
+            // Room stays Occupied, update date range to cover remaining check-ins
+            if (checkIn.Room != null)
+            {
+                checkIn.Room.RoomStatusFromDate = otherActiveCheckIns.Min(c => c.CheckInDate);
+                checkIn.Room.RoomStatusToDate = otherActiveCheckIns.Max(c => c.CheckOutDate);
+            }
+
+            // If only 1 remains, un-share it
+            if (otherActiveCheckIns.Count == 1)
+            {
+                otherActiveCheckIns[0].IsSharedRoom = false;
+                otherActiveCheckIns[0].SharedGroupId = null;
+            }
+        }
+        else
+        {
+            // No other active check-ins: set room to Dirty
+            if (checkIn.Room != null)
+            {
+                checkIn.Room.RoomStatus = RoomStatus.Dirty;
+                checkIn.Room.RoomStatusFromDate = null;
+                checkIn.Room.RoomStatusToDate = null;
+            }
         }
 
         await _context.SaveChangesAsync();
@@ -577,6 +617,8 @@ public class CheckInService : ICheckInService
             TariffApplied = checkIn.TariffApplied,
             DiscountPercentage = checkIn.DiscountPercentage,
             FinalAmount = checkIn.FinalAmount,
+            IsSharedRoom = checkIn.IsSharedRoom,
+            SharedGroupId = checkIn.SharedGroupId,
             CreatedAt = checkIn.CreatedAt,
             UpdatedAt = checkIn.UpdatedAt,
             CreatedBy = checkIn.CreatedBy,
@@ -601,14 +643,206 @@ public class CheckInService : ICheckInService
         // Free up the room if it was occupied
         if (checkIn.Status == CheckInStatus.Active && checkIn.Room != null)
         {
-            checkIn.Room.RoomStatus = RoomStatus.Available;
-            checkIn.Room.RoomStatusFromDate = null;
-            checkIn.Room.RoomStatusToDate = null;
+            // Check for other active check-ins on the same room
+            var otherActiveCheckIns = await _context.CheckIns
+                .Where(c => c.RoomId == checkIn.RoomId && c.Status == CheckInStatus.Active && c.Id != id)
+                .ToListAsync();
+
+            if (otherActiveCheckIns.Any())
+            {
+                // Room stays Occupied, update date range
+                checkIn.Room.RoomStatusFromDate = otherActiveCheckIns.Min(c => c.CheckInDate);
+                checkIn.Room.RoomStatusToDate = otherActiveCheckIns.Max(c => c.CheckOutDate);
+
+                // If only 1 remains, un-share it
+                if (otherActiveCheckIns.Count == 1)
+                {
+                    otherActiveCheckIns[0].IsSharedRoom = false;
+                    otherActiveCheckIns[0].SharedGroupId = null;
+                }
+            }
+            else
+            {
+                checkIn.Room.RoomStatus = RoomStatus.Available;
+                checkIn.Room.RoomStatusFromDate = null;
+                checkIn.Room.RoomStatusToDate = null;
+            }
         }
 
         _context.CheckIns.Remove(checkIn);
         await _context.SaveChangesAsync();
 
         _logger.LogInformation("Deleted check-in ID {Id}", id);
+    }
+
+    public async Task<CheckInWithGuestsDto> CreateSharedCheckInAsync(int existingCheckInId, ShareRoomDto dto)
+    {
+        // Validate feature is enabled
+        var isEnabled = await _systemSettingsService.IsRoomSharingEnabledAsync();
+        if (!isEnabled)
+            throw new BusinessRuleException("Room sharing feature is not enabled. Enable it in System Settings.");
+
+        // Get existing check-in
+        var existingCheckIn = await _context.CheckIns
+            .Include(c => c.Room)
+            .ThenInclude(r => r.RoomType)
+            .FirstOrDefaultAsync(c => c.Id == existingCheckInId);
+
+        if (existingCheckIn == null)
+            throw new NotFoundException(nameof(CheckIn), existingCheckInId);
+
+        if (existingCheckIn.Status != CheckInStatus.Active)
+            throw new BusinessRuleException("Can only share a room with an active check-in.");
+
+        // Validate max 3 check-ins per room
+        var activeCount = await _context.CheckIns
+            .CountAsync(c => c.RoomId == existingCheckIn.RoomId && c.Status == CheckInStatus.Active);
+        if (activeCount >= 3)
+            throw new BusinessRuleException("Maximum 3 active check-ins per room. Cannot add more.");
+
+        // Validate dates
+        if (dto.CheckOutDate <= dto.CheckInDate)
+            throw new BusinessRuleException("Check-out date must be after check-in date.");
+
+        // Validate guest count
+        if (dto.Guests.Count < 1 || dto.Guests.Count > 3)
+            throw new BusinessRuleException("Number of guests must be between 1 and 3.");
+
+        var roomId = existingCheckIn.RoomId;
+
+        // Calculate tariff independently for new guest
+        decimal? tariffApplied = null;
+        decimal discountPercentage = 0;
+        decimal? finalAmount = null;
+        decimal? mealPlanRate = null;
+
+        var roomForTariff = existingCheckIn.Room;
+        if (roomForTariff != null)
+        {
+            try
+            {
+                var tariffCalc = await _tariffService.CalculateTariffAsync(
+                    roomForTariff.RoomTypeId,
+                    dto.Guests.Count,
+                    dto.CheckInDate,
+                    dto.CheckOutDate,
+                    dto.CompanyId,
+                    dto.MealPlanId);
+
+                tariffApplied = tariffCalc.ApplicableRate;
+                discountPercentage = tariffCalc.DiscountPercentage;
+                finalAmount = tariffCalc.MealPlanId.HasValue ? tariffCalc.TotalAmountWithMealPlan : tariffCalc.TotalAmount;
+                mealPlanRate = tariffCalc.MealPlanId.HasValue ? tariffCalc.MealPlanTotalRate : null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to calculate tariff for shared check-in, proceeding without pricing");
+            }
+        }
+
+        // Create tax snapshot
+        var taxSnapshot = await _taxService.CreateTaxSlabSnapshotAsync(dto.ActualCheckInDate ?? DateTime.UtcNow);
+        var taxSnapshotJson = JsonSerializer.Serialize(taxSnapshot);
+
+        // Determine SharedGroupId: use existing group or the first check-in's ID
+        var sharedGroupId = existingCheckIn.SharedGroupId ?? existingCheckIn.Id;
+
+        using var transaction = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            // Create new shared check-in
+            var newCheckIn = new CheckIn
+            {
+                RoomId = roomId,
+                CheckInDate = dto.CheckInDate,
+                CheckOutDate = dto.CheckOutDate,
+                ActualCheckInDate = dto.ActualCheckInDate ?? DateTime.UtcNow,
+                RegistrationNo = dto.RegistrationNo,
+                Pax = dto.Guests.Count,
+                Status = CheckInStatus.Active,
+                Remarks = dto.Remarks,
+                CompanyId = dto.CompanyId,
+                BusinessSourceId = dto.BusinessSourceId,
+                MealPlanId = dto.MealPlanId,
+                GuestTypeId = dto.GuestTypeId,
+                MealPlanRate = mealPlanRate,
+                TariffApplied = tariffApplied,
+                DiscountPercentage = discountPercentage,
+                FinalAmount = finalAmount,
+                TaxType = dto.TaxType,
+                TaxSlabSnapshotJson = taxSnapshotJson,
+                IsSharedRoom = true,
+                SharedGroupId = sharedGroupId,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.CheckIns.Add(newCheckIn);
+            await _context.SaveChangesAsync();
+
+            // Create guests
+            for (int i = 0; i < dto.Guests.Count; i++)
+            {
+                var guestDto = dto.Guests[i];
+                var guest = new Guest
+                {
+                    CheckInId = newCheckIn.Id,
+                    GuestNumber = i + 1,
+                    GuestName = guestDto.GuestName,
+                    Address = guestDto.Address,
+                    City = guestDto.City,
+                    State = guestDto.State,
+                    Country = guestDto.Country,
+                    MobileNo = guestDto.MobileNo,
+                    PanOrAadharNo = guestDto.PanOrAadharNo,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _context.Guests.Add(guest);
+            }
+
+            // Mark all existing active check-ins in the room as shared
+            var allActiveCheckIns = await _context.CheckIns
+                .Where(c => c.RoomId == roomId && c.Status == CheckInStatus.Active && c.Id != newCheckIn.Id)
+                .ToListAsync();
+
+            foreach (var ci in allActiveCheckIns)
+            {
+                ci.IsSharedRoom = true;
+                ci.SharedGroupId = sharedGroupId;
+            }
+
+            // Update room date range to cover all active check-ins
+            var room = await _context.Rooms.FindAsync(roomId);
+            if (room != null)
+            {
+                var allDates = allActiveCheckIns.Concat(new[] { newCheckIn });
+                room.RoomStatusFromDate = allDates.Min(c => c.CheckInDate);
+                room.RoomStatusToDate = allDates.Max(c => c.CheckOutDate);
+                // Room stays Occupied (no status change needed)
+            }
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            _logger.LogInformation("Created shared check-in ID {Id} for room {RoomId} (group {GroupId})",
+                newCheckIn.Id, roomId, sharedGroupId);
+
+            return await GetByIdAsync(newCheckIn.Id);
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+    }
+
+    public async Task<int> GetActiveCheckInCountForRoomAsync(int roomId)
+    {
+        return await _context.CheckIns
+            .CountAsync(c => c.RoomId == roomId && c.Status == CheckInStatus.Active);
+    }
+
+    public async Task<bool> IsRoomSharingEnabledAsync()
+    {
+        return await _systemSettingsService.IsRoomSharingEnabledAsync();
     }
 }

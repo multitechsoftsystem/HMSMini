@@ -12,15 +12,21 @@ public class PaymentService : IPaymentService
 {
     private readonly ApplicationDbContext _context;
     private readonly IVoucherService _voucherService;
+    private readonly IJournalEntryService _journalEntryService;
+    private readonly IChartOfAccountService _chartOfAccountService;
     private readonly ILogger<PaymentService> _logger;
 
     public PaymentService(
         ApplicationDbContext context,
         IVoucherService voucherService,
+        IJournalEntryService journalEntryService,
+        IChartOfAccountService chartOfAccountService,
         ILogger<PaymentService> logger)
     {
         _context = context;
         _voucherService = voucherService;
+        _journalEntryService = journalEntryService;
+        _chartOfAccountService = chartOfAccountService;
         _logger = logger;
     }
 
@@ -111,6 +117,39 @@ public class PaymentService : IPaymentService
         }
 
         await _context.SaveChangesAsync();
+
+        // Post journal entry: Dr. Cash/Bank / Cr. Accounts Receivable
+        if (dto.PaymentType != PaymentType.Refund)
+        {
+            try
+            {
+                int debitAccountId;
+                if (dto.PaymentMode == PaymentMode.Cash)
+                    debitAccountId = await _chartOfAccountService.GetAccountIdByCodeAsync("1001");
+                else
+                    debitAccountId = await _chartOfAccountService.GetAccountIdByCodeAsync("1002");
+
+                int creditAccountId = await _chartOfAccountService.GetAccountIdByCodeAsync("1003"); // AR
+
+                var lines = new List<(int accountId, decimal debit, decimal credit, string? desc)>
+                {
+                    (debitAccountId, dto.Amount, 0, $"Guest payment {receiptNumber}"),
+                    (creditAccountId, 0, dto.Amount, $"AR cleared - {receiptNumber}")
+                };
+
+                await _journalEntryService.PostJournalEntryAsync(
+                    dto.PaymentDate,
+                    $"Guest Payment {receiptNumber}: {dto.SourceType} {dto.PaymentMode}",
+                    JournalSourceType.GuestPayment,
+                    payment.Id,
+                    lines,
+                    dto.ReceivedBy);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to create journal entry for payment {ReceiptNumber}", receiptNumber);
+            }
+        }
 
         _logger.LogInformation("Payment {ReceiptNumber} recorded: {SourceType} Amount={Amount}",
             receiptNumber, dto.SourceType, dto.Amount);

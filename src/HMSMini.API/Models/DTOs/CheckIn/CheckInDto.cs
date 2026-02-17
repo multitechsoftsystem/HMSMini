@@ -33,6 +33,8 @@ public class CheckInDto
     public decimal? FinalAmount { get; set; }
     public TaxType TaxType { get; set; }
     public string GuestNames { get; set; } = string.Empty;
+    public bool IsSharedRoom { get; set; }
+    public int? SharedGroupId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public string? CreatedBy { get; set; }

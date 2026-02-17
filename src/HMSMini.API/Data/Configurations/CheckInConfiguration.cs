@@ -41,11 +41,23 @@ public class CheckInConfiguration : IEntityTypeConfiguration<CheckIn>
         builder.Property(c => c.UpdatedAt)
             .IsRequired(false);
 
+        // Room sharing properties
+        builder.Property(c => c.IsSharedRoom)
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(c => c.SharedGroupId)
+            .IsRequired(false);
+
         // Indexes for performance
         builder.HasIndex(c => c.CheckInDate);
         builder.HasIndex(c => c.CheckOutDate);
         builder.HasIndex(c => c.Status);
         builder.HasIndex(c => new { c.RoomId, c.Status });
+
+        // Filtered index for shared room lookups
+        builder.HasIndex(c => c.SharedGroupId)
+            .HasFilter("[SharedGroupId] IS NOT NULL");
 
         // Relationships
         builder.HasOne(c => c.Room)

@@ -52,6 +52,16 @@ public static class ServiceExtensions
         services.AddScoped<IVoucherService, VoucherService>();
         services.AddScoped<IDayClosingService, DayClosingService>();
 
+        // Accounting Module Services
+        services.AddScoped<IFinancialYearService, FinancialYearService>();
+        services.AddScoped<IChartOfAccountService, ChartOfAccountService>();
+        services.AddScoped<IJournalEntryService, JournalEntryService>();
+        services.AddScoped<IExpenseHeadService, ExpenseHeadService>();
+        services.AddScoped<IExpenseVoucherService, ExpenseVoucherService>();
+        services.AddScoped<IPaymentVoucherService, PaymentVoucherService>();
+        services.AddScoped<IReceiptService, ReceiptService>();
+        services.AddScoped<IAccountingReportService, AccountingReportService>();
+
         return services;
     }
 

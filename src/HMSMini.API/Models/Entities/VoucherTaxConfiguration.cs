@@ -53,6 +53,12 @@ public class VoucherTaxConfiguration
     public string? Description { get; set; }
 
     /// <summary>
+    /// SAC (Service Accounting Code) for GST invoicing
+    /// </summary>
+    [StringLength(20)]
+    public string? SACCode { get; set; }
+
+    /// <summary>
     /// Display order for UI
     /// </summary>
     public int DisplayOrder { get; set; }

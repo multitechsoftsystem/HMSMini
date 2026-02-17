@@ -12,4 +12,7 @@ public interface ICheckInService
     Task<CheckInDto> ExtendStayAsync(int id, ExtendStayDto dto);
     Task CheckOutAsync(int id);
     Task DeleteAsync(int id);
+    Task<CheckInWithGuestsDto> CreateSharedCheckInAsync(int existingCheckInId, ShareRoomDto dto);
+    Task<int> GetActiveCheckInCountForRoomAsync(int roomId);
+    Task<bool> IsRoomSharingEnabledAsync();
 }

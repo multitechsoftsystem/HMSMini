@@ -157,7 +157,6 @@ public class CheckIn
     [StringLength(100)]
     public string? DeletedBy { get; set; }
 
-    // Navigation properties
     [ForeignKey(nameof(RoomId))]
     public virtual RoomNo Room { get; set; } = null!;
 
@@ -173,6 +172,17 @@ public class CheckIn
     [ForeignKey(nameof(GuestTypeId))]
     public virtual MGuestType? GuestType { get; set; }
 
+    /// <summary>
+    /// Whether this check-in is part of a shared room (room splitting)
+    /// </summary>
+    public bool IsSharedRoom { get; set; } = false;
+
+    /// <summary>
+    /// Group identifier for shared room check-ins (uses the first check-in's ID)
+    /// </summary>
+    public int? SharedGroupId { get; set; }
+
+    // Navigation properties
     public virtual ICollection<Guest> Guests { get; set; } = new List<Guest>();
     public virtual ICollection<Payment> Payments { get; set; } = new List<Payment>();
 }

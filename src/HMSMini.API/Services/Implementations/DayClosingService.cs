@@ -3,6 +3,7 @@ using HMSMini.API.Exceptions;
 using HMSMini.API.Models.DTOs.DayClosing;
 using HMSMini.API.Models.DTOs.Voucher;
 using HMSMini.API.Models.Entities;
+using HMSMini.API.Models.Enums;
 using HMSMini.API.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
@@ -20,6 +21,8 @@ public class DayClosingService : IDayClosingService
     private readonly IVoucherService _voucherService;
     private readonly ITaxService _taxService;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IJournalEntryService _journalEntryService;
+    private readonly IChartOfAccountService _chartOfAccountService;
     private readonly ILogger<DayClosingService> _logger;
 
     public DayClosingService(
@@ -28,6 +31,8 @@ public class DayClosingService : IDayClosingService
         IVoucherService voucherService,
         ITaxService taxService,
         IDateTimeProvider dateTimeProvider,
+        IJournalEntryService journalEntryService,
+        IChartOfAccountService chartOfAccountService,
         ILogger<DayClosingService> logger)
     {
         _context = context;
@@ -35,6 +40,8 @@ public class DayClosingService : IDayClosingService
         _voucherService = voucherService;
         _taxService = taxService;
         _dateTimeProvider = dateTimeProvider;
+        _journalEntryService = journalEntryService;
+        _chartOfAccountService = chartOfAccountService;
         _logger = logger;
     }
 
@@ -498,6 +505,16 @@ public class DayClosingService : IDayClosingService
                 .OrderBy(s => s.VoucherType)
                 .ToList();
 
+            // Post aggregated journal entry for GL
+            try
+            {
+                await PostDayCloseJournalEntryAsync(workingDate, voucherTypeSummary, closedBy);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to post journal entry for day close {WorkingDate}. Vouchers were still posted successfully.", workingDate);
+            }
+
             // Create audit record
             var audit = new DayClosingAudit
             {
@@ -612,6 +629,66 @@ public class DayClosingService : IDayClosingService
             .ToListAsync();
 
         return audits;
+    }
+
+    private async Task PostDayCloseJournalEntryAsync(
+        DateTime workingDate,
+        Dictionary<string, (int count, decimal amount)> voucherTypeSummary,
+        string? closedBy)
+    {
+        if (voucherTypeSummary.Count == 0) return;
+
+        // Cache account IDs
+        var arAccountId = await _chartOfAccountService.GetAccountIdByCodeAsync("1003");
+        var roomRevenueId = await _chartOfAccountService.GetAccountIdByCodeAsync("4001");
+        var mealPlanRevenueId = await _chartOfAccountService.GetAccountIdByCodeAsync("4002");
+        var cgstPayableId = await _chartOfAccountService.GetAccountIdByCodeAsync("2002");
+        var sgstPayableId = await _chartOfAccountService.GetAccountIdByCodeAsync("2003");
+        var igstPayableId = await _chartOfAccountService.GetAccountIdByCodeAsync("2004");
+        var additionalRevenueId = await _chartOfAccountService.GetAccountIdByCodeAsync("4006");
+        var discountId = await _chartOfAccountService.GetAccountIdByCodeAsync("4007");
+
+        var voucherTypeToAccount = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["RoomTariff"] = roomRevenueId,
+            ["MealPlan"] = mealPlanRevenueId,
+            ["Tax-CGST"] = cgstPayableId,
+            ["Tax-SGST"] = sgstPayableId,
+            ["Tax-IGST"] = igstPayableId,
+            ["AdditionalCharge"] = additionalRevenueId,
+            ["Discount"] = discountId
+        };
+
+        var lines = new List<(int accountId, decimal debit, decimal credit, string? desc)>();
+
+        foreach (var (voucherType, (count, amount)) in voucherTypeSummary)
+        {
+            if (amount == 0) continue;
+
+            if (voucherType == "Discount")
+            {
+                // Discount: Dr. Discount Given / Cr. AR
+                lines.Add((discountId, amount, 0, $"Day close discount ({count} entries)"));
+                lines.Add((arAccountId, 0, amount, $"Discount reduction to AR"));
+            }
+            else if (voucherTypeToAccount.TryGetValue(voucherType, out var creditAccountId))
+            {
+                // Revenue/Tax: Dr. AR / Cr. Revenue or Tax Payable
+                lines.Add((arAccountId, amount, 0, $"Day close {voucherType} ({count} entries)"));
+                lines.Add((creditAccountId, 0, amount, $"{voucherType} - day close"));
+            }
+        }
+
+        if (lines.Count > 0)
+        {
+            await _journalEntryService.PostJournalEntryAsync(
+                workingDate,
+                $"Day Close {workingDate:yyyy-MM-dd}",
+                JournalSourceType.DayClosing,
+                null,
+                lines,
+                closedBy);
+        }
     }
 
     private static void AddToSummary(

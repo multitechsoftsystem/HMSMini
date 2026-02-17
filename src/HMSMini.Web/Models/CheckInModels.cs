@@ -3,6 +3,7 @@ namespace HMSMini.Web.Models;
 public class CheckInDto
 {
     public int Id { get; set; }
+    public int RoomId { get; set; }
     public string RoomNumber { get; set; } = string.Empty;
     public DateTime CheckInDate { get; set; }
     public DateTime CheckOutDate { get; set; }
@@ -25,6 +26,8 @@ public class CheckInDto
     public decimal? MealPlanRate { get; set; }
     public decimal DiscountPercentage { get; set; }
     public decimal? FinalAmount { get; set; }
+    public bool IsSharedRoom { get; set; }
+    public int? SharedGroupId { get; set; }
 }
 
 public class CheckInWithGuestsDto : CheckInDto
@@ -61,6 +64,20 @@ public enum CheckInStatus
     Active = 0,
     CheckedOut = 1,
     Cancelled = 2
+}
+
+public class ShareRoomDto
+{
+    public DateTime CheckInDate { get; set; } = DateTime.Today;
+    public DateTime CheckOutDate { get; set; } = DateTime.Today.AddDays(2);
+    public DateTime? ActualCheckInDate { get; set; }
+    public string? RegistrationNo { get; set; }
+    public string? Remarks { get; set; }
+    public int? CompanyId { get; set; }
+    public int? BusinessSourceId { get; set; }
+    public int? MealPlanId { get; set; }
+    public int? GuestTypeId { get; set; }
+    public List<CreateGuestDto> Guests { get; set; } = new();
 }
 
 public class CheckInFinancialData

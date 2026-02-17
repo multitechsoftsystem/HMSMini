@@ -197,6 +197,7 @@ public class RoomService : IRoomService
                 c.RoomId,
                 c.CheckInDate,
                 c.CheckOutDate,
+                c.IsSharedRoom,
                 GuestName = c.Guests.OrderBy(g => g.Id).FirstOrDefault() != null
                     ? c.Guests.OrderBy(g => g.Id).FirstOrDefault()!.GuestName
                     : "Guest"
@@ -315,8 +316,8 @@ public class RoomService : IRoomService
                     Status = "Available"
                 };
 
-                // Check if room is blocked/under maintenance
-                if (room.RoomStatus != RoomStatus.Available)
+                // Check if room is blocked/under maintenance/dirty (skip Occupied — handled by check-in logic below)
+                if (room.RoomStatus != RoomStatus.Available && room.RoomStatus != RoomStatus.Occupied)
                 {
                     if (room.RoomStatusFromDate.HasValue && room.RoomStatusToDate.HasValue)
                     {
@@ -338,17 +339,25 @@ public class RoomService : IRoomService
                     }
                 }
 
-                // Check if room is occupied by a check-in
-                var checkIn = checkIns.FirstOrDefault(c =>
+                // Check if room is occupied by check-in(s) — handle shared rooms
+                var roomCheckIns = checkIns.Where(c =>
                     c.RoomId == room.RoomId &&
                     date >= c.CheckInDate.Date &&
-                    date < c.CheckOutDate.Date);
+                    date < c.CheckOutDate.Date).ToList();
 
-                if (checkIn != null)
+                if (roomCheckIns.Any())
                 {
                     dailyStatus.IsAvailable = false;
-                    dailyStatus.Status = "Occupied";
-                    dailyStatus.GuestName = checkIn.GuestName;
+                    if (roomCheckIns.Count > 1)
+                    {
+                        dailyStatus.Status = "Shared";
+                        dailyStatus.GuestName = $"Shared ({roomCheckIns.Count})";
+                    }
+                    else
+                    {
+                        dailyStatus.Status = "Occupied";
+                        dailyStatus.GuestName = roomCheckIns[0].GuestName;
+                    }
                     roomAvailability.DailyAvailability.Add(dailyStatus);
                     continue;
                 }
@@ -425,8 +434,8 @@ public class RoomService : IRoomService
             .Select(c => c.RoomId)
             .ToListAsync();
 
-        // Count rooms by status
-        int occupiedRooms = occupiedCheckIns.Count;
+        // Count rooms by status (Distinct to avoid double-counting shared rooms)
+        int occupiedRooms = occupiedCheckIns.Distinct().Count();
         int checkedOutRooms = checkedOutCheckIns.Count;
         int dirtyRooms = rooms.Count(r => r.RoomStatus == RoomStatus.Dirty);
         int maintenanceRooms = rooms.Count(r => r.RoomStatus == RoomStatus.Maintenance &&

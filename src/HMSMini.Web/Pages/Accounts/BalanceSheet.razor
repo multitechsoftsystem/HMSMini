@@ -1,0 +1,370 @@
+@page "/accounts/balance-sheet"
+@inject IApiClientService ApiClient
+@inject IAuthenticationService AuthService
+@inject IJSRuntime JSRuntime
+@using HMSMini.Web.Services
+@using HMSMini.Web.Models
+@using Microsoft.JSInterop
+
+<PageTitle>Balance Sheet - MSS</PageTitle>
+
+<div class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Balance Sheet</h2>
+        @if (report != null)
+        {
+            <button class="btn btn-outline-secondary" @onclick="PrintReport">
+                <i class="bi bi-printer"></i> Print
+            </button>
+        }
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible">
+            @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+        </div>
+    }
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible">
+            @successMessage
+            <button type="button" class="btn-close" @onclick="() => successMessage = string.Empty"></button>
+        </div>
+    }
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label">As of Date</label>
+                    <input type="date" class="form-control" @bind="asOfDate" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Financial Year</label>
+                    <select class="form-select" @bind="selectedFinancialYearId">
+                        <option value="">-- All --</option>
+                        @foreach (var fy in financialYears)
+                        {
+                            <option value="@fy.Id">@fy.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <button class="btn btn-primary w-100" @onclick="GenerateReport">
+                        <i class="bi bi-bar-chart"></i> Generate
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report -->
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border"></div>
+        </div>
+    }
+    else if (report != null)
+    {
+        <div id="printable-report">
+            <!-- Report Header -->
+            <div class="text-center mb-4">
+                <h4>Balance Sheet</h4>
+                <p class="text-muted mb-0">
+                    As of @report.AsOfDate.ToString("dd-MMM-yyyy")
+                    @if (!string.IsNullOrEmpty(report.FinancialYearName))
+                    {
+                        <text> | Financial Year: @report.FinancialYearName</text>
+                    }
+                </p>
+            </div>
+
+            <!-- Balance Check Indicator -->
+            @{
+                var totalLiabilitiesAndEquity = report.TotalLiabilities + report.TotalEquity;
+                var isBalanced = report.TotalAssets == totalLiabilitiesAndEquity;
+            }
+            <div class="alert @(isBalanced ? "alert-success" : "alert-danger") d-flex align-items-center mb-4">
+                <i class="bi @(isBalanced ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill") me-2 fs-5"></i>
+                <div>
+                    @if (isBalanced)
+                    {
+                        <strong>Balance Sheet is balanced.</strong>
+                        <span class="ms-2">Total Assets (@report.TotalAssets.ToString("N2")) = Total Liabilities + Equity (@totalLiabilitiesAndEquity.ToString("N2"))</span>
+                    }
+                    else
+                    {
+                        <strong>Balance Sheet is NOT balanced.</strong>
+                        <span class="ms-2">
+                            Total Assets (@report.TotalAssets.ToString("N2")) does not equal Total Liabilities + Equity (@totalLiabilitiesAndEquity.ToString("N2")).
+                            Difference: @Math.Abs(report.TotalAssets - totalLiabilitiesAndEquity).ToString("N2")
+                        </span>
+                    }
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Assets Section -->
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="bi bi-building"></i> Assets</h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Account Code</th>
+                                        <th>Account Name</th>
+                                        <th class="text-end">Balance</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (report.Assets.Any())
+                                    {
+                                        @foreach (var item in report.Assets)
+                                        {
+                                            <tr>
+                                                <td>@item.AccountCode</td>
+                                                <td>@item.AccountName</td>
+                                                <td class="text-end">@item.Balance.ToString("N2")</td>
+                                            </tr>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <tr>
+                                            <td colspan="3" class="text-center text-muted">No asset accounts found.</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                                <tfoot class="table-primary fw-bold">
+                                    <tr>
+                                        <td colspan="2" class="text-end">Total Assets:</td>
+                                        <td class="text-end">@report.TotalAssets.ToString("N2")</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Liabilities & Equity Section -->
+                <div class="col-md-6 mb-4">
+                    <!-- Liabilities -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="mb-0"><i class="bi bi-credit-card"></i> Liabilities</h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Account Code</th>
+                                        <th>Account Name</th>
+                                        <th class="text-end">Balance</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (report.Liabilities.Any())
+                                    {
+                                        @foreach (var item in report.Liabilities)
+                                        {
+                                            <tr>
+                                                <td>@item.AccountCode</td>
+                                                <td>@item.AccountName</td>
+                                                <td class="text-end">@item.Balance.ToString("N2")</td>
+                                            </tr>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <tr>
+                                            <td colspan="3" class="text-center text-muted">No liability accounts found.</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                                <tfoot class="table-warning fw-bold">
+                                    <tr>
+                                        <td colspan="2" class="text-end">Total Liabilities:</td>
+                                        <td class="text-end">@report.TotalLiabilities.ToString("N2")</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Equity -->
+                    <div class="card">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0"><i class="bi bi-pie-chart"></i> Equity</h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Account Code</th>
+                                        <th>Account Name</th>
+                                        <th class="text-end">Balance</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @if (report.Equity.Any())
+                                    {
+                                        @foreach (var item in report.Equity)
+                                        {
+                                            <tr>
+                                                <td>@item.AccountCode</td>
+                                                <td>@item.AccountName</td>
+                                                <td class="text-end">@item.Balance.ToString("N2")</td>
+                                            </tr>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <tr>
+                                            <td colspan="3" class="text-center text-muted">No equity accounts found.</td>
+                                        </tr>
+                                    }
+                                    <!-- Retained Earnings -->
+                                    <tr class="table-light fst-italic">
+                                        <td></td>
+                                        <td>Retained Earnings</td>
+                                        <td class="text-end">@report.RetainedEarnings.ToString("N2")</td>
+                                    </tr>
+                                </tbody>
+                                <tfoot class="table-info fw-bold">
+                                    <tr>
+                                        <td colspan="2" class="text-end">Total Equity:</td>
+                                        <td class="text-end">@report.TotalEquity.ToString("N2")</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary Row -->
+            <div class="card">
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-4">
+                            <h6 class="text-muted">Total Assets</h6>
+                            <h4 class="text-primary">@report.TotalAssets.ToString("N2")</h4>
+                        </div>
+                        <div class="col-md-4">
+                            <h6 class="text-muted">Total Liabilities</h6>
+                            <h4 class="text-warning">@report.TotalLiabilities.ToString("N2")</h4>
+                        </div>
+                        <div class="col-md-4">
+                            <h6 class="text-muted">Total Equity</h6>
+                            <h4 class="text-info">@report.TotalEquity.ToString("N2")</h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    else if (!isFirstLoad)
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> No data available for the selected filters. Please adjust your filters and try again.
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-light text-center">
+            <i class="bi bi-bar-chart"></i> Select filters and click <strong>Generate</strong> to view the balance sheet.
+        </div>
+    }
+</div>
+
+@code {
+    private List<FinancialYearModel> financialYears = new();
+    private BalanceSheetModel? report = null;
+    private bool isLoading = false;
+    private bool isFirstLoad = true;
+
+    private string errorMessage = "";
+    private string successMessage = "";
+
+    // Filters
+    private DateTime? asOfDate = DateTime.Today;
+    private string selectedFinancialYearId = "";
+
+    // Role-based permissions
+    private bool canManageMasterData = false;
+    private int currentUserRole = -1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckUserPermissions();
+        await LoadFinancialYears();
+    }
+
+    private async Task CheckUserPermissions()
+    {
+        var currentUser = await AuthService.GetCurrentUserAsync();
+        if (currentUser != null)
+        {
+            currentUserRole = currentUser.Role;
+            canManageMasterData = currentUserRole == 0 || currentUserRole == 1;
+        }
+    }
+
+    private async Task LoadFinancialYears()
+    {
+        try
+        {
+            financialYears = await ApiClient.GetFinancialYearsAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load financial years: {ex.Message}";
+        }
+    }
+
+    private async Task GenerateReport()
+    {
+        isLoading = true;
+        isFirstLoad = false;
+        errorMessage = "";
+        successMessage = "";
+        report = null;
+
+        try
+        {
+            int? fyId = null;
+            if (!string.IsNullOrEmpty(selectedFinancialYearId) && int.TryParse(selectedFinancialYearId, out var parsedId))
+            {
+                fyId = parsedId;
+            }
+
+            report = await ApiClient.GetBalanceSheetAsync(asOfDate, fyId);
+
+            if (report != null)
+            {
+                var totalAccounts = report.Assets.Count + report.Liabilities.Count + report.Equity.Count;
+                successMessage = $"Balance sheet generated with {totalAccounts} account(s).";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to generate balance sheet: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task PrintReport()
+    {
+        await JSRuntime.InvokeVoidAsync("window.print");
+    }
+}

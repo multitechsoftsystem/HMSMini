@@ -1,0 +1,328 @@
+@page "/accounts/payment-vouchers"
+@inject IApiClientService ApiClient
+@inject IAuthenticationService AuthService
+@using HMSMini.Web.Services
+@using HMSMini.Web.Models
+
+<PageTitle>Payment Vouchers - MSS</PageTitle>
+
+<div class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-cash-stack"></i> Payment Vouchers</h2>
+        @if (canManageMasterData)
+        {
+            <button class="btn btn-primary" @onclick="ShowCreateModal">
+                <i class="bi bi-plus-circle"></i> New Payment Voucher
+            </button>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle"></i> @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle"></i> @successMessage
+            <button type="button" class="btn-close" @onclick="() => successMessage = string.Empty"></button>
+        </div>
+    }
+
+    <!-- Date Filter -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">From Date</label>
+                    <input type="date" class="form-control" @bind="fromDate" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">To Date</label>
+                    <input type="date" class="form-control" @bind="toDate" />
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-outline-primary" @onclick="LoadVouchers">
+                        <i class="bi bi-funnel"></i> Load
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (vouchers.Any())
+    {
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>Voucher Number</th>
+                        <th>Voucher Date</th>
+                        <th>Payee Name</th>
+                        <th>Amount</th>
+                        <th>Payment Mode</th>
+                        <th>Created At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var voucher in vouchers)
+                    {
+                        <tr>
+                            <td><strong>@voucher.VoucherNumber</strong></td>
+                            <td>@voucher.VoucherDate.ToString("dd MMM yyyy")</td>
+                            <td>@voucher.PayeeName</td>
+                            <td class="text-end">@voucher.Amount.ToString("N2")</td>
+                            <td><span class="badge bg-info">@voucher.PaymentModeName</span></td>
+                            <td>@voucher.CreatedAt.ToString("dd MMM yyyy HH:mm")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> No payment vouchers found for the selected date range.
+        </div>
+    }
+</div>
+
+<!-- Create Payment Voucher Modal -->
+@if (showCreateModal)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">New Payment Voucher</h5>
+                    <button type="button" class="btn-close" @onclick="HideCreateModal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrWhiteSpace(modalErrorMessage))
+                    {
+                        <div class="alert alert-danger">@modalErrorMessage</div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(modalSuccessMessage))
+                    {
+                        <div class="alert alert-success">@modalSuccessMessage</div>
+                    }
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Voucher Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" @bind="createModel.VoucherDate" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Payee Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" @bind="createModel.PayeeName" />
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Amount <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" @bind="createModel.Amount" min="0.01" step="0.01" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Payment Mode <span class="text-danger">*</span></label>
+                            <select class="form-select" @bind="createModel.PaymentMode">
+                                <option value="@PaymentMode.Cash">Cash</option>
+                                <option value="@PaymentMode.Card">Card</option>
+                                <option value="@PaymentMode.UPI">UPI</option>
+                                <option value="@PaymentMode.BankTransfer">Bank Transfer</option>
+                                <option value="@PaymentMode.Cheque">Cheque</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    @if (createModel.PaymentMode != PaymentMode.Cash)
+                    {
+                        <div class="mb-3">
+                            <label class="form-label">Bank Account <span class="text-danger">*</span></label>
+                            <select class="form-select" @bind="createModel.BankAccountId">
+                                <option value="">-- Select Bank Account --</option>
+                                @foreach (var account in bankAccounts)
+                                {
+                                    <option value="@account.Id">@account.DisplayName</option>
+                                }
+                            </select>
+                        </div>
+                    }
+
+                    <div class="mb-3">
+                        <label class="form-label">Reference Number</label>
+                        <input type="text" class="form-control" @bind="createModel.ReferenceNumber" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Narration</label>
+                        <textarea class="form-control" rows="2" @bind="createModel.Narration"></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Expense Voucher ID (optional)</label>
+                        <input type="number" class="form-control" @bind="createModel.ExpenseVoucherId" placeholder="Link to an existing expense voucher" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideCreateModal">Cancel</button>
+                    <button type="button" class="btn btn-primary" @onclick="CreateVoucher" disabled="@saving">
+                        @if (saving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Create
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<PaymentVoucherListModel> vouchers = new();
+    private List<AccountDropdownModel> bankAccounts = new();
+    private bool isLoading = true;
+    private bool saving = false;
+    private bool showCreateModal = false;
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+    private string modalErrorMessage = string.Empty;
+    private string modalSuccessMessage = string.Empty;
+
+    private DateTime fromDate = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private DateTime toDate = DateTime.Today;
+
+    private CreatePaymentVoucherModel createModel = new();
+
+    // Role-based permissions
+    private bool canManageMasterData = false;
+    private int currentUserRole = -1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckUserPermissions();
+        await LoadVouchers();
+    }
+
+    private async Task CheckUserPermissions()
+    {
+        var currentUser = await AuthService.GetCurrentUserAsync();
+        if (currentUser != null)
+        {
+            currentUserRole = currentUser.Role;
+            canManageMasterData = currentUserRole == 0 || currentUserRole == 1;
+        }
+    }
+
+    private async Task LoadVouchers()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+
+        try
+        {
+            vouchers = await ApiClient.GetPaymentVouchersAsync(fromDate, toDate);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading payment vouchers: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ShowCreateModal()
+    {
+        createModel = new CreatePaymentVoucherModel();
+        modalErrorMessage = string.Empty;
+        modalSuccessMessage = string.Empty;
+
+        try
+        {
+            bankAccounts = await ApiClient.GetAccountDropdownAsync(AccountType.Asset);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading form data: {ex.Message}";
+            return;
+        }
+
+        showCreateModal = true;
+    }
+
+    private void HideCreateModal()
+    {
+        showCreateModal = false;
+        createModel = new();
+        modalErrorMessage = string.Empty;
+        modalSuccessMessage = string.Empty;
+    }
+
+    private async Task CreateVoucher()
+    {
+        modalErrorMessage = string.Empty;
+        modalSuccessMessage = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(createModel.PayeeName))
+        {
+            modalErrorMessage = "Payee name is required.";
+            return;
+        }
+
+        if (createModel.Amount <= 0)
+        {
+            modalErrorMessage = "Amount must be greater than zero.";
+            return;
+        }
+
+        if (createModel.PaymentMode != PaymentMode.Cash && !createModel.BankAccountId.HasValue)
+        {
+            modalErrorMessage = "Please select a bank account for non-cash payments.";
+            return;
+        }
+
+        saving = true;
+
+        try
+        {
+            var result = await ApiClient.CreatePaymentVoucherAsync(createModel);
+            if (result != null)
+            {
+                modalSuccessMessage = "Payment voucher created successfully!";
+                await LoadVouchers();
+                await Task.Delay(1000);
+                HideCreateModal();
+                successMessage = "Payment voucher created successfully!";
+            }
+            else
+            {
+                modalErrorMessage = "Failed to create payment voucher.";
+            }
+        }
+        catch (Exception ex)
+        {
+            modalErrorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+}

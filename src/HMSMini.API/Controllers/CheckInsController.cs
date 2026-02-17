@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using HMSMini.API.Exceptions;
 using HMSMini.API.Models.DTOs.CheckIn;
 using HMSMini.API.Models.DTOs.Billing;
 using HMSMini.API.Services.Interfaces;
@@ -250,5 +251,59 @@ public class CheckInsController : ControllerBase
     {
         await _checkInService.DeleteAsync(id);
         return NoContent();
+    }
+
+    /// <summary>
+    /// Create a shared check-in in the same room as an existing check-in
+    /// </summary>
+    [HttpPost("{id}/share")]
+    [Authorize(Roles = "Admin,Manager,Receptionist")]
+    [ProducesResponseType(typeof(CheckInWithGuestsDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<CheckInWithGuestsDto>> ShareRoom(int id, [FromBody] ShareRoomDto dto)
+    {
+        try
+        {
+            // Validate check-in date
+            var workingDate = await _systemSettingsService.GetWorkingDateAsync();
+            var isManager = User.IsInRole("Admin") || User.IsInRole("Manager");
+
+            // No future dates allowed
+            if (dto.CheckInDate.Date > workingDate.Date)
+                return BadRequest(new { error = "Check-in date cannot be in the future." });
+
+            // Only Manager/Admin can set past dates
+            if (dto.CheckInDate.Date < workingDate.Date && !isManager)
+                return BadRequest(new { error = "Only Manager or Admin can create check-ins with past dates." });
+
+            var result = await _checkInService.CreateSharedCheckInAsync(id, dto);
+            return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
+        }
+        catch (Exception ex) when (ex is BusinessRuleException || ex is NotFoundException)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get count of active check-ins for a room
+    /// </summary>
+    [HttpGet("room/{roomId}/active-count")]
+    [ProducesResponseType(typeof(int), StatusCodes.Status200OK)]
+    public async Task<ActionResult<int>> GetActiveCheckInCountForRoom(int roomId)
+    {
+        var count = await _checkInService.GetActiveCheckInCountForRoomAsync(roomId);
+        return Ok(count);
+    }
+
+    /// <summary>
+    /// Check if room sharing feature is enabled
+    /// </summary>
+    [HttpGet("room-sharing-enabled")]
+    [ProducesResponseType(typeof(bool), StatusCodes.Status200OK)]
+    public async Task<ActionResult<bool>> IsRoomSharingEnabled()
+    {
+        var enabled = await _checkInService.IsRoomSharingEnabledAsync();
+        return Ok(enabled);
     }
 }

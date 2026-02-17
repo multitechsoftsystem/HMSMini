@@ -146,6 +146,18 @@
                 </div>
 
                 <div class="nav-item px-3 masters-child">
+                    <NavLink class="nav-link" href="banquet/calendar">
+                        <span class="bi bi-calendar3"></span> Calendar
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3 masters-child">
+                    <NavLink class="nav-link" href="banquet/bill-search">
+                        <span class="bi bi-receipt"></span> Bill Search
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3 masters-child">
                     <NavLink class="nav-link" href="banquet/halls">
                         <span class="bi bi-building"></span> Halls
                     </NavLink>
@@ -171,6 +183,75 @@
             </div>
         }
 
+        @if (canManageMasterData)
+        {
+            <div class="nav-item px-3 masters-parent" @onclick="ToggleAccounts" @onclick:stopPropagation="true">
+                <div class="nav-link" style="cursor: pointer;">
+                    <span class="bi bi-chevron-right masters-toggle-icon @(collapseAccounts ? "" : "expanded")"></span>
+                    <span class="bi bi-journal-text"></span> Accounts
+                </div>
+            </div>
+
+            <div class="@AccountsCssClass">
+                <div class="nav-item px-3 masters-child">
+                    <NavLink class="nav-link" href="accounts/expense-vouchers">
+                        <span class="bi bi-cash-stack"></span> Expense Vouchers
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3 masters-child">
+                    <NavLink class="nav-link" href="accounts/payment-vouchers">
+                        <span class="bi bi-credit-card"></span> Payment Vouchers
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3 masters-child">
+                    <NavLink class="nav-link" href="accounts/receipts">
+                        <span class="bi bi-receipt-cutoff"></span> Receipts
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3 masters-child">
+                    <NavLink class="nav-link" href="accounts/journal-entries">
+                        <span class="bi bi-journal-check"></span> Journal Entries
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3 masters-child">
+                    <NavLink class="nav-link" href="accounts/trial-balance">
+                        <span class="bi bi-table"></span> Trial Balance
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3 masters-child">
+                    <NavLink class="nav-link" href="accounts/balance-sheet">
+                        <span class="bi bi-clipboard-data"></span> Balance Sheet
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3 masters-child">
+                    <NavLink class="nav-link" href="accounts/chart-of-accounts">
+                        <span class="bi bi-list-ol"></span> Chart of Accounts
+                    </NavLink>
+                </div>
+
+                <div class="nav-item px-3 masters-child">
+                    <NavLink class="nav-link" href="accounts/expense-heads">
+                        <span class="bi bi-tags"></span> Expense Heads
+                    </NavLink>
+                </div>
+
+                @if (isAdmin)
+                {
+                    <div class="nav-item px-3 masters-child">
+                        <NavLink class="nav-link" href="accounts/financial-years">
+                            <span class="bi bi-calendar-range"></span> Financial Years
+                        </NavLink>
+                    </div>
+                }
+            </div>
+        }
+
         @if (canAccessOCR)
         {
             <div class="nav-item px-3">
@@ -188,6 +269,15 @@
                 </NavLink>
             </div>
         }
+
+        @if (isDeveloper)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="admin/settings">
+                    <span class="bi bi-sliders"></span> Settings
+                </NavLink>
+            </div>
+        }
     </nav>
 </div>
 
@@ -195,17 +285,20 @@
     private bool collapseNavMenu = true;
     private bool collapseMasters = true;
     private bool collapseBanquet = true;
+    private bool collapseAccounts = true;
     private int? currentUserRole = null;
 
     private bool isAdmin => currentUserRole == 0;
-    private bool canManageMasterData => currentUserRole == 0 || currentUserRole == 1;
-    private bool canAccessBanquet => currentUserRole == 0 || currentUserRole == 1;
-    private bool canAccessOCR => currentUserRole == 0 || currentUserRole == 1 || currentUserRole == 2;
-    private bool canAccessHousekeeping => currentUserRole == 0 || currentUserRole == 1 || currentUserRole == 3;
+    private bool isDeveloper => currentUserRole == 7;
+    private bool canManageMasterData => currentUserRole == 0 || currentUserRole == 1 || currentUserRole == 7;
+    private bool canAccessBanquet => currentUserRole == 0 || currentUserRole == 1 || currentUserRole == 7;
+    private bool canAccessOCR => currentUserRole == 0 || currentUserRole == 1 || currentUserRole == 2 || currentUserRole == 7;
+    private bool canAccessHousekeeping => currentUserRole == 0 || currentUserRole == 1 || currentUserRole == 3 || currentUserRole == 7;
 
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
     private string? MastersCssClass => collapseMasters ? "collapse" : null;
     private string? BanquetCssClass => collapseBanquet ? "collapse" : null;
+    private string? AccountsCssClass => collapseAccounts ? "collapse" : null;
 
     protected override async Task OnInitializedAsync()
     {
@@ -219,4 +312,5 @@
     private void ToggleNavMenu() => collapseNavMenu = !collapseNavMenu;
     private void ToggleMasters() => collapseMasters = !collapseMasters;
     private void ToggleBanquet() => collapseBanquet = !collapseBanquet;
+    private void ToggleAccounts() => collapseAccounts = !collapseAccounts;
 }

@@ -31,6 +31,9 @@ public interface IApiClientService
     Task<CheckInWithGuestsDto?> CreateCheckInAsync(CreateCheckInDto checkIn);
     Task<CheckInDto?> UpdateCheckInAsync(int id, UpdateCheckInModel dto);
     Task<bool> CheckOutAsync(int id);
+    Task<CheckInWithGuestsDto?> ShareRoomAsync(int checkInId, ShareRoomDto dto);
+    Task<int> GetActiveCheckInCountForRoomAsync(int roomId);
+    Task<bool> IsRoomSharingEnabledAsync();
 
     // Guests
     Task<GuestDto?> GetGuestByIdAsync(int id);
@@ -211,6 +214,7 @@ public interface IApiClientService
     Task<BanquetInvoiceModel?> FinalizeBanquetInvoiceAsync(int bookingId, FinalizeBanquetInvoiceModel dto);
     Task<BanquetInvoiceModel?> GetBanquetInvoiceByIdAsync(int invoiceId);
     Task<BanquetInvoiceModel?> GetBanquetInvoiceByBookingAsync(int bookingId);
+    Task<List<BanquetInvoiceListModel>> GetAllBanquetInvoicesAsync();
 
     // Unified Payments
     Task<PaymentModel?> CreatePaymentAsync(CreatePaymentModel dto);
@@ -227,6 +231,61 @@ public interface IApiClientService
     Task<CompanyStatementModel?> GetCompanyStatementAsync(int companyId, DateTime from, DateTime to);
     Task<AgingReportModel?> GetAgingReportAsync(DateTime? asOfDate = null);
     Task<BusinessSourceOutstandingModel?> GetBusinessSourceOutstandingAsync(DateTime? asOfDate = null);
+
+    // System Settings
+    Task<List<SystemSettingModel>> GetAllSystemSettingsAsync();
+    Task<string?> GetSystemSettingAsync(string key);
+    Task<bool> UpdateSystemSettingAsync(string key, string value);
+    Task<bool> UploadBillHeadingImageAsync(Stream fileStream, string fileName);
+
+    // Accounting - Financial Years
+    Task<List<FinancialYearModel>> GetFinancialYearsAsync();
+    Task<FinancialYearModel?> GetFinancialYearByIdAsync(int id);
+    Task<FinancialYearModel?> GetCurrentFinancialYearAsync();
+    Task<FinancialYearModel?> CreateFinancialYearAsync(CreateFinancialYearModel dto);
+    Task<bool> SetCurrentFinancialYearAsync(int id);
+    Task<bool> CloseFinancialYearAsync(int id);
+
+    // Accounting - Chart of Accounts
+    Task<List<ChartOfAccountModel>> GetChartOfAccountsAsync();
+    Task<ChartOfAccountModel?> GetChartOfAccountByIdAsync(int id);
+    Task<List<AccountDropdownModel>> GetAccountDropdownAsync(AccountType? type = null);
+    Task<ChartOfAccountModel?> CreateChartOfAccountAsync(CreateChartOfAccountModel dto);
+    Task<ChartOfAccountModel?> UpdateChartOfAccountAsync(int id, UpdateChartOfAccountModel dto);
+    Task<bool> DeleteChartOfAccountAsync(int id);
+
+    // Accounting - Journal Entries
+    Task<JournalEntryModel?> GetJournalEntryByIdAsync(int id);
+    Task<List<JournalEntryModel>> GetJournalEntriesAsync(DateTime? from = null, DateTime? to = null, int? financialYearId = null);
+    Task<JournalEntryModel?> CreateJournalEntryAsync(CreateJournalEntryModel dto);
+    Task<JournalEntryModel?> ReverseJournalEntryAsync(int id);
+
+    // Accounting - Expense Heads
+    Task<List<ExpenseHeadModel>> GetExpenseHeadsAsync();
+    Task<ExpenseHeadModel?> GetExpenseHeadByIdAsync(int id);
+    Task<ExpenseHeadModel?> CreateExpenseHeadAsync(CreateExpenseHeadModel dto);
+    Task<ExpenseHeadModel?> UpdateExpenseHeadAsync(int id, UpdateExpenseHeadModel dto);
+    Task<bool> DeleteExpenseHeadAsync(int id);
+
+    // Accounting - Expense Vouchers
+    Task<ExpenseVoucherModel?> GetExpenseVoucherByIdAsync(int id);
+    Task<List<ExpenseVoucherListModel>> GetExpenseVouchersAsync(DateTime? from = null, DateTime? to = null);
+    Task<ExpenseVoucherModel?> CreateExpenseVoucherAsync(CreateExpenseVoucherModel dto);
+
+    // Accounting - Payment Vouchers
+    Task<PaymentVoucherModel?> GetPaymentVoucherByIdAsync(int id);
+    Task<List<PaymentVoucherListModel>> GetPaymentVouchersAsync(DateTime? from = null, DateTime? to = null);
+    Task<PaymentVoucherModel?> CreatePaymentVoucherAsync(CreatePaymentVoucherModel dto);
+
+    // Accounting - Receipts
+    Task<ReceiptModel?> GetReceiptByIdAsync(int id);
+    Task<List<ReceiptListModel>> GetReceiptsAsync(DateTime? from = null, DateTime? to = null);
+    Task<List<OutstandingInvoiceModel>> GetOutstandingInvoicesAsync(int? companyId = null);
+    Task<ReceiptModel?> CreateReceiptAsync(CreateReceiptModel dto);
+
+    // Accounting - Reports
+    Task<TrialBalanceModel?> GetTrialBalanceAsync(int? financialYearId = null, DateTime? from = null, DateTime? to = null);
+    Task<BalanceSheetModel?> GetBalanceSheetAsync(DateTime? asOfDate = null, int? financialYearId = null);
 
     // Utility
     string GetBaseUrl();
@@ -516,6 +575,44 @@ public class ApiClientService : IApiClientService
         {
             var response = await _httpClient.PostAsync($"/api/checkins/{id}/checkout", null);
             return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public async Task<CheckInWithGuestsDto?> ShareRoomAsync(int checkInId, ShareRoomDto dto)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync($"/api/checkins/{checkInId}/share", dto);
+            if (response.IsSuccessStatusCode)
+            {
+                return await response.Content.ReadFromJsonAsync<CheckInWithGuestsDto>();
+            }
+            var errorContent = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"Share room failed: {response.StatusCode} - {errorContent}");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception sharing room: {ex.Message}");
+            return null;
+        }
+    }
+
+    public async Task<int> GetActiveCheckInCountForRoomAsync(int roomId)
+    {
+        try
+        {
+            return await _httpClient.GetFromJsonAsync<int>($"/api/checkins/room/{roomId}/active-count");
+        }
+        catch { return 0; }
+    }
+
+    public async Task<bool> IsRoomSharingEnabledAsync()
+    {
+        try
+        {
+            return await _httpClient.GetFromJsonAsync<bool>("/api/checkins/room-sharing-enabled");
         }
         catch { return false; }
     }
@@ -2069,6 +2166,16 @@ public class ApiClientService : IApiClientService
         catch { return null; }
     }
 
+    public async Task<List<BanquetInvoiceListModel>> GetAllBanquetInvoicesAsync()
+    {
+        try
+        {
+            return await _httpClient.GetFromJsonAsync<List<BanquetInvoiceListModel>>(
+                "/api/banquet-billing/invoices") ?? new();
+        }
+        catch { return new(); }
+    }
+
     // Unified Payments
     public async Task<PaymentModel?> CreatePaymentAsync(CreatePaymentModel dto)
     {
@@ -2199,6 +2306,382 @@ public class ApiClientService : IApiClientService
             if (asOfDate.HasValue)
                 url += $"?asOfDate={asOfDate.Value:yyyy-MM-dd}";
             return await _httpClient.GetFromJsonAsync<BusinessSourceOutstandingModel>(url);
+        }
+        catch { return null; }
+    }
+
+    // System Settings
+    public async Task<List<SystemSettingModel>> GetAllSystemSettingsAsync()
+    {
+        try
+        {
+            return await _httpClient.GetFromJsonAsync<List<SystemSettingModel>>("/api/system-settings") ?? new();
+        }
+        catch { return new(); }
+    }
+
+    public async Task<string?> GetSystemSettingAsync(string key)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"/api/system-settings/{Uri.EscapeDataString(key)}");
+            if (response.IsSuccessStatusCode)
+            {
+                return await response.Content.ReadAsStringAsync();
+            }
+            return null;
+        }
+        catch { return null; }
+    }
+
+    public async Task<bool> UpdateSystemSettingAsync(string key, string value)
+    {
+        try
+        {
+            var response = await _httpClient.PutAsJsonAsync(
+                $"/api/system-settings/{Uri.EscapeDataString(key)}",
+                new { Value = value });
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public async Task<bool> UploadBillHeadingImageAsync(Stream fileStream, string fileName)
+    {
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            var streamContent = new StreamContent(fileStream);
+            streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/jpeg");
+            content.Add(streamContent, "file", fileName);
+
+            var response = await _httpClient.PostAsync("/api/system-settings/bill-heading-image", content);
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    // Accounting - Financial Years
+    public async Task<List<FinancialYearModel>> GetFinancialYearsAsync()
+    {
+        try { return await _httpClient.GetFromJsonAsync<List<FinancialYearModel>>("/api/financial-years") ?? new(); }
+        catch { return new(); }
+    }
+
+    public async Task<FinancialYearModel?> GetFinancialYearByIdAsync(int id)
+    {
+        try { return await _httpClient.GetFromJsonAsync<FinancialYearModel>($"/api/financial-years/{id}"); }
+        catch { return null; }
+    }
+
+    public async Task<FinancialYearModel?> GetCurrentFinancialYearAsync()
+    {
+        try { return await _httpClient.GetFromJsonAsync<FinancialYearModel>("/api/financial-years/current"); }
+        catch { return null; }
+    }
+
+    public async Task<FinancialYearModel?> CreateFinancialYearAsync(CreateFinancialYearModel dto)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync("/api/financial-years", dto);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<FinancialYearModel>();
+        }
+        catch { return null; }
+    }
+
+    public async Task<bool> SetCurrentFinancialYearAsync(int id)
+    {
+        try
+        {
+            var response = await _httpClient.PutAsync($"/api/financial-years/{id}/set-current", null);
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    public async Task<bool> CloseFinancialYearAsync(int id)
+    {
+        try
+        {
+            var response = await _httpClient.PutAsync($"/api/financial-years/{id}/close", null);
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    // Accounting - Chart of Accounts
+    public async Task<List<ChartOfAccountModel>> GetChartOfAccountsAsync()
+    {
+        try { return await _httpClient.GetFromJsonAsync<List<ChartOfAccountModel>>("/api/chart-of-accounts") ?? new(); }
+        catch { return new(); }
+    }
+
+    public async Task<ChartOfAccountModel?> GetChartOfAccountByIdAsync(int id)
+    {
+        try { return await _httpClient.GetFromJsonAsync<ChartOfAccountModel>($"/api/chart-of-accounts/{id}"); }
+        catch { return null; }
+    }
+
+    public async Task<List<AccountDropdownModel>> GetAccountDropdownAsync(AccountType? type = null)
+    {
+        try
+        {
+            var url = "/api/chart-of-accounts/dropdown";
+            if (type.HasValue) url += $"?type={type.Value}";
+            return await _httpClient.GetFromJsonAsync<List<AccountDropdownModel>>(url) ?? new();
+        }
+        catch { return new(); }
+    }
+
+    public async Task<ChartOfAccountModel?> CreateChartOfAccountAsync(CreateChartOfAccountModel dto)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync("/api/chart-of-accounts", dto);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<ChartOfAccountModel>();
+        }
+        catch { return null; }
+    }
+
+    public async Task<ChartOfAccountModel?> UpdateChartOfAccountAsync(int id, UpdateChartOfAccountModel dto)
+    {
+        try
+        {
+            var response = await _httpClient.PutAsJsonAsync($"/api/chart-of-accounts/{id}", dto);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<ChartOfAccountModel>();
+        }
+        catch { return null; }
+    }
+
+    public async Task<bool> DeleteChartOfAccountAsync(int id)
+    {
+        try
+        {
+            var response = await _httpClient.DeleteAsync($"/api/chart-of-accounts/{id}");
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    // Accounting - Journal Entries
+    public async Task<JournalEntryModel?> GetJournalEntryByIdAsync(int id)
+    {
+        try { return await _httpClient.GetFromJsonAsync<JournalEntryModel>($"/api/journal-entries/{id}"); }
+        catch { return null; }
+    }
+
+    public async Task<List<JournalEntryModel>> GetJournalEntriesAsync(DateTime? from = null, DateTime? to = null, int? financialYearId = null)
+    {
+        try
+        {
+            var queryParts = new List<string>();
+            if (from.HasValue) queryParts.Add($"from={from.Value:yyyy-MM-dd}");
+            if (to.HasValue) queryParts.Add($"to={to.Value:yyyy-MM-dd}");
+            if (financialYearId.HasValue) queryParts.Add($"financialYearId={financialYearId.Value}");
+            var query = queryParts.Count > 0 ? "?" + string.Join("&", queryParts) : "";
+            return await _httpClient.GetFromJsonAsync<List<JournalEntryModel>>($"/api/journal-entries{query}") ?? new();
+        }
+        catch { return new(); }
+    }
+
+    public async Task<JournalEntryModel?> CreateJournalEntryAsync(CreateJournalEntryModel dto)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync("/api/journal-entries", dto);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<JournalEntryModel>();
+        }
+        catch { return null; }
+    }
+
+    public async Task<JournalEntryModel?> ReverseJournalEntryAsync(int id)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsync($"/api/journal-entries/{id}/reverse", null);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<JournalEntryModel>();
+        }
+        catch { return null; }
+    }
+
+    // Accounting - Expense Heads
+    public async Task<List<ExpenseHeadModel>> GetExpenseHeadsAsync()
+    {
+        try { return await _httpClient.GetFromJsonAsync<List<ExpenseHeadModel>>("/api/expense-heads") ?? new(); }
+        catch { return new(); }
+    }
+
+    public async Task<ExpenseHeadModel?> GetExpenseHeadByIdAsync(int id)
+    {
+        try { return await _httpClient.GetFromJsonAsync<ExpenseHeadModel>($"/api/expense-heads/{id}"); }
+        catch { return null; }
+    }
+
+    public async Task<ExpenseHeadModel?> CreateExpenseHeadAsync(CreateExpenseHeadModel dto)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync("/api/expense-heads", dto);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<ExpenseHeadModel>();
+        }
+        catch { return null; }
+    }
+
+    public async Task<ExpenseHeadModel?> UpdateExpenseHeadAsync(int id, UpdateExpenseHeadModel dto)
+    {
+        try
+        {
+            var response = await _httpClient.PutAsJsonAsync($"/api/expense-heads/{id}", dto);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<ExpenseHeadModel>();
+        }
+        catch { return null; }
+    }
+
+    public async Task<bool> DeleteExpenseHeadAsync(int id)
+    {
+        try
+        {
+            var response = await _httpClient.DeleteAsync($"/api/expense-heads/{id}");
+            return response.IsSuccessStatusCode;
+        }
+        catch { return false; }
+    }
+
+    // Accounting - Expense Vouchers
+    public async Task<ExpenseVoucherModel?> GetExpenseVoucherByIdAsync(int id)
+    {
+        try { return await _httpClient.GetFromJsonAsync<ExpenseVoucherModel>($"/api/expense-vouchers/{id}"); }
+        catch { return null; }
+    }
+
+    public async Task<List<ExpenseVoucherListModel>> GetExpenseVouchersAsync(DateTime? from = null, DateTime? to = null)
+    {
+        try
+        {
+            var queryParts = new List<string>();
+            if (from.HasValue) queryParts.Add($"from={from.Value:yyyy-MM-dd}");
+            if (to.HasValue) queryParts.Add($"to={to.Value:yyyy-MM-dd}");
+            var query = queryParts.Count > 0 ? "?" + string.Join("&", queryParts) : "";
+            return await _httpClient.GetFromJsonAsync<List<ExpenseVoucherListModel>>($"/api/expense-vouchers{query}") ?? new();
+        }
+        catch { return new(); }
+    }
+
+    public async Task<ExpenseVoucherModel?> CreateExpenseVoucherAsync(CreateExpenseVoucherModel dto)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync("/api/expense-vouchers", dto);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<ExpenseVoucherModel>();
+        }
+        catch { return null; }
+    }
+
+    // Accounting - Payment Vouchers
+    public async Task<PaymentVoucherModel?> GetPaymentVoucherByIdAsync(int id)
+    {
+        try { return await _httpClient.GetFromJsonAsync<PaymentVoucherModel>($"/api/payment-vouchers/{id}"); }
+        catch { return null; }
+    }
+
+    public async Task<List<PaymentVoucherListModel>> GetPaymentVouchersAsync(DateTime? from = null, DateTime? to = null)
+    {
+        try
+        {
+            var queryParts = new List<string>();
+            if (from.HasValue) queryParts.Add($"from={from.Value:yyyy-MM-dd}");
+            if (to.HasValue) queryParts.Add($"to={to.Value:yyyy-MM-dd}");
+            var query = queryParts.Count > 0 ? "?" + string.Join("&", queryParts) : "";
+            return await _httpClient.GetFromJsonAsync<List<PaymentVoucherListModel>>($"/api/payment-vouchers{query}") ?? new();
+        }
+        catch { return new(); }
+    }
+
+    public async Task<PaymentVoucherModel?> CreatePaymentVoucherAsync(CreatePaymentVoucherModel dto)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync("/api/payment-vouchers", dto);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<PaymentVoucherModel>();
+        }
+        catch { return null; }
+    }
+
+    // Accounting - Receipts
+    public async Task<ReceiptModel?> GetReceiptByIdAsync(int id)
+    {
+        try { return await _httpClient.GetFromJsonAsync<ReceiptModel>($"/api/receipts/{id}"); }
+        catch { return null; }
+    }
+
+    public async Task<List<ReceiptListModel>> GetReceiptsAsync(DateTime? from = null, DateTime? to = null)
+    {
+        try
+        {
+            var queryParts = new List<string>();
+            if (from.HasValue) queryParts.Add($"from={from.Value:yyyy-MM-dd}");
+            if (to.HasValue) queryParts.Add($"to={to.Value:yyyy-MM-dd}");
+            var query = queryParts.Count > 0 ? "?" + string.Join("&", queryParts) : "";
+            return await _httpClient.GetFromJsonAsync<List<ReceiptListModel>>($"/api/receipts{query}") ?? new();
+        }
+        catch { return new(); }
+    }
+
+    public async Task<List<OutstandingInvoiceModel>> GetOutstandingInvoicesAsync(int? companyId = null)
+    {
+        try
+        {
+            var query = companyId.HasValue ? $"?companyId={companyId.Value}" : "";
+            return await _httpClient.GetFromJsonAsync<List<OutstandingInvoiceModel>>($"/api/receipts/outstanding-invoices{query}") ?? new();
+        }
+        catch { return new(); }
+    }
+
+    public async Task<ReceiptModel?> CreateReceiptAsync(CreateReceiptModel dto)
+    {
+        try
+        {
+            var response = await _httpClient.PostAsJsonAsync("/api/receipts", dto);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<ReceiptModel>();
+        }
+        catch { return null; }
+    }
+
+    // Accounting - Reports
+    public async Task<TrialBalanceModel?> GetTrialBalanceAsync(int? financialYearId = null, DateTime? from = null, DateTime? to = null)
+    {
+        try
+        {
+            var queryParts = new List<string>();
+            if (financialYearId.HasValue) queryParts.Add($"financialYearId={financialYearId.Value}");
+            if (from.HasValue) queryParts.Add($"from={from.Value:yyyy-MM-dd}");
+            if (to.HasValue) queryParts.Add($"to={to.Value:yyyy-MM-dd}");
+            var query = queryParts.Count > 0 ? "?" + string.Join("&", queryParts) : "";
+            return await _httpClient.GetFromJsonAsync<TrialBalanceModel>($"/api/accounting-reports/trial-balance{query}");
+        }
+        catch { return null; }
+    }
+
+    public async Task<BalanceSheetModel?> GetBalanceSheetAsync(DateTime? asOfDate = null, int? financialYearId = null)
+    {
+        try
+        {
+            var queryParts = new List<string>();
+            if (asOfDate.HasValue) queryParts.Add($"asOfDate={asOfDate.Value:yyyy-MM-dd}");
+            if (financialYearId.HasValue) queryParts.Add($"financialYearId={financialYearId.Value}");
+            var query = queryParts.Count > 0 ? "?" + string.Join("&", queryParts) : "";
+            return await _httpClient.GetFromJsonAsync<BalanceSheetModel>($"/api/accounting-reports/balance-sheet{query}");
         }
         catch { return null; }
     }

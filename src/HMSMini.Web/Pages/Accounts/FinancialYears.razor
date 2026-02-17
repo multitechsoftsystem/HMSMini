@@ -1,0 +1,412 @@
+@page "/accounts/financial-years"
+@inject IApiClientService ApiClient
+@inject IAuthenticationService AuthService
+@using HMSMini.Web.Services
+@using HMSMini.Web.Models
+
+<PageTitle>Financial Years - MSS</PageTitle>
+
+<div class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-calendar-range"></i> Financial Years</h2>
+        <div>
+            <button class="btn btn-outline-primary me-2" @onclick="LoadFinancialYears">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+            @if (canManageMasterData)
+            {
+                <button class="btn btn-primary" @onclick="ShowCreateModal">
+                    <i class="bi bi-plus-circle"></i> New Financial Year
+                </button>
+            }
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle"></i> @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle"></i> @successMessage
+            <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+        </div>
+    }
+
+    @if (!canManageMasterData)
+    {
+        <div class="alert alert-warning">
+            <i class="bi bi-shield-lock"></i> You do not have permission to access this page. Only administrators can manage financial years.
+        </div>
+    }
+    else if (isLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (financialYears.Any())
+    {
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-table"></i> Financial Years</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Name</th>
+                                <th>Start Date</th>
+                                <th>End Date</th>
+                                <th>Current</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var fy in financialYears.OrderByDescending(f => f.StartDate))
+                            {
+                                <tr>
+                                    <td><strong>@fy.Name</strong></td>
+                                    <td>@fy.StartDate.ToString("dd MMM yyyy")</td>
+                                    <td>@fy.EndDate.ToString("dd MMM yyyy")</td>
+                                    <td>
+                                        @if (fy.IsCurrent)
+                                        {
+                                            <span class="badge bg-success">Current</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">-</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (fy.IsClosed)
+                                        {
+                                            <span class="badge bg-danger">Closed</span>
+                                            @if (fy.ClosedAt.HasValue)
+                                            {
+                                                <br />
+                                                <small class="text-muted">@fy.ClosedAt.Value.ToString("dd MMM yyyy")</small>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-success">Open</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (!fy.IsCurrent && !fy.IsClosed)
+                                        {
+                                            <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => SetCurrentFinancialYear(fy.Id)" disabled="@isSaving">
+                                                <i class="bi bi-check-circle"></i> Set Current
+                                            </button>
+                                        }
+                                        @if (!fy.IsClosed)
+                                        {
+                                            <button class="btn btn-sm btn-outline-danger" @onclick="() => ShowCloseConfirmation(fy)" disabled="@isSaving">
+                                                <i class="bi bi-lock"></i> Close
+                                            </button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> No financial years found. Click "New Financial Year" to create one.
+        </div>
+    }
+</div>
+
+@* Create Financial Year Modal *@
+@if (showCreateModal)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-plus-circle"></i> New Financial Year</h5>
+                    <button type="button" class="btn-close" @onclick="HideCreateModal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrWhiteSpace(modalErrorMessage))
+                    {
+                        <div class="alert alert-danger">@modalErrorMessage</div>
+                    }
+
+                    <div class="mb-3">
+                        <label class="form-label">Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" @bind="createForm.Name" placeholder="e.g., FY 2025-26" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Start Date <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" @bind="createForm.StartDate" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">End Date <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" @bind="createForm.EndDate" />
+                    </div>
+                    <div class="form-check mb-3">
+                        <input type="checkbox" class="form-check-input" id="isCurrent" @bind="createForm.IsCurrent" />
+                        <label class="form-check-label" for="isCurrent">Set as Current Financial Year</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideCreateModal">Cancel</button>
+                    <button type="button" class="btn btn-primary" @onclick="CreateFinancialYear" disabled="@isSaving">
+                        @if (isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Create
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* Close Confirmation Modal *@
+@if (showCloseConfirmation)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Confirm Close</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="HideCloseConfirmation"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to close the financial year <strong>@closingFinancialYear?.Name</strong>?</p>
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i> This action cannot be undone. Once closed, no further transactions can be posted to this financial year.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideCloseConfirmation">Cancel</button>
+                    <button type="button" class="btn btn-danger" @onclick="CloseFinancialYear" disabled="@isSaving">
+                        @if (isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Close Financial Year
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<FinancialYearModel> financialYears = new();
+    private bool isLoading = true;
+    private bool isSaving = false;
+    private string? errorMessage;
+    private string? successMessage;
+    private string? modalErrorMessage;
+
+    // Create modal
+    private bool showCreateModal = false;
+    private CreateFinancialYearModel createForm = new();
+
+    // Close confirmation modal
+    private bool showCloseConfirmation = false;
+    private FinancialYearModel? closingFinancialYear;
+
+    // Role-based permissions - Only Admin (0)
+    private bool canManageMasterData = false;
+    private int currentUserRole = -1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckUserPermissions();
+        if (canManageMasterData)
+        {
+            await LoadFinancialYears();
+        }
+        else
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task CheckUserPermissions()
+    {
+        var currentUser = await AuthService.GetCurrentUserAsync();
+        if (currentUser != null)
+        {
+            currentUserRole = currentUser.Role;
+            // Only Admin (0) can manage financial years
+            canManageMasterData = currentUserRole == 0;
+        }
+    }
+
+    private async Task LoadFinancialYears()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            financialYears = await ApiClient.GetFinancialYearsAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading financial years: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ShowCreateModal()
+    {
+        createForm = new CreateFinancialYearModel
+        {
+            StartDate = new DateTime(DateTime.Today.Year, 4, 1),
+            EndDate = new DateTime(DateTime.Today.Year + 1, 3, 31)
+        };
+        modalErrorMessage = null;
+        showCreateModal = true;
+    }
+
+    private void HideCreateModal()
+    {
+        showCreateModal = false;
+        createForm = new();
+        modalErrorMessage = null;
+    }
+
+    private async Task CreateFinancialYear()
+    {
+        modalErrorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(createForm.Name))
+        {
+            modalErrorMessage = "Name is required.";
+            return;
+        }
+
+        if (createForm.EndDate <= createForm.StartDate)
+        {
+            modalErrorMessage = "End date must be after start date.";
+            return;
+        }
+
+        isSaving = true;
+
+        try
+        {
+            var result = await ApiClient.CreateFinancialYearAsync(createForm);
+            if (result != null)
+            {
+                successMessage = $"Financial year '{result.Name}' created successfully.";
+                await LoadFinancialYears();
+                HideCreateModal();
+            }
+            else
+            {
+                modalErrorMessage = "Failed to create financial year.";
+            }
+        }
+        catch (Exception ex)
+        {
+            modalErrorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task SetCurrentFinancialYear(int id)
+    {
+        isSaving = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var result = await ApiClient.SetCurrentFinancialYearAsync(id);
+            if (result)
+            {
+                successMessage = "Financial year set as current successfully.";
+                await LoadFinancialYears();
+            }
+            else
+            {
+                errorMessage = "Failed to set financial year as current.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void ShowCloseConfirmation(FinancialYearModel fy)
+    {
+        closingFinancialYear = fy;
+        showCloseConfirmation = true;
+    }
+
+    private void HideCloseConfirmation()
+    {
+        showCloseConfirmation = false;
+        closingFinancialYear = null;
+    }
+
+    private async Task CloseFinancialYear()
+    {
+        if (closingFinancialYear == null) return;
+
+        isSaving = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var result = await ApiClient.CloseFinancialYearAsync(closingFinancialYear.Id);
+            if (result)
+            {
+                successMessage = $"Financial year '{closingFinancialYear.Name}' closed successfully.";
+                HideCloseConfirmation();
+                await LoadFinancialYears();
+            }
+            else
+            {
+                errorMessage = "Failed to close financial year.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

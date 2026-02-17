@@ -1,0 +1,200 @@
+@page "/banquet/calendar"
+@inject IApiClientService ApiClient
+@inject NavigationManager Navigation
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0">Booking Calendar</h4>
+</div>
+
+<div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+    <div class="d-flex align-items-center gap-2">
+        <button class="btn btn-outline-secondary btn-sm" @onclick="PrevMonth">&lt; Prev</button>
+        <h5 class="mb-0 mx-2">@currentDate.ToString("MMMM yyyy")</h5>
+        <button class="btn btn-outline-secondary btn-sm" @onclick="NextMonth">Next &gt;</button>
+        <button class="btn btn-outline-primary btn-sm" @onclick="GoToToday">Today</button>
+    </div>
+
+    <select class="form-select form-select-sm" style="width: 180px;" @bind="selectedHall">
+        <option value="">All Halls</option>
+        @foreach (var hall in halls)
+        {
+            <option value="@hall.HallName">@hall.HallName</option>
+        }
+    </select>
+
+    <select class="form-select form-select-sm" style="width: 160px;" @bind="selectedStatus">
+        <option value="">All Status</option>
+        <option value="Enquiry">Enquiry</option>
+        <option value="Confirmed">Confirmed</option>
+        <option value="InProgress">In Progress</option>
+        <option value="Completed">Completed</option>
+        <option value="Cancelled">Cancelled</option>
+    </select>
+</div>
+
+@if (isLoading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else
+{
+    <div class="calendar-grid">
+        @foreach (var day in new[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" })
+        {
+            <div class="calendar-header-cell">@day</div>
+        }
+
+        @foreach (var day in calendarDays)
+        {
+            var isOtherMonth = day.Month != currentDate.Month;
+            var isToday = day.Date == DateTime.Today;
+            var cellClass = "calendar-cell" + (isOtherMonth ? " other-month" : "") + (isToday ? " today" : "");
+            var dayBookings = GetBookingsForDay(day);
+
+            <div class="@cellClass">
+                <div class="calendar-day-number">@day.Day</div>
+                @if (dayBookings.Count > 0)
+                {
+                    var showCount = dayBookings.Count > 3 ? 2 : dayBookings.Count;
+                    @for (var i = 0; i < showCount; i++)
+                    {
+                        var booking = dayBookings[i];
+                        <div class="calendar-booking @GetStatusClass(booking.Status)"
+                             @onclick="() => NavigateToBooking(booking.Id)"
+                             title="@booking.HallName - @booking.ContactPersonName">
+                            <div class="calendar-booking-hall">@booking.HallName @FormatTime(booking.EventStartTime)-@FormatTime(booking.EventEndTime)</div>
+                            <div class="calendar-booking-contact">@Truncate(booking.ContactPersonName, 18)</div>
+                        </div>
+                    }
+                    @if (dayBookings.Count > 3)
+                    {
+                        <div class="calendar-booking-more" @onclick="() => NavigateToDateBookings(day)">
+                            +@(dayBookings.Count - 2) more
+                        </div>
+                    }
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private DateTime currentDate = DateTime.Today;
+    private bool isLoading = true;
+    private List<BanquetBookingListModel> allBookings = new();
+    private List<BanquetHallModel> halls = new();
+    private Dictionary<DateTime, List<BanquetBookingListModel>> bookingsByDate = new();
+    private List<DateTime> calendarDays = new();
+
+    private string selectedHall = "";
+    private string selectedStatus = "";
+
+    private string _prevHall = "";
+    private string _prevStatus = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var bookingsTask = ApiClient.GetAllBanquetBookingsAsync();
+        var hallsTask = ApiClient.GetAllBanquetHallsAsync();
+        await Task.WhenAll(bookingsTask, hallsTask);
+        allBookings = await bookingsTask;
+        halls = await hallsTask;
+        BuildCalendar();
+        isLoading = false;
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (_prevHall != selectedHall || _prevStatus != selectedStatus)
+        {
+            _prevHall = selectedHall;
+            _prevStatus = selectedStatus;
+            BuildBookingIndex();
+            StateHasChanged();
+        }
+    }
+
+    private void BuildCalendar()
+    {
+        BuildCalendarDays();
+        BuildBookingIndex();
+    }
+
+    private void BuildCalendarDays()
+    {
+        calendarDays = new List<DateTime>();
+        var firstOfMonth = new DateTime(currentDate.Year, currentDate.Month, 1);
+        var startDay = firstOfMonth.AddDays(-(int)firstOfMonth.DayOfWeek);
+        var lastOfMonth = firstOfMonth.AddMonths(1).AddDays(-1);
+        var endDay = lastOfMonth.AddDays(6 - (int)lastOfMonth.DayOfWeek);
+
+        for (var d = startDay; d <= endDay; d = d.AddDays(1))
+        {
+            calendarDays.Add(d);
+        }
+    }
+
+    private void BuildBookingIndex()
+    {
+        var filtered = allBookings.AsEnumerable();
+
+        if (!string.IsNullOrEmpty(selectedHall))
+            filtered = filtered.Where(b => b.HallName == selectedHall);
+
+        if (!string.IsNullOrEmpty(selectedStatus) && Enum.TryParse<BanquetBookingStatus>(selectedStatus, out var status))
+            filtered = filtered.Where(b => b.Status == status);
+
+        bookingsByDate = filtered
+            .GroupBy(b => b.EventDate.Date)
+            .ToDictionary(g => g.Key, g => g.OrderBy(b => b.EventStartTime).ToList());
+    }
+
+    private List<BanquetBookingListModel> GetBookingsForDay(DateTime day)
+    {
+        return bookingsByDate.TryGetValue(day.Date, out var list) ? list : new();
+    }
+
+    private void PrevMonth()
+    {
+        currentDate = currentDate.AddMonths(-1);
+        BuildCalendar();
+    }
+
+    private void NextMonth()
+    {
+        currentDate = currentDate.AddMonths(1);
+        BuildCalendar();
+    }
+
+    private void GoToToday()
+    {
+        currentDate = DateTime.Today;
+        BuildCalendar();
+    }
+
+    private void NavigateToBooking(int id) => Navigation.NavigateTo($"/banquet/bookings/{id}");
+
+    private void NavigateToDateBookings(DateTime date) => Navigation.NavigateTo($"/banquet/bookings?date={date:yyyy-MM-dd}");
+
+    private string GetStatusClass(BanquetBookingStatus status) => status switch
+    {
+        BanquetBookingStatus.Enquiry => "status-enquiry",
+        BanquetBookingStatus.Confirmed => "status-confirmed",
+        BanquetBookingStatus.InProgress => "status-inprogress",
+        BanquetBookingStatus.Completed => "status-completed",
+        BanquetBookingStatus.Cancelled => "status-cancelled",
+        _ => ""
+    };
+
+    private string FormatTime(TimeSpan ts) => $"{ts.Hours:D2}:{ts.Minutes:D2}";
+
+    private string Truncate(string? value, int max)
+    {
+        if (string.IsNullOrEmpty(value)) return "";
+        return value.Length <= max ? value : value[..max] + "...";
+    }
+}

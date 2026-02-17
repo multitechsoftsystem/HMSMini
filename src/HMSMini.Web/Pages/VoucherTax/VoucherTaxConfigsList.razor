@@ -70,6 +70,7 @@
                                 <th>SGST</th>
                                 <th>IGST</th>
                                 <th>Total (CGST+SGST)</th>
+                                <th>SAC Code</th>
                                 <th>Description</th>
                                 <th>Status</th>
                                 <th>Actions</th>
@@ -84,6 +85,7 @@
                                     <td><span class="badge bg-info">@config.SgstPercentage%</span></td>
                                     <td><span class="badge bg-warning text-dark">@config.IgstPercentage%</span></td>
                                     <td><span class="badge bg-primary">@(config.CgstPercentage + config.SgstPercentage)%</span></td>
+                                    <td>@(config.SACCode ?? "-")</td>
                                     <td><small class="text-muted">@config.Description</small></td>
                                     <td>
                                         @if (config.IsActive)
@@ -176,9 +178,15 @@
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label">Description</label>
-                        <textarea class="form-control" @bind="currentConfig.Description" rows="2" placeholder="Brief description of this tax configuration"></textarea>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">SAC Code</label>
+                            <input type="text" class="form-control" @bind="currentConfig.SACCode" placeholder="e.g., 996331" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Description</label>
+                            <textarea class="form-control" @bind="currentConfig.Description" rows="1" placeholder="Brief description"></textarea>
+                        </div>
                     </div>
 
                     <div class="row">
@@ -300,6 +308,7 @@
             IgstPercentage = config.IgstPercentage,
             IsActive = config.IsActive,
             Description = config.Description,
+            SACCode = config.SACCode,
             DisplayOrder = config.DisplayOrder
         };
         showModal = true;

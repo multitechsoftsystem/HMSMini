@@ -1,0 +1,563 @@
+@page "/accounts/journal-entries"
+@inject IApiClientService ApiClient
+@inject IAuthenticationService AuthService
+@using HMSMini.Web.Services
+@using HMSMini.Web.Models
+
+<PageTitle>Journal Entries - MSS</PageTitle>
+
+<div class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Journal Entries</h2>
+        @if (canManageMasterData)
+        {
+            <button class="btn btn-primary" @onclick="ShowCreateModal">
+                <i class="bi bi-plus-circle"></i> New Manual Entry
+            </button>
+        }
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible">
+            @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+        </div>
+    }
+    @if (!string.IsNullOrWhiteSpace(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible">
+            @successMessage
+            <button type="button" class="btn-close" @onclick="() => successMessage = string.Empty"></button>
+        </div>
+    }
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">From Date</label>
+                    <input type="date" class="form-control" @bind="fromDate" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">To Date</label>
+                    <input type="date" class="form-control" @bind="toDate" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Financial Year</label>
+                    <select class="form-select" @bind="selectedFinancialYearId">
+                        <option value="">-- All --</option>
+                        @foreach (var fy in financialYears)
+                        {
+                            <option value="@fy.Id">@fy.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-outline-primary w-100" @onclick="LoadEntries">
+                        <i class="bi bi-search"></i> Search
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Journal Entries Table -->
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border"></div>
+        </div>
+    }
+    else if (entries.Any())
+    {
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>Entry Number</th>
+                        <th>Entry Date</th>
+                        <th>Description</th>
+                        <th>Source Type</th>
+                        <th>Total Amount</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var entry in entries)
+                    {
+                        <tr>
+                            <td>
+                                <button class="btn btn-sm btn-link p-0" @onclick="() => ToggleExpandRow(entry.Id)">
+                                    <i class="bi @(expandedEntryId == entry.Id ? "bi-chevron-up" : "bi-chevron-down")"></i>
+                                </button>
+                            </td>
+                            <td><strong>@entry.EntryNumber</strong></td>
+                            <td>@entry.EntryDate.ToString("dd-MMM-yyyy")</td>
+                            <td>@entry.Description</td>
+                            <td>@entry.SourceTypeName</td>
+                            <td class="text-end">@entry.TotalAmount.ToString("N2")</td>
+                            <td>
+                                @if (entry.IsReversed)
+                                {
+                                    <span class="badge bg-danger">Reversed</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-success">Active</span>
+                                }
+                            </td>
+                            <td>
+                                @if (canManageMasterData && !entry.IsReversed)
+                                {
+                                    <button class="btn btn-sm btn-outline-warning" @onclick="() => ReverseEntry(entry.Id)" disabled="@reversingId.HasValue">
+                                        @if (reversingId == entry.Id)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-1"></span>
+                                        }
+                                        <i class="bi bi-arrow-counterclockwise"></i> Reverse
+                                    </button>
+                                }
+                                else if (entry.IsReversed)
+                                {
+                                    <span class="text-muted">Reversed</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">View Only</span>
+                                }
+                            </td>
+                        </tr>
+                        @if (expandedEntryId == entry.Id && entry.Lines.Any())
+                        {
+                            <tr>
+                                <td colspan="8" class="p-0">
+                                    <div class="bg-light p-3 mx-3 mb-2 rounded">
+                                        <h6 class="mb-2">Journal Lines</h6>
+                                        <table class="table table-sm table-bordered mb-0">
+                                            <thead class="table-secondary">
+                                                <tr>
+                                                    <th>Account Code</th>
+                                                    <th>Account Name</th>
+                                                    <th class="text-end">Debit Amount</th>
+                                                    <th class="text-end">Credit Amount</th>
+                                                    <th>Description</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var line in entry.Lines)
+                                                {
+                                                    <tr>
+                                                        <td>@line.AccountCode</td>
+                                                        <td>@line.AccountName</td>
+                                                        <td class="text-end">@(line.DebitAmount > 0 ? line.DebitAmount.ToString("N2") : "-")</td>
+                                                        <td class="text-end">@(line.CreditAmount > 0 ? line.CreditAmount.ToString("N2") : "-")</td>
+                                                        <td>@(line.Description ?? "-")</td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                            <tfoot class="fw-bold">
+                                                <tr>
+                                                    <td colspan="2" class="text-end">Totals:</td>
+                                                    <td class="text-end">@entry.Lines.Sum(l => l.DebitAmount).ToString("N2")</td>
+                                                    <td class="text-end">@entry.Lines.Sum(l => l.CreditAmount).ToString("N2")</td>
+                                                    <td></td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> No journal entries found for the selected filters.
+        </div>
+    }
+</div>
+
+<!-- Create Manual Entry Modal -->
+@if (showCreateModal)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Create Manual Journal Entry</h5>
+                    <button type="button" class="btn-close" @onclick="HideCreateModal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrWhiteSpace(modalErrorMessage))
+                    {
+                        <div class="alert alert-danger">@modalErrorMessage</div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(modalSuccessMessage))
+                    {
+                        <div class="alert alert-success">@modalSuccessMessage</div>
+                    }
+
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Entry Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" @bind="newEntry.EntryDate" />
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label">Description <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" @bind="newEntry.Description" placeholder="Enter journal entry description" />
+                        </div>
+                    </div>
+
+                    <!-- Lines Table -->
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">Entry Lines</h6>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="AddLine">
+                            <i class="bi bi-plus"></i> Add Line
+                        </button>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 35%;">Account</th>
+                                    <th style="width: 20%;" class="text-end">Debit Amount</th>
+                                    <th style="width: 20%;" class="text-end">Credit Amount</th>
+                                    <th style="width: 20%;">Description</th>
+                                    <th style="width: 5%;"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (int i = 0; i < newEntry.Lines.Count; i++)
+                                {
+                                    var index = i;
+                                    <tr>
+                                        <td>
+                                            <select class="form-select form-select-sm" @bind="newEntry.Lines[index].AccountId">
+                                                <option value="0">-- Select Account --</option>
+                                                @foreach (var account in accounts)
+                                                {
+                                                    <option value="@account.Id">@account.DisplayName</option>
+                                                }
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <input type="number" class="form-control form-control-sm text-end" step="0.01" min="0"
+                                                   @bind="newEntry.Lines[index].DebitAmount" />
+                                        </td>
+                                        <td>
+                                            <input type="number" class="form-control form-control-sm text-end" step="0.01" min="0"
+                                                   @bind="newEntry.Lines[index].CreditAmount" />
+                                        </td>
+                                        <td>
+                                            <input type="text" class="form-control form-control-sm" @bind="newEntry.Lines[index].Description" />
+                                        </td>
+                                        <td class="text-center">
+                                            @if (newEntry.Lines.Count > 2)
+                                            {
+                                                <button class="btn btn-sm btn-outline-danger" @onclick="() => RemoveLine(index)">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                            <tfoot>
+                                @{
+                                    var totalDebit = newEntry.Lines.Sum(l => l.DebitAmount);
+                                    var totalCredit = newEntry.Lines.Sum(l => l.CreditAmount);
+                                    var isBalanced = totalDebit == totalCredit && totalDebit > 0;
+                                }
+                                <tr class="fw-bold @(isBalanced ? "" : "table-danger")">
+                                    <td class="text-end">Totals:</td>
+                                    <td class="text-end">@totalDebit.ToString("N2")</td>
+                                    <td class="text-end">@totalCredit.ToString("N2")</td>
+                                    <td colspan="2">
+                                        @if (!isBalanced)
+                                        {
+                                            <span class="text-danger">
+                                                <i class="bi bi-exclamation-triangle"></i>
+                                                @if (totalDebit != totalCredit)
+                                                {
+                                                    <text>Debit and Credit totals must match</text>
+                                                }
+                                                else
+                                                {
+                                                    <text>Totals must be greater than zero</text>
+                                                }
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-success"><i class="bi bi-check-circle"></i> Balanced</span>
+                                        }
+                                    </td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideCreateModal">Cancel</button>
+                    <button type="button" class="btn btn-primary" @onclick="SaveEntry" disabled="@saving">
+                        @if (saving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Create Entry
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<JournalEntryModel> entries = new();
+    private List<FinancialYearModel> financialYears = new();
+    private List<AccountDropdownModel> accounts = new();
+    private bool isLoading = true;
+    private bool saving = false;
+    private bool showCreateModal = false;
+    private int? expandedEntryId = null;
+    private int? reversingId = null;
+
+    private string errorMessage = "";
+    private string successMessage = "";
+    private string modalErrorMessage = "";
+    private string modalSuccessMessage = "";
+
+    // Filters
+    private DateTime? fromDate;
+    private DateTime? toDate;
+    private string selectedFinancialYearId = "";
+
+    // Create form
+    private CreateJournalEntryModel newEntry = new();
+
+    // Role-based permissions
+    private bool canManageMasterData = false;
+    private int currentUserRole = -1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckUserPermissions();
+        await LoadFinancialYears();
+        await LoadEntries();
+    }
+
+    private async Task CheckUserPermissions()
+    {
+        var currentUser = await AuthService.GetCurrentUserAsync();
+        if (currentUser != null)
+        {
+            currentUserRole = currentUser.Role;
+            canManageMasterData = currentUserRole == 0 || currentUserRole == 1;
+        }
+    }
+
+    private async Task LoadFinancialYears()
+    {
+        try
+        {
+            financialYears = await ApiClient.GetFinancialYearsAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load financial years: {ex.Message}";
+        }
+    }
+
+    private async Task LoadEntries()
+    {
+        isLoading = true;
+        errorMessage = "";
+
+        try
+        {
+            int? fyId = null;
+            if (!string.IsNullOrEmpty(selectedFinancialYearId) && int.TryParse(selectedFinancialYearId, out var parsedId))
+            {
+                fyId = parsedId;
+            }
+
+            entries = await ApiClient.GetJournalEntriesAsync(fromDate, toDate, fyId);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Failed to load journal entries: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ToggleExpandRow(int entryId)
+    {
+        expandedEntryId = expandedEntryId == entryId ? null : entryId;
+    }
+
+    private async Task ShowCreateModal()
+    {
+        modalErrorMessage = "";
+        modalSuccessMessage = "";
+        newEntry = new CreateJournalEntryModel
+        {
+            EntryDate = DateTime.Today,
+            Lines = new List<CreateJournalEntryLineModel>
+            {
+                new(),
+                new()
+            }
+        };
+
+        try
+        {
+            accounts = await ApiClient.GetAccountDropdownAsync();
+        }
+        catch (Exception ex)
+        {
+            modalErrorMessage = $"Failed to load accounts: {ex.Message}";
+        }
+
+        showCreateModal = true;
+    }
+
+    private void HideCreateModal()
+    {
+        showCreateModal = false;
+        newEntry = new();
+        modalErrorMessage = "";
+        modalSuccessMessage = "";
+    }
+
+    private void AddLine()
+    {
+        newEntry.Lines.Add(new CreateJournalEntryLineModel());
+    }
+
+    private void RemoveLine(int index)
+    {
+        if (newEntry.Lines.Count > 2)
+        {
+            newEntry.Lines.RemoveAt(index);
+        }
+    }
+
+    private async Task SaveEntry()
+    {
+        modalErrorMessage = "";
+        modalSuccessMessage = "";
+
+        if (string.IsNullOrWhiteSpace(newEntry.Description))
+        {
+            modalErrorMessage = "Description is required.";
+            return;
+        }
+
+        if (newEntry.Lines.Count < 2)
+        {
+            modalErrorMessage = "At least two lines are required.";
+            return;
+        }
+
+        if (newEntry.Lines.Any(l => l.AccountId == 0))
+        {
+            modalErrorMessage = "All lines must have an account selected.";
+            return;
+        }
+
+        var totalDebit = newEntry.Lines.Sum(l => l.DebitAmount);
+        var totalCredit = newEntry.Lines.Sum(l => l.CreditAmount);
+
+        if (totalDebit != totalCredit)
+        {
+            modalErrorMessage = "Total debit must equal total credit.";
+            return;
+        }
+
+        if (totalDebit <= 0)
+        {
+            modalErrorMessage = "Total amounts must be greater than zero.";
+            return;
+        }
+
+        if (newEntry.Lines.Any(l => l.DebitAmount > 0 && l.CreditAmount > 0))
+        {
+            modalErrorMessage = "A line cannot have both debit and credit amounts.";
+            return;
+        }
+
+        if (newEntry.Lines.Any(l => l.DebitAmount == 0 && l.CreditAmount == 0))
+        {
+            modalErrorMessage = "Each line must have either a debit or credit amount.";
+            return;
+        }
+
+        saving = true;
+
+        try
+        {
+            var result = await ApiClient.CreateJournalEntryAsync(newEntry);
+            if (result != null)
+            {
+                modalSuccessMessage = $"Journal entry {result.EntryNumber} created successfully!";
+                await LoadEntries();
+                await Task.Delay(1000);
+                HideCreateModal();
+            }
+            else
+            {
+                modalErrorMessage = "Failed to create journal entry.";
+            }
+        }
+        catch (Exception ex)
+        {
+            modalErrorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    private async Task ReverseEntry(int entryId)
+    {
+        reversingId = entryId;
+        errorMessage = "";
+        successMessage = "";
+
+        try
+        {
+            var result = await ApiClient.ReverseJournalEntryAsync(entryId);
+            if (result != null)
+            {
+                successMessage = $"Journal entry reversed successfully. Reversal entry: {result.EntryNumber}";
+                await LoadEntries();
+            }
+            else
+            {
+                errorMessage = "Failed to reverse journal entry.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error reversing entry: {ex.Message}";
+        }
+        finally
+        {
+            reversingId = null;
+        }
+    }
+}

@@ -2,6 +2,8 @@
 @inject IApiClientService ApiClient
 @inject IAuthenticationService AuthService
 @inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@using HMSMini.Web.Utilities
 
 <PageTitle>Booking Detail - MSS</PageTitle>
 
@@ -114,12 +116,13 @@ else
                 @if (booking.Menus.Any())
                 {
                     <table class="table table-sm">
-                        <thead><tr><th>Package/Item</th><th>Qty</th><th>Rate/Plate</th><th>Total</th><th></th></tr></thead>
+                        <thead><tr><th>Date</th><th>Item Name</th><th>Qty (Plates)</th><th>Rate/Plate</th><th>Total</th><th></th></tr></thead>
                         <tbody>
                             @foreach (var m in booking.Menus)
                             {
                                 <tr>
-                                    <td>@(m.PackageName ?? m.ItemName ?? "Custom")</td>
+                                    <td>@m.MenuDate.ToString("MMM dd")</td>
+                                    <td>@(m.ItemName ?? m.PackageName ?? "-")</td>
                                     <td>@m.Quantity</td>
                                     <td>@m.RatePerPlate.ToString("N2")</td>
                                     <td>@m.TotalAmount.ToString("N2")</td>
@@ -154,11 +157,12 @@ else
                 @if (booking.Services.Any())
                 {
                     <table class="table table-sm">
-                        <thead><tr><th>Service</th><th>Qty</th><th>Rate</th><th>Total</th><th>Tax</th><th></th></tr></thead>
+                        <thead><tr><th>Date</th><th>Service</th><th>Qty</th><th>Rate</th><th>Total</th><th>Tax</th><th></th></tr></thead>
                         <tbody>
                             @foreach (var s in booking.Services)
                             {
                                 <tr>
+                                    <td>@s.ServiceDate.ToString("MMM dd")</td>
                                     <td>@s.ServiceName</td>
                                     <td>@s.Quantity</td>
                                     <td>@s.Rate.ToString("N2")</td>
@@ -272,11 +276,15 @@ else
         <div class="card">
             <div class="card-header d-flex justify-content-between">
                 <h5 class="mb-0">Billing</h5>
-                <div>
+                <div class="no-print">
                     <button class="btn btn-sm btn-outline-primary me-2" @onclick="PreviewBill" disabled="@billingLoading">Preview Bill</button>
                     @if (invoice == null && booking.Status != BanquetBookingStatus.Cancelled)
                     {
-                        <button class="btn btn-sm btn-success" @onclick="FinalizeInvoice" disabled="@billingLoading">Finalize Invoice</button>
+                        <button class="btn btn-sm btn-success me-2" @onclick="FinalizeInvoice" disabled="@billingLoading">Finalize Invoice</button>
+                    }
+                    @if (invoice != null || billPreview != null)
+                    {
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="PrintInvoice"><i class="bi bi-printer"></i> Print</button>
                     }
                 </div>
             </div>
@@ -285,62 +293,344 @@ else
                 {
                     <div class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading...</div>
                 }
-                else if (invoice != null)
+                else if (invoice != null || billPreview != null)
                 {
-                    <div class="bill-preview" id="printable-invoice">
-                        <h4>Invoice #@invoice.InvoiceNumber</h4>
-                        <p><strong>Date:</strong> @invoice.InvoiceDate.ToString("MMM dd, yyyy") | <strong>Status:</strong> @invoice.PaymentStatus</p>
-                        <hr />
-                        <div class="row">
-                            <div class="col-md-6"><strong>Hall:</strong> @invoice.HallName | <strong>Event:</strong> @invoice.EventTypeName</div>
-                            <div class="col-md-6"><strong>Date:</strong> @invoice.EventDate.ToString("MMM dd, yyyy") | <strong>Guests:</strong> @(invoice.ActualGuests ?? invoice.ExpectedGuests)</div>
+                    var isFinalized = invoice != null;
+                        var isCgstSgst = booking?.TaxType == TaxType.CgstSgst;
+                        var sacCode = GetHotelSetting("HotelSACCode");
+                        var bookingCompany = GetBookingCompany();
+
+                        // Extract common values
+                        string invBookingNumber, invHallName, invEventTypeName, invContactPerson;
+                        string? invCompanyName;
+                        DateTime invEventDate;
+                        int invExpectedGuests;
+                        int? invActualGuests;
+                        decimal invHallRent, invDiscountAmount, invTaxableAmount, invTotalTax, invGrandTotal, invTotalPaid, invBalanceDue;
+                        decimal invDiscountPct;
+                        List<BanquetMenuChargeModel> invMenuCharges;
+                        List<BanquetServiceChargeModel> invServiceCharges;
+                        List<BanquetAdditionalChargeModel> invAdditionalCharges;
+                        List<BanquetTaxSummaryModel> invTaxBreakdown;
+                        decimal invMenuSub, invServiceSub, invAdditionalSub;
+
+                        if (isFinalized)
+                        {
+                            invBookingNumber = invoice!.BookingNumber;
+                            invHallName = invoice.HallName;
+                            invEventTypeName = invoice.EventTypeName;
+                            invContactPerson = invoice.ContactPersonName;
+                            invCompanyName = invoice.CompanyName;
+                            invEventDate = invoice.EventDate;
+                            invExpectedGuests = invoice.ExpectedGuests;
+                            invActualGuests = invoice.ActualGuests;
+                            invHallRent = invoice.HallRent;
+                            invDiscountAmount = invoice.DiscountAmount;
+                            invMenuSub = invoice.MenuChargesSubtotal;
+                            invServiceSub = invoice.ServiceChargesSubtotal;
+                            invAdditionalSub = invoice.AdditionalChargesSubtotal;
+                            var invSubtotal = invHallRent + invMenuSub + invServiceSub + invAdditionalSub;
+                            invDiscountPct = invSubtotal > 0 ? Math.Round(invoice.DiscountAmount / invSubtotal * 100, 2) : 0;
+                            invTaxableAmount = invoice.SubtotalBeforeTax;
+                            invTotalTax = invoice.TotalTax;
+                            invGrandTotal = invoice.GrandTotal;
+                            invTotalPaid = invoice.TotalPaid;
+                            invBalanceDue = invoice.BalanceDue;
+                            invMenuCharges = invoice.MenuCharges;
+                            invServiceCharges = invoice.ServiceCharges;
+                            invAdditionalCharges = invoice.AdditionalCharges;
+                            invTaxBreakdown = invoice.TaxBreakdown;
+                        }
+                        else
+                        {
+                            invBookingNumber = billPreview!.BookingNumber;
+                            invHallName = billPreview.HallName;
+                            invEventTypeName = billPreview.EventTypeName;
+                            invContactPerson = billPreview.ContactPersonName;
+                            invCompanyName = billPreview.CompanyName;
+                            invEventDate = billPreview.EventDate;
+                            invExpectedGuests = billPreview.ExpectedGuests;
+                            invActualGuests = billPreview.ActualGuests;
+                            invHallRent = billPreview.HallRent;
+                            invDiscountAmount = billPreview.DiscountAmount;
+                            invDiscountPct = billPreview.DiscountPercentage;
+                            invMenuSub = billPreview.MenuChargesSubtotal;
+                            invServiceSub = billPreview.ServiceChargesSubtotal;
+                            invAdditionalSub = billPreview.AdditionalChargesSubtotal;
+                            invTaxableAmount = billPreview.SubtotalAfterDiscount;
+                            invTotalTax = billPreview.TotalTax;
+                            invGrandTotal = billPreview.GrandTotal;
+                            invTotalPaid = billPreview.TotalPaid;
+                            invBalanceDue = billPreview.BalanceDue;
+                            invMenuCharges = billPreview.MenuCharges;
+                            invServiceCharges = billPreview.ServiceCharges;
+                            invAdditionalCharges = billPreview.AdditionalCharges;
+                            invTaxBreakdown = billPreview.TaxBreakdown;
+                        }
+
+                        var invSubtotalAll = invHallRent + invMenuSub + invServiceSub + invAdditionalSub;
+
+                        // Build line items (skip rows with zero amount)
+                        var lineItems = new List<(string Name, string Sac, int Qty, decimal Rate, decimal Amount, decimal CgstPct, decimal SgstPct, decimal IgstPct, decimal TaxAmt)>();
+                        if (invHallRent > 0)
+                            lineItems.Add(("Hall Rent", sacCode, 1, invHallRent, invHallRent, 0, 0, 0, 0));
+                        foreach (var m in invMenuCharges)
+                            if (m.TotalAmount > 0)
+                                lineItems.Add((m.ItemName ?? m.PackageName ?? "Menu Item", m.SACCode ?? sacCode, m.Quantity, m.RatePerPlate, m.TotalAmount, m.ApplyTax ? m.CgstPercentage : 0, m.ApplyTax ? m.SgstPercentage : 0, m.ApplyTax ? m.IgstPercentage : 0, m.TaxAmount));
+                        foreach (var s in invServiceCharges)
+                            if (s.TotalAmount > 0)
+                                lineItems.Add((s.ServiceName, s.SACCode ?? sacCode, s.Quantity, s.Rate, s.TotalAmount, s.ApplyTax ? s.CgstPercentage : 0, s.ApplyTax ? s.SgstPercentage : 0, s.ApplyTax ? s.IgstPercentage : 0, s.TaxAmount));
+                        foreach (var c in invAdditionalCharges)
+                            if (c.TotalAmount > 0)
+                                lineItems.Add(($"{c.ChargeType} - {c.Description}", c.SACCode ?? "", c.Quantity, c.Amount, c.TotalAmount, c.ApplyTax ? c.CgstPercentage : 0, c.ApplyTax ? c.SgstPercentage : 0, c.ApplyTax ? c.IgstPercentage : 0, c.TaxAmount));
+
+                        var footColSpan = 5;
+                        var taxColSpan = isCgstSgst ? 3 : 2;
+                        var hotelName = GetHotelSetting("HotelName");
+
+                    <div class="gst-invoice" id="printable-invoice">
+                        @if (!string.IsNullOrEmpty(billHeadingImagePath))
+                        {
+                            <div class="gst-invoice-heading-img">
+                                <img src="@($"{apiBaseUrl}{billHeadingImagePath}")" alt="Bill Heading" />
+                            </div>
+                        }
+
+                        <div class="gst-invoice-header">
+                            <div class="gst-invoice-header-left">
+                                @if (!string.IsNullOrEmpty(hotelName))
+                                {
+                                    <h3>@hotelName</h3>
+                                }
+                                @{ var hotelAddr = GetHotelSetting("HotelAddress"); }
+                                @if (!string.IsNullOrEmpty(hotelAddr))
+                                {
+                                    <p>@hotelAddr</p>
+                                }
+                                @{
+                                    var hotelPhone = GetHotelSetting("HotelPhone");
+                                    var hotelEmail = GetHotelSetting("HotelEmail");
+                                }
+                                @if (!string.IsNullOrEmpty(hotelPhone) || !string.IsNullOrEmpty(hotelEmail))
+                                {
+                                    <p>
+                                        @if (!string.IsNullOrEmpty(hotelPhone)) { <span>Phone: @hotelPhone</span> }
+                                        @if (!string.IsNullOrEmpty(hotelPhone) && !string.IsNullOrEmpty(hotelEmail)) { <span> | </span> }
+                                        @if (!string.IsNullOrEmpty(hotelEmail)) { <span>Email: @hotelEmail</span> }
+                                    </p>
+                                }
+                                @{ var hotelGstin = GetHotelSetting("HotelGSTIN"); }
+                                @if (!string.IsNullOrEmpty(hotelGstin))
+                                {
+                                    <p><strong>GSTIN:</strong> @hotelGstin</p>
+                                }
+                                @{ var stateCode = GetHotelSetting("HotelStateCode"); }
+                                @if (!string.IsNullOrEmpty(stateCode))
+                                {
+                                    <p><strong>State:</strong> @stateCode</p>
+                                }
+                            </div>
+                            <div class="gst-invoice-header-right">
+                                <h4>@(isFinalized ? "Tax Invoice" : "Bill Preview")</h4>
+                                @if (isFinalized)
+                                {
+                                    <p><strong>Invoice #:</strong> @invoice!.InvoiceNumber</p>
+                                    <p><strong>Date:</strong> @invoice.InvoiceDate.ToString("MMM dd, yyyy")</p>
+                                }
+                                else
+                                {
+                                    <p><strong>Date:</strong> @DateTime.Today.ToString("MMM dd, yyyy")</p>
+                                }
+                                <p><strong>Booking #:</strong> @invBookingNumber</p>
+                            </div>
                         </div>
-                        <hr />
-                        <table class="table table-sm">
+
+                        <div class="gst-invoice-parties">
+                            <div>
+                                <h6>Bill To</h6>
+                                @if (bookingCompany != null)
+                                {
+                                    <p class="party-name">@bookingCompany.CompanyName</p>
+                                    @if (!string.IsNullOrEmpty(bookingCompany.Address))
+                                    {
+                                        <p>@bookingCompany.Address@(!string.IsNullOrEmpty(bookingCompany.City) ? $", {bookingCompany.City}" : "")@(!string.IsNullOrEmpty(bookingCompany.State) ? $", {bookingCompany.State}" : "")</p>
+                                    }
+                                    @if (!string.IsNullOrEmpty(bookingCompany.GSTNumber))
+                                    {
+                                        <p><strong>GSTIN:</strong> @bookingCompany.GSTNumber</p>
+                                    }
+                                }
+                                <p><strong>Contact:</strong> @invContactPerson</p>
+                                @if (!string.IsNullOrEmpty(booking?.ContactPhone))
+                                {
+                                    <p><strong>Phone:</strong> @booking.ContactPhone</p>
+                                }
+                            </div>
+                            <div>
+                                <h6>Event Details</h6>
+                                <p><strong>Hall:</strong> @invHallName</p>
+                                <p><strong>Event:</strong> @invEventTypeName</p>
+                                <p><strong>Date:</strong> @invEventDate.ToString("MMM dd, yyyy")</p>
+                                <p><strong>Guests:</strong> @(invActualGuests ?? invExpectedGuests)</p>
+                            </div>
+                        </div>
+
+                        <table class="gst-invoice-items">
+                            <thead>
+                                <tr>
+                                    <th style="width:40px;">#</th>
+                                    <th style="text-align:left;">Particulars</th>
+                                    <th>SAC</th>
+                                    <th>Qty</th>
+                                    <th>Rate</th>
+                                    <th>Amount</th>
+                                    @if (isCgstSgst)
+                                    {
+                                        <th>CGST %</th>
+                                        <th>SGST %</th>
+                                    }
+                                    else
+                                    {
+                                        <th>IGST %</th>
+                                    }
+                                    <th>Tax Amt</th>
+                                </tr>
+                            </thead>
                             <tbody>
-                                <tr><td>Hall Rent</td><td class="text-end">@invoice.HallRent.ToString("N2")</td></tr>
-                                <tr><td>Menu Charges</td><td class="text-end">@invoice.MenuChargesSubtotal.ToString("N2")</td></tr>
-                                <tr><td>Service Charges</td><td class="text-end">@invoice.ServiceChargesSubtotal.ToString("N2")</td></tr>
-                                <tr><td>Additional Charges</td><td class="text-end">@invoice.AdditionalChargesSubtotal.ToString("N2")</td></tr>
-                                @if (invoice.DiscountAmount > 0)
+                                @for (var i = 0; i < lineItems.Count; i++)
                                 {
-                                    <tr><td>Discount</td><td class="text-end text-danger">-@invoice.DiscountAmount.ToString("N2")</td></tr>
+                                    var item = lineItems[i];
+                                    <tr>
+                                        <td class="text-center">@(i + 1)</td>
+                                        <td>@item.Name</td>
+                                        <td class="text-center">@(string.IsNullOrEmpty(item.Sac) ? "-" : item.Sac)</td>
+                                        <td class="text-center">@item.Qty</td>
+                                        <td class="text-end">@item.Rate.ToString("N2")</td>
+                                        <td class="text-end">@item.Amount.ToString("N2")</td>
+                                        @if (isCgstSgst)
+                                        {
+                                            <td class="text-center">@(item.CgstPct > 0 ? item.CgstPct.ToString("0.##") : "-")</td>
+                                            <td class="text-center">@(item.SgstPct > 0 ? item.SgstPct.ToString("0.##") : "-")</td>
+                                        }
+                                        else
+                                        {
+                                            <td class="text-center">@(item.IgstPct > 0 ? item.IgstPct.ToString("0.##") : "-")</td>
+                                        }
+                                        <td class="text-end">@(item.TaxAmt > 0 ? item.TaxAmt.ToString("N2") : "-")</td>
+                                    </tr>
                                 }
-                                @foreach (var t in invoice.TaxBreakdown)
-                                {
-                                    <tr><td>@t.TaxType (@t.TaxPercentage%)</td><td class="text-end">@t.TotalTaxAmount.ToString("N2")</td></tr>
-                                }
-                                <tr class="fw-bold"><td>Grand Total</td><td class="text-end">@invoice.GrandTotal.ToString("N2")</td></tr>
-                                <tr><td>Total Paid</td><td class="text-end">@invoice.TotalPaid.ToString("N2")</td></tr>
-                                <tr class="fw-bold"><td>Balance Due</td><td class="text-end @(invoice.BalanceDue > 0 ? "text-danger" : "text-success")">@invoice.BalanceDue.ToString("N2")</td></tr>
                             </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="@footColSpan" class="text-end"><strong>Subtotal</strong></td>
+                                    <td class="text-end"><strong>@invSubtotalAll.ToString("N2")</strong></td>
+                                    <td colspan="@taxColSpan"></td>
+                                </tr>
+                                @if (invDiscountAmount > 0)
+                                {
+                                    <tr>
+                                        <td colspan="@footColSpan" class="text-end">Discount (@invDiscountPct%)</td>
+                                        <td class="text-end" style="color:#dc3545;">-@invDiscountAmount.ToString("N2")</td>
+                                        <td colspan="@taxColSpan"></td>
+                                    </tr>
+                                }
+                                <tr>
+                                    <td colspan="@footColSpan" class="text-end"><strong>Taxable Amount</strong></td>
+                                    <td class="text-end"><strong>@invTaxableAmount.ToString("N2")</strong></td>
+                                    <td colspan="@taxColSpan"></td>
+                                </tr>
+                                @foreach (var t in invTaxBreakdown)
+                                {
+                                    <tr>
+                                        <td colspan="@footColSpan" class="text-end">@t.TaxType @@ @t.TaxPercentage%</td>
+                                        <td></td>
+                                        <td colspan="@(taxColSpan - 1)"></td>
+                                        <td class="text-end">@t.TotalTaxAmount.ToString("N2")</td>
+                                    </tr>
+                                }
+                                <tr class="grand-total">
+                                    <td colspan="@footColSpan" class="text-end">GRAND TOTAL</td>
+                                    <td colspan="@(taxColSpan + 1)" class="text-end" style="font-size:15px;">@invGrandTotal.ToString("N2")</td>
+                                </tr>
+                            </tfoot>
                         </table>
+
+                        <div class="gst-invoice-amount-words">
+                            <strong>Amount in Words:</strong> @NumberToWordsConverter.ConvertToIndianRupees(invGrandTotal)
+                        </div>
+
+                        @if (isFinalized && invoice!.PaymentHistory != null && invoice.PaymentHistory.Any())
+                        {
+                            <div class="gst-invoice-payments">
+                                <h6>Payment History</h6>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Receipt #</th>
+                                            <th>Mode</th>
+                                            <th>Type</th>
+                                            <th style="text-align:right;">Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var p in invoice.PaymentHistory)
+                                        {
+                                            <tr>
+                                                <td>@p.PaymentDate.ToString("MMM dd, yyyy")</td>
+                                                <td>@p.ReceiptNumber</td>
+                                                <td>@p.PaymentMode</td>
+                                                <td>@p.PaymentType</td>
+                                                <td style="text-align:right;">@p.Amount.ToString("N2")</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                                <div class="payment-summary">
+                                    <span>Total Paid: <strong>@invTotalPaid.ToString("N2")</strong></span>
+                                    <span>Balance Due: <strong class="@(invBalanceDue > 0 ? "text-danger" : "text-success")">@invBalanceDue.ToString("N2")</strong></span>
+                                </div>
+                            </div>
+                        }
+
+                        @{
+                            var bankDetails = GetHotelSetting("BankDetails");
+                            var invoiceTerms = GetHotelSetting("InvoiceTerms");
+                        }
+                        @if (!string.IsNullOrEmpty(bankDetails) || !string.IsNullOrEmpty(invoiceTerms))
+                        {
+                            <div class="gst-invoice-footer">
+                                @if (!string.IsNullOrEmpty(bankDetails))
+                                {
+                                    <p><strong>Bank Details:</strong> @bankDetails</p>
+                                }
+                                @if (!string.IsNullOrEmpty(invoiceTerms))
+                                {
+                                    <p><strong>Terms & Conditions:</strong> @invoiceTerms</p>
+                                }
+                            </div>
+                        }
+
+                        <div class="gst-invoice-signature">
+                            <div class="gst-invoice-signature-left">
+                                @{ var footerNote = GetHotelSetting("InvoiceFooterNote"); }
+                                @if (!string.IsNullOrEmpty(footerNote))
+                                {
+                                    @footerNote
+                                }
+                            </div>
+                            <div class="gst-invoice-signature-right">
+                                @if (!string.IsNullOrEmpty(hotelName))
+                                {
+                                    <div class="hotel-name">For @hotelName</div>
+                                }
+                                <div class="sig-label">Authorised Signatory</div>
+                            </div>
+                        </div>
                     </div>
-                }
-                else if (billPreview != null)
-                {
-                    <div class="bill-preview">
-                        <h5>Bill Preview</h5>
-                        <table class="table table-sm">
-                            <tbody>
-                                <tr><td>Hall Rent</td><td class="text-end">@billPreview.HallRent.ToString("N2")</td></tr>
-                                <tr><td>Menu Charges</td><td class="text-end">@billPreview.MenuChargesSubtotal.ToString("N2")</td></tr>
-                                <tr><td>Service Charges</td><td class="text-end">@billPreview.ServiceChargesSubtotal.ToString("N2")</td></tr>
-                                <tr><td>Additional Charges</td><td class="text-end">@billPreview.AdditionalChargesSubtotal.ToString("N2")</td></tr>
-                                <tr><td>Subtotal</td><td class="text-end">@billPreview.Subtotal.ToString("N2")</td></tr>
-                                @if (billPreview.DiscountAmount > 0)
-                                {
-                                    <tr><td>Discount (@billPreview.DiscountPercentage%)</td><td class="text-end text-danger">-@billPreview.DiscountAmount.ToString("N2")</td></tr>
-                                }
-                                @foreach (var t in billPreview.TaxBreakdown)
-                                {
-                                    <tr><td>@t.TaxType (@t.TaxPercentage%)</td><td class="text-end">@t.TotalTaxAmount.ToString("N2")</td></tr>
-                                }
-                                <tr class="fw-bold"><td>Grand Total</td><td class="text-end">@billPreview.GrandTotal.ToString("N2")</td></tr>
-                                <tr><td>Total Paid</td><td class="text-end">@billPreview.TotalPaid.ToString("N2")</td></tr>
-                                <tr class="fw-bold"><td>Balance Due</td><td class="text-end @(billPreview.BalanceDue > 0 ? "text-danger" : "text-success")">@billPreview.BalanceDue.ToString("N2")</td></tr>
-                            </tbody>
-                        </table>
+
+                    <div class="text-center mt-3 no-print">
+                        <button class="btn btn-outline-secondary" @onclick="PrintInvoice"><i class="bi bi-printer"></i> @(isFinalized ? "Print Invoice" : "Print Preview")</button>
                     </div>
                 }
                 else
@@ -359,8 +649,26 @@ else
         <div class="modal-content" @onclick:stopPropagation="true">
             <div class="modal-header"><h4>Add Menu Item</h4><button class="btn-close" @onclick="() => showMenuModal = false">&times;</button></div>
             <div class="modal-body">
-                <div class="form-group"><label>Quantity *</label><input type="number" class="form-control" @bind="menuForm.Quantity" /></div>
-                <div class="form-group"><label>Rate Per Plate *</label><input type="number" step="0.01" class="form-control" @bind="menuForm.RatePerPlate" /></div>
+                <div class="form-group"><label>Date *</label><input type="date" class="form-control" @bind="menuForm.MenuDate" disabled="@(!isManager)" /></div>
+                <div class="form-group"><label>Item Name *</label><input type="text" class="form-control" @bind="menuForm.ItemName" placeholder="e.g., Veg Thali, Non-Veg Thali" /></div>
+                <div class="row">
+                    <div class="col-md-6"><div class="form-group"><label>Quantity (Plates) *</label><input type="number" class="form-control" @bind="menuForm.Quantity" /></div></div>
+                    <div class="col-md-6"><div class="form-group"><label>Rate Per Plate *</label><input type="number" step="0.01" class="form-control" @bind="menuForm.RatePerPlate" /></div></div>
+                </div>
+                <div class="form-group form-check mt-2">
+                    <input type="checkbox" class="form-check-input" id="menuTax" @bind="menuForm.ApplyTax" />
+                    <label class="form-check-label" for="menuTax">Apply Tax</label>
+                </div>
+                <div class="form-group">
+                    <label>Tax Config</label>
+                    <select class="form-control" @bind="menuForm.VoucherTaxConfigId">
+                        <option value="">-- Default (TaxSlab) --</option>
+                        @foreach (var tc in voucherTaxConfigs)
+                        {
+                            <option value="@tc.Id">@tc.VoucherType (CGST @tc.CgstPercentage% + SGST @tc.SgstPercentage%)</option>
+                        }
+                    </select>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" @onclick="() => showMenuModal = false">Cancel</button>
@@ -377,6 +685,7 @@ else
         <div class="modal-content" @onclick:stopPropagation="true">
             <div class="modal-header"><h4>Add Service</h4><button class="btn-close" @onclick="() => showServiceModal = false">&times;</button></div>
             <div class="modal-body">
+                <div class="form-group"><label>Date *</label><input type="date" class="form-control" @bind="serviceForm.ServiceDate" disabled="@(!isManager)" /></div>
                 <div class="form-group">
                     <label>Master Service</label>
                     <select class="form-control" @bind="selectedMasterServiceId" @bind:after="OnMasterServiceChanged">
@@ -410,7 +719,7 @@ else
         <div class="modal-content" @onclick:stopPropagation="true">
             <div class="modal-header"><h4>Add Charge</h4><button class="btn-close" @onclick="() => showChargeModal = false">&times;</button></div>
             <div class="modal-body">
-                <div class="form-group"><label>Date *</label><input type="date" class="form-control" @bind="chargeForm.ChargeDate" /></div>
+                <div class="form-group"><label>Date *</label><input type="date" class="form-control" @bind="chargeForm.ChargeDate" disabled="@(!isManager)" /></div>
                 <div class="form-group"><label>Charge Type *</label><input type="text" class="form-control" @bind="chargeForm.ChargeType" placeholder="e.g., Decoration, Audio/Visual" /></div>
                 <div class="form-group"><label>Description *</label><input type="text" class="form-control" @bind="chargeForm.Description" /></div>
                 <div class="row">
@@ -420,6 +729,16 @@ else
                 <div class="form-group form-check mt-2">
                     <input type="checkbox" class="form-check-input" id="chgTax" @bind="chargeForm.ApplyTax" />
                     <label class="form-check-label" for="chgTax">Apply Tax</label>
+                </div>
+                <div class="form-group">
+                    <label>Tax Config</label>
+                    <select class="form-control" @bind="chargeForm.VoucherTaxConfigId">
+                        <option value="">-- Default (TaxSlab) --</option>
+                        @foreach (var tc in voucherTaxConfigs)
+                        {
+                            <option value="@tc.Id">@tc.VoucherType (CGST @tc.CgstPercentage% + SGST @tc.SgstPercentage%)</option>
+                        }
+                    </select>
                 </div>
             </div>
             <div class="modal-footer">
@@ -443,7 +762,10 @@ else
                         <div class="form-group"><label>Payment Type *</label>
                             <select class="form-control" @bind="paymentForm.PaymentType">
                                 <option value="@PaymentType.Advance">Advance</option>
-                                <option value="@PaymentType.Installment">Installment</option>
+                                @if (enablePartialPayment)
+                                {
+                                    <option value="@PaymentType.PartialPayment">Partial Payment</option>
+                                }
                                 <option value="@PaymentType.FinalSettlement">Final Settlement</option>
                                 <option value="@PaymentType.Refund">Refund</option>
                             </select>
@@ -541,6 +863,8 @@ else
 
 @code {
     [Parameter] public int BookingId { get; set; }
+    [SupplyParameterFromQuery(Name = "tab")] public string? Tab { get; set; }
+    [SupplyParameterFromQuery(Name = "print")] public string? AutoPrint { get; set; }
 
     private BanquetBookingDetailModel? booking;
     private PaymentSummaryModel? paymentSummary;
@@ -558,6 +882,13 @@ else
     private string? errorMessage;
     private string? successMessage;
     private int currentUserRole = -1;
+    private bool isManager => currentUserRole == 0;
+    private bool enablePartialPayment = true;
+    private string? billHeadingImagePath;
+    private string apiBaseUrl = string.Empty;
+    private List<VoucherTaxConfigModel> voucherTaxConfigs = new();
+    private int? defaultBanquetTaxConfigId;
+    private Dictionary<string, string> hotelSettings = new();
 
     // Modals
     private bool showMenuModal, showServiceModal, showChargeModal, showPaymentModal, showEditModal;
@@ -573,7 +904,40 @@ else
     {
         var user = await AuthService.GetCurrentUserAsync();
         if (user != null) currentUserRole = user.Role;
+        var partialPaySetting = await ApiClient.GetSystemSettingAsync("EnablePartialPayment");
+        if (partialPaySetting != null)
+            enablePartialPayment = partialPaySetting.Trim('"').Equals("true", StringComparison.OrdinalIgnoreCase);
+        var billImageSetting = await ApiClient.GetSystemSettingAsync("BillHeadingImagePath");
+        if (!string.IsNullOrEmpty(billImageSetting))
+            billHeadingImagePath = billImageSetting.Trim('"');
+        var defaultTaxSetting = await ApiClient.GetSystemSettingAsync("DefaultBanquetTaxConfigId");
+        if (!string.IsNullOrEmpty(defaultTaxSetting) && int.TryParse(defaultTaxSetting.Trim('"'), out var dtcId))
+            defaultBanquetTaxConfigId = dtcId;
+        apiBaseUrl = ApiClient.GetBaseUrl();
+
+        // Load hotel settings for GST invoice
+        var settingKeys = new[] { "HotelName", "HotelAddress", "HotelPhone", "HotelEmail", "HotelGSTIN", "HotelStateCode", "BankDetails", "InvoiceTerms", "InvoiceFooterNote", "HotelSACCode" };
+        var settingTasks = settingKeys.Select(async key =>
+        {
+            var val = await ApiClient.GetSystemSettingAsync(key);
+            return (key, value: val?.Trim('"') ?? "");
+        });
+        var results = await Task.WhenAll(settingTasks);
+        foreach (var (key, value) in results)
+            hotelSettings[key] = value;
+
+        // Apply tab from query string
+        if (!string.IsNullOrEmpty(Tab))
+            activeTab = Tab;
+
         await LoadData();
+
+        // Auto-print if requested and invoice is available
+        if (AutoPrint == "true" && invoice != null)
+        {
+            if (activeTab == "billing")
+                await PrintInvoice();
+        }
     }
 
     private async Task LoadData()
@@ -589,6 +953,7 @@ else
         eventTypes = await ApiClient.GetAllEventTypesAsync();
         masterServices = await ApiClient.GetAllBanquetServicesAsync();
         companies = await ApiClient.GetActiveCompaniesAsync();
+        voucherTaxConfigs = await ApiClient.GetVoucherTaxConfigsAsync(activeOnly: true);
         isLoading = false;
     }
 
@@ -609,9 +974,12 @@ else
     }
 
     // Menu
-    private void ShowAddMenuModal() { menuForm = new CreateBanquetBookingMenuModel { Quantity = 1 }; showMenuModal = true; }
+    private void ShowAddMenuModal() { menuForm = new CreateBanquetBookingMenuModel { Quantity = 1, VoucherTaxConfigId = defaultBanquetTaxConfigId ?? voucherTaxConfigs.FirstOrDefault()?.Id }; showMenuModal = true; }
     private async Task AddMenu()
     {
+        if (string.IsNullOrWhiteSpace(menuForm.ItemName)) { errorMessage = "Item name is required."; return; }
+        if (menuForm.Quantity < 1) { errorMessage = "Quantity must be at least 1."; return; }
+        if (menuForm.RatePerPlate <= 0) { errorMessage = "Rate per plate must be greater than 0."; return; }
         isSaving = true;
         try
         {
@@ -657,7 +1025,7 @@ else
     private async Task DeleteService(int id) { await ApiClient.DeleteBanquetBookingServiceAsync(id); await LoadData(); }
 
     // Charges
-    private void ShowAddChargeModal() { chargeForm = new CreateBanquetChargeModel(); showChargeModal = true; }
+    private void ShowAddChargeModal() { chargeForm = new CreateBanquetChargeModel { VoucherTaxConfigId = defaultBanquetTaxConfigId ?? voucherTaxConfigs.FirstOrDefault()?.Id }; showChargeModal = true; }
     private async Task AddCharge()
     {
         if (string.IsNullOrWhiteSpace(chargeForm.ChargeType) || string.IsNullOrWhiteSpace(chargeForm.Description)) return;
@@ -767,4 +1135,12 @@ else
         BanquetBookingStatus.Cancelled => "danger",
         _ => "secondary"
     };
+
+    private async Task PrintInvoice() => await JSRuntime.InvokeVoidAsync("window.print");
+
+    private CompanyDto? GetBookingCompany()
+        => booking?.CompanyId != null ? companies.FirstOrDefault(c => c.Id == booking.CompanyId) : null;
+
+    private string GetHotelSetting(string key)
+        => hotelSettings.TryGetValue(key, out var val) ? val : "";
 }

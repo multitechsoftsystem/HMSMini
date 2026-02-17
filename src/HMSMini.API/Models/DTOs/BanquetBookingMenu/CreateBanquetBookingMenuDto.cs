@@ -8,6 +8,10 @@ public class CreateBanquetBookingMenuDto
 
     public int? MenuItemId { get; set; }
 
+    public string? ItemName { get; set; }
+
+    public DateTime MenuDate { get; set; }
+
     [Required]
     [Range(1, 100000)]
     public int Quantity { get; set; }
@@ -15,4 +19,8 @@ public class CreateBanquetBookingMenuDto
     [Required]
     [Range(0, double.MaxValue)]
     public decimal RatePerPlate { get; set; }
+
+    public bool ApplyTax { get; set; } = true;
+
+    public int? VoucherTaxConfigId { get; set; }
 }

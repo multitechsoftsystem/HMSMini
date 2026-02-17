@@ -244,6 +244,11 @@ namespace HMSMini.API.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<bool>("ApplyTax")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(true);
+
                     b.Property<int>("BanquetBookingId")
                         .HasColumnType("int");
 
@@ -262,6 +267,13 @@ namespace HMSMini.API.Migrations
                     b.Property<string>("DeletedBy")
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("ItemName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("MenuDate")
+                        .HasColumnType("datetime2");
 
                     b.Property<int?>("MenuItemId")
                         .HasColumnType("int");
@@ -289,6 +301,9 @@ namespace HMSMini.API.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<int?>("VoucherTaxConfigId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("BanquetBookingId")
@@ -297,6 +312,8 @@ namespace HMSMini.API.Migrations
                     b.HasIndex("MenuItemId");
 
                     b.HasIndex("MenuPackageId");
+
+                    b.HasIndex("VoucherTaxConfigId");
 
                     b.ToTable("BanquetBookingMenus", (string)null);
                 });
@@ -343,6 +360,9 @@ namespace HMSMini.API.Migrations
 
                     b.Property<decimal>("Rate")
                         .HasColumnType("decimal(10,2)");
+
+                    b.Property<DateTime>("ServiceDate")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("ServiceName")
                         .IsRequired()
@@ -736,6 +756,73 @@ namespace HMSMini.API.Migrations
                     b.ToTable("BaseTariff", (string)null);
                 });
 
+            modelBuilder.Entity("HMSMini.API.Models.Entities.ChartOfAccount", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AccountCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("AccountName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("AccountType")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DeletedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsSystemAccount")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("ParentAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountCode")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ChartOfAccounts_AccountCode");
+
+                    b.HasIndex("AccountType")
+                        .HasDatabaseName("IX_ChartOfAccounts_AccountType");
+
+                    b.HasIndex("ParentAccountId");
+
+                    b.ToTable("ChartOfAccounts", (string)null);
+                });
+
             modelBuilder.Entity("HMSMini.API.Models.Entities.CheckIn", b =>
                 {
                     b.Property<int>("Id")
@@ -787,6 +874,11 @@ namespace HMSMini.API.Migrations
                     b.Property<int?>("GuestTypeId")
                         .HasColumnType("int");
 
+                    b.Property<bool>("IsSharedRoom")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bit")
+                        .HasDefaultValue(false);
+
                     b.Property<int?>("MealPlanId")
                         .HasColumnType("int");
 
@@ -805,6 +897,9 @@ namespace HMSMini.API.Migrations
                         .HasColumnType("nvarchar(1000)");
 
                     b.Property<int>("RoomId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("SharedGroupId")
                         .HasColumnType("int");
 
                     b.Property<int>("Status")
@@ -839,6 +934,9 @@ namespace HMSMini.API.Migrations
                     b.HasIndex("GuestTypeId");
 
                     b.HasIndex("MealPlanId");
+
+                    b.HasIndex("SharedGroupId")
+                        .HasFilter("[SharedGroupId] IS NOT NULL");
 
                     b.HasIndex("Status");
 
@@ -1081,6 +1179,160 @@ namespace HMSMini.API.Migrations
                     b.ToTable("DayClosingAudit", (string)null);
                 });
 
+            modelBuilder.Entity("HMSMini.API.Models.Entities.ExpenseVoucher", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<int?>("BankAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DeletedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("ExpenseHeadId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("FinancialYearId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("JournalEntryId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Narration")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("PaidTo")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("PaymentMode")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ReferenceNumber")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("VoucherDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("VoucherNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BankAccountId");
+
+                    b.HasIndex("ExpenseHeadId");
+
+                    b.HasIndex("FinancialYearId")
+                        .HasDatabaseName("IX_ExpenseVouchers_FinancialYearId");
+
+                    b.HasIndex("JournalEntryId");
+
+                    b.HasIndex("VoucherDate")
+                        .HasDatabaseName("IX_ExpenseVouchers_VoucherDate");
+
+                    b.HasIndex("VoucherNumber")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ExpenseVouchers_VoucherNumber");
+
+                    b.ToTable("ExpenseVouchers", (string)null);
+                });
+
+            modelBuilder.Entity("HMSMini.API.Models.Entities.FinancialYear", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("ClosedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ClosedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DeletedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("EndDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsClosed")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsCurrent")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime>("StartDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("IX_FinancialYears_Name");
+
+                    b.ToTable("FinancialYears", (string)null);
+                });
+
             modelBuilder.Entity("HMSMini.API.Models.Entities.Guest", b =>
                 {
                     b.Property<int>("Id")
@@ -1308,6 +1560,127 @@ namespace HMSMini.API.Migrations
                         .HasDatabaseName("IX_Invoices_InvoiceNumber");
 
                     b.ToTable("Invoices", (string)null);
+                });
+
+            modelBuilder.Entity("HMSMini.API.Models.Entities.JournalEntry", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DeletedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("EntryDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EntryNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("FinancialYearId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsReversed")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("ReversalOfId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("SourceId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SourceType")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EntryDate")
+                        .HasDatabaseName("IX_JournalEntries_EntryDate");
+
+                    b.HasIndex("EntryNumber")
+                        .IsUnique()
+                        .HasDatabaseName("IX_JournalEntries_EntryNumber");
+
+                    b.HasIndex("FinancialYearId")
+                        .HasDatabaseName("IX_JournalEntries_FinancialYearId");
+
+                    b.HasIndex("ReversalOfId");
+
+                    b.HasIndex("SourceType", "SourceId")
+                        .HasDatabaseName("IX_JournalEntries_Source");
+
+                    b.ToTable("JournalEntries", (string)null);
+                });
+
+            modelBuilder.Entity("HMSMini.API.Models.Entities.JournalEntryLine", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AccountId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("CreditAmount")
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<decimal>("DebitAmount")
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("JournalEntryId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountId")
+                        .HasDatabaseName("IX_JournalEntryLines_AccountId");
+
+                    b.HasIndex("JournalEntryId")
+                        .HasDatabaseName("IX_JournalEntryLines_JournalEntryId");
+
+                    b.ToTable("JournalEntryLines", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_JournalEntryLines_CreditAmount", "[CreditAmount] >= 0");
+
+                            t.HasCheckConstraint("CK_JournalEntryLines_DebitAmount", "[DebitAmount] >= 0");
+                        });
                 });
 
             modelBuilder.Entity("HMSMini.API.Models.Entities.MBanquetHall", b =>
@@ -1580,6 +1953,59 @@ namespace HMSMini.API.Migrations
                     b.ToTable("MEventTypes", (string)null);
                 });
 
+            modelBuilder.Entity("HMSMini.API.Models.Entities.MExpenseHead", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int?>("DefaultAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DeletedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DefaultAccountId");
+
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("IX_MExpenseHeads_Name");
+
+                    b.ToTable("MExpenseHeads", (string)null);
+                });
+
             modelBuilder.Entity("HMSMini.API.Models.Entities.MGuestType", b =>
                 {
                     b.Property<int>("GuestTypeId")
@@ -1624,7 +2050,7 @@ namespace HMSMini.API.Migrations
                         new
                         {
                             GuestTypeId = 1,
-                            CreatedAt = new DateTime(2026, 2, 12, 17, 22, 10, 56, DateTimeKind.Utc).AddTicks(1659),
+                            CreatedAt = new DateTime(2026, 2, 15, 13, 23, 42, 475, DateTimeKind.Utc).AddTicks(7134),
                             Description = "Regular paying guest",
                             DisplayOrder = 1,
                             IsActive = true,
@@ -1633,7 +2059,7 @@ namespace HMSMini.API.Migrations
                         new
                         {
                             GuestTypeId = 2,
-                            CreatedAt = new DateTime(2026, 2, 12, 17, 22, 10, 56, DateTimeKind.Utc).AddTicks(1663),
+                            CreatedAt = new DateTime(2026, 2, 15, 13, 23, 42, 475, DateTimeKind.Utc).AddTicks(7141),
                             Description = "Complimentary stay",
                             DisplayOrder = 2,
                             IsActive = true,
@@ -1642,7 +2068,7 @@ namespace HMSMini.API.Migrations
                         new
                         {
                             GuestTypeId = 3,
-                            CreatedAt = new DateTime(2026, 2, 12, 17, 22, 10, 56, DateTimeKind.Utc).AddTicks(1667),
+                            CreatedAt = new DateTime(2026, 2, 15, 13, 23, 42, 475, DateTimeKind.Utc).AddTicks(7144),
                             Description = "Family member stay",
                             DisplayOrder = 3,
                             IsActive = true,
@@ -1651,7 +2077,7 @@ namespace HMSMini.API.Migrations
                         new
                         {
                             GuestTypeId = 4,
-                            CreatedAt = new DateTime(2026, 2, 12, 17, 22, 10, 56, DateTimeKind.Utc).AddTicks(1669),
+                            CreatedAt = new DateTime(2026, 2, 15, 13, 23, 42, 475, DateTimeKind.Utc).AddTicks(7147),
                             Description = "Hotel2 guest type",
                             DisplayOrder = 4,
                             IsActive = true,
@@ -1660,7 +2086,7 @@ namespace HMSMini.API.Migrations
                         new
                         {
                             GuestTypeId = 5,
-                            CreatedAt = new DateTime(2026, 2, 12, 17, 22, 10, 56, DateTimeKind.Utc).AddTicks(1671),
+                            CreatedAt = new DateTime(2026, 2, 15, 13, 23, 42, 475, DateTimeKind.Utc).AddTicks(7150),
                             Description = "Hotel3 guest type",
                             DisplayOrder = 5,
                             IsActive = true,
@@ -2181,6 +2607,223 @@ namespace HMSMini.API.Migrations
                     b.ToTable("Payments", (string)null);
                 });
 
+            modelBuilder.Entity("HMSMini.API.Models.Entities.PaymentVoucher", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<int?>("BankAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DeletedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int?>("ExpenseVoucherId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("FinancialYearId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("JournalEntryId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Narration")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("PayeeName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("PaymentMode")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ReferenceNumber")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime>("VoucherDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("VoucherNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BankAccountId");
+
+                    b.HasIndex("ExpenseVoucherId");
+
+                    b.HasIndex("FinancialYearId")
+                        .HasDatabaseName("IX_PaymentVouchers_FinancialYearId");
+
+                    b.HasIndex("JournalEntryId");
+
+                    b.HasIndex("VoucherDate")
+                        .HasDatabaseName("IX_PaymentVouchers_VoucherDate");
+
+                    b.HasIndex("VoucherNumber")
+                        .IsUnique()
+                        .HasDatabaseName("IX_PaymentVouchers_VoucherNumber");
+
+                    b.ToTable("PaymentVouchers", (string)null);
+                });
+
+            modelBuilder.Entity("HMSMini.API.Models.Entities.Receipt", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<int?>("BankAccountId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("CompanyId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETUTCDATE()");
+
+                    b.Property<string>("CreatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DeletedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("FinancialYearId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("JournalEntryId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Narration")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("PaymentMode")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("ReceiptDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ReceiptNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("ReceivedFrom")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("ReferenceNumber")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BankAccountId");
+
+                    b.HasIndex("CompanyId")
+                        .HasDatabaseName("IX_Receipts_CompanyId");
+
+                    b.HasIndex("FinancialYearId")
+                        .HasDatabaseName("IX_Receipts_FinancialYearId");
+
+                    b.HasIndex("JournalEntryId");
+
+                    b.HasIndex("ReceiptDate")
+                        .HasDatabaseName("IX_Receipts_ReceiptDate");
+
+                    b.HasIndex("ReceiptNumber")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Receipts_ReceiptNumber");
+
+                    b.ToTable("Receipts", (string)null);
+                });
+
+            modelBuilder.Entity("HMSMini.API.Models.Entities.ReceiptAllocation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("AllocatedAmount")
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<int?>("BanquetInvoiceId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("InvoiceId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ReceiptId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BanquetInvoiceId")
+                        .HasDatabaseName("IX_ReceiptAllocations_BanquetInvoiceId");
+
+                    b.HasIndex("InvoiceId")
+                        .HasDatabaseName("IX_ReceiptAllocations_InvoiceId");
+
+                    b.HasIndex("ReceiptId")
+                        .HasDatabaseName("IX_ReceiptAllocations_ReceiptId");
+
+                    b.ToTable("ReceiptAllocations", (string)null);
+                });
+
             modelBuilder.Entity("HMSMini.API.Models.Entities.Reservation", b =>
                 {
                     b.Property<int>("Id")
@@ -2402,13 +3045,167 @@ namespace HMSMini.API.Migrations
                         new
                         {
                             Id = 1,
-                            CreatedAt = new DateTime(2026, 2, 12, 17, 22, 10, 61, DateTimeKind.Utc).AddTicks(771),
+                            CreatedAt = new DateTime(2026, 2, 15, 13, 23, 42, 487, DateTimeKind.Utc).AddTicks(2470),
                             CreatedBy = "System",
                             DataType = "Date",
                             Description = "Current business/working date for hotel operations",
                             IsSystemLocked = true,
                             SettingKey = "WorkingDate",
-                            SettingValue = "2026-02-12"
+                            SettingValue = "2026-02-15"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            CreatedAt = new DateTime(2026, 2, 15, 13, 23, 42, 487, DateTimeKind.Utc).AddTicks(2584),
+                            CreatedBy = "System",
+                            DataType = "Bool",
+                            Description = "Enable or disable Partial Payment option in payment modal",
+                            IsSystemLocked = false,
+                            SettingKey = "EnablePartialPayment",
+                            SettingValue = "true"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            CreatedAt = new DateTime(2026, 2, 15, 13, 23, 42, 487, DateTimeKind.Utc).AddTicks(2597),
+                            CreatedBy = "System",
+                            DataType = "Image",
+                            Description = "Image displayed at the top of banquet bills and invoices",
+                            IsSystemLocked = false,
+                            SettingKey = "BillHeadingImagePath",
+                            SettingValue = ""
+                        },
+                        new
+                        {
+                            Id = 4,
+                            CreatedAt = new DateTime(2026, 2, 15, 13, 23, 42, 487, DateTimeKind.Utc).AddTicks(2606),
+                            CreatedBy = "System",
+                            DataType = "String",
+                            Description = "Business name on invoice header",
+                            IsSystemLocked = false,
+                            SettingKey = "HotelName",
+                            SettingValue = ""
+                        },
+                        new
+                        {
+                            Id = 5,
+                            CreatedAt = new DateTime(2026, 2, 15, 13, 23, 42, 487, DateTimeKind.Utc).AddTicks(2615),
+                            CreatedBy = "System",
+                            DataType = "String",
+                            Description = "Full address line",
+                            IsSystemLocked = false,
+                            SettingKey = "HotelAddress",
+                            SettingValue = ""
+                        },
+                        new
+                        {
+                            Id = 6,
+                            CreatedAt = new DateTime(2026, 2, 15, 13, 23, 42, 487, DateTimeKind.Utc).AddTicks(2628),
+                            CreatedBy = "System",
+                            DataType = "String",
+                            Description = "Contact phone",
+                            IsSystemLocked = false,
+                            SettingKey = "HotelPhone",
+                            SettingValue = ""
+                        },
+                        new
+                        {
+                            Id = 7,
+                            CreatedAt = new DateTime(2026, 2, 15, 13, 23, 42, 487, DateTimeKind.Utc).AddTicks(2638),
+                            CreatedBy = "System",
+                            DataType = "String",
+                            Description = "Contact email",
+                            IsSystemLocked = false,
+                            SettingKey = "HotelEmail",
+                            SettingValue = ""
+                        },
+                        new
+                        {
+                            Id = 8,
+                            CreatedAt = new DateTime(2026, 2, 15, 13, 23, 42, 487, DateTimeKind.Utc).AddTicks(2647),
+                            CreatedBy = "System",
+                            DataType = "String",
+                            Description = "Supplier GSTIN",
+                            IsSystemLocked = false,
+                            SettingKey = "HotelGSTIN",
+                            SettingValue = ""
+                        },
+                        new
+                        {
+                            Id = 9,
+                            CreatedAt = new DateTime(2026, 2, 15, 13, 23, 42, 487, DateTimeKind.Utc).AddTicks(2657),
+                            CreatedBy = "System",
+                            DataType = "String",
+                            Description = "State code for GST (e.g., 27-Maharashtra)",
+                            IsSystemLocked = false,
+                            SettingKey = "HotelStateCode",
+                            SettingValue = ""
+                        },
+                        new
+                        {
+                            Id = 10,
+                            CreatedAt = new DateTime(2026, 2, 15, 13, 23, 42, 487, DateTimeKind.Utc).AddTicks(2683),
+                            CreatedBy = "System",
+                            DataType = "String",
+                            Description = "Bank name, A/C, IFSC, Branch (single line)",
+                            IsSystemLocked = false,
+                            SettingKey = "BankDetails",
+                            SettingValue = ""
+                        },
+                        new
+                        {
+                            Id = 11,
+                            CreatedAt = new DateTime(2026, 2, 15, 13, 23, 42, 487, DateTimeKind.Utc).AddTicks(2693),
+                            CreatedBy = "System",
+                            DataType = "String",
+                            Description = "Terms & conditions text",
+                            IsSystemLocked = false,
+                            SettingKey = "InvoiceTerms",
+                            SettingValue = ""
+                        },
+                        new
+                        {
+                            Id = 12,
+                            CreatedAt = new DateTime(2026, 2, 15, 13, 23, 42, 487, DateTimeKind.Utc).AddTicks(2701),
+                            CreatedBy = "System",
+                            DataType = "String",
+                            Description = "Footer disclaimer",
+                            IsSystemLocked = false,
+                            SettingKey = "InvoiceFooterNote",
+                            SettingValue = "This is a computer generated invoice"
+                        },
+                        new
+                        {
+                            Id = 13,
+                            CreatedAt = new DateTime(2026, 2, 15, 13, 23, 42, 487, DateTimeKind.Utc).AddTicks(2734),
+                            CreatedBy = "System",
+                            DataType = "String",
+                            Description = "Default SAC code for hospitality services",
+                            IsSystemLocked = false,
+                            SettingKey = "HotelSACCode",
+                            SettingValue = "996331"
+                        },
+                        new
+                        {
+                            Id = 14,
+                            CreatedAt = new DateTime(2026, 2, 15, 13, 23, 42, 487, DateTimeKind.Utc).AddTicks(2743),
+                            CreatedBy = "System",
+                            DataType = "String",
+                            Description = "Default VoucherTaxConfig ID for banquet menus and charges",
+                            IsSystemLocked = false,
+                            SettingKey = "DefaultBanquetTaxConfigId",
+                            SettingValue = ""
+                        },
+                        new
+                        {
+                            Id = 15,
+                            CreatedAt = new DateTime(2026, 2, 15, 13, 23, 42, 487, DateTimeKind.Utc).AddTicks(2756),
+                            CreatedBy = "System",
+                            DataType = "Bool",
+                            Description = "Enable or disable Room Sharing (room splitting) feature for multiple independent check-ins in the same room",
+                            IsSystemLocked = false,
+                            SettingKey = "EnableRoomSharing",
+                            SettingValue = "false"
                         });
                 });
 
@@ -2803,6 +3600,10 @@ namespace HMSMini.API.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(true);
 
+                    b.Property<string>("SACCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<decimal>("SgstPercentage")
                         .HasColumnType("decimal(5,2)");
 
@@ -2908,11 +3709,18 @@ namespace HMSMini.API.Migrations
                         .HasForeignKey("MenuPackageId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("HMSMini.API.Models.Entities.VoucherTaxConfiguration", "VoucherTaxConfig")
+                        .WithMany()
+                        .HasForeignKey("VoucherTaxConfigId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("BanquetBooking");
 
                     b.Navigation("MenuItem");
 
                     b.Navigation("MenuPackage");
+
+                    b.Navigation("VoucherTaxConfig");
                 });
 
             modelBuilder.Entity("HMSMini.API.Models.Entities.BanquetBookingService", b =>
@@ -2991,6 +3799,16 @@ namespace HMSMini.API.Migrations
                     b.Navigation("RoomType");
                 });
 
+            modelBuilder.Entity("HMSMini.API.Models.Entities.ChartOfAccount", b =>
+                {
+                    b.HasOne("HMSMini.API.Models.Entities.ChartOfAccount", "ParentAccount")
+                        .WithMany("ChildAccounts")
+                        .HasForeignKey("ParentAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ParentAccount");
+                });
+
             modelBuilder.Entity("HMSMini.API.Models.Entities.CheckIn", b =>
                 {
                     b.HasOne("HMSMini.API.Models.Entities.MBusinessSource", "BusinessSource")
@@ -3048,6 +3866,39 @@ namespace HMSMini.API.Migrations
                     b.Navigation("RoomType");
                 });
 
+            modelBuilder.Entity("HMSMini.API.Models.Entities.ExpenseVoucher", b =>
+                {
+                    b.HasOne("HMSMini.API.Models.Entities.ChartOfAccount", "BankAccount")
+                        .WithMany()
+                        .HasForeignKey("BankAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("HMSMini.API.Models.Entities.MExpenseHead", "ExpenseHead")
+                        .WithMany()
+                        .HasForeignKey("ExpenseHeadId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HMSMini.API.Models.Entities.FinancialYear", "FinancialYear")
+                        .WithMany()
+                        .HasForeignKey("FinancialYearId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HMSMini.API.Models.Entities.JournalEntry", "JournalEntry")
+                        .WithMany()
+                        .HasForeignKey("JournalEntryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("BankAccount");
+
+                    b.Navigation("ExpenseHead");
+
+                    b.Navigation("FinancialYear");
+
+                    b.Navigation("JournalEntry");
+                });
+
             modelBuilder.Entity("HMSMini.API.Models.Entities.Guest", b =>
                 {
                     b.HasOne("HMSMini.API.Models.Entities.CheckIn", "CheckIn")
@@ -3070,6 +3921,43 @@ namespace HMSMini.API.Migrations
                     b.Navigation("CheckIn");
                 });
 
+            modelBuilder.Entity("HMSMini.API.Models.Entities.JournalEntry", b =>
+                {
+                    b.HasOne("HMSMini.API.Models.Entities.FinancialYear", "FinancialYear")
+                        .WithMany()
+                        .HasForeignKey("FinancialYearId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HMSMini.API.Models.Entities.JournalEntry", "ReversalOf")
+                        .WithMany()
+                        .HasForeignKey("ReversalOfId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("FinancialYear");
+
+                    b.Navigation("ReversalOf");
+                });
+
+            modelBuilder.Entity("HMSMini.API.Models.Entities.JournalEntryLine", b =>
+                {
+                    b.HasOne("HMSMini.API.Models.Entities.ChartOfAccount", "Account")
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HMSMini.API.Models.Entities.JournalEntry", "JournalEntry")
+                        .WithMany("Lines")
+                        .HasForeignKey("JournalEntryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Account");
+
+                    b.Navigation("JournalEntry");
+                });
+
             modelBuilder.Entity("HMSMini.API.Models.Entities.MBanquetService", b =>
                 {
                     b.HasOne("HMSMini.API.Models.Entities.VoucherTaxConfiguration", "VoucherTaxConfig")
@@ -3078,6 +3966,16 @@ namespace HMSMini.API.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("VoucherTaxConfig");
+                });
+
+            modelBuilder.Entity("HMSMini.API.Models.Entities.MExpenseHead", b =>
+                {
+                    b.HasOne("HMSMini.API.Models.Entities.ChartOfAccount", "DefaultAccount")
+                        .WithMany()
+                        .HasForeignKey("DefaultAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("DefaultAccount");
                 });
 
             modelBuilder.Entity("HMSMini.API.Models.Entities.MMenuItem", b =>
@@ -3158,6 +4056,95 @@ namespace HMSMini.API.Migrations
                     b.Navigation("Company");
 
                     b.Navigation("Voucher");
+                });
+
+            modelBuilder.Entity("HMSMini.API.Models.Entities.PaymentVoucher", b =>
+                {
+                    b.HasOne("HMSMini.API.Models.Entities.ChartOfAccount", "BankAccount")
+                        .WithMany()
+                        .HasForeignKey("BankAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("HMSMini.API.Models.Entities.ExpenseVoucher", "ExpenseVoucher")
+                        .WithMany()
+                        .HasForeignKey("ExpenseVoucherId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("HMSMini.API.Models.Entities.FinancialYear", "FinancialYear")
+                        .WithMany()
+                        .HasForeignKey("FinancialYearId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HMSMini.API.Models.Entities.JournalEntry", "JournalEntry")
+                        .WithMany()
+                        .HasForeignKey("JournalEntryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("BankAccount");
+
+                    b.Navigation("ExpenseVoucher");
+
+                    b.Navigation("FinancialYear");
+
+                    b.Navigation("JournalEntry");
+                });
+
+            modelBuilder.Entity("HMSMini.API.Models.Entities.Receipt", b =>
+                {
+                    b.HasOne("HMSMini.API.Models.Entities.ChartOfAccount", "BankAccount")
+                        .WithMany()
+                        .HasForeignKey("BankAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("HMSMini.API.Models.Entities.Company", "Company")
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("HMSMini.API.Models.Entities.FinancialYear", "FinancialYear")
+                        .WithMany()
+                        .HasForeignKey("FinancialYearId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("HMSMini.API.Models.Entities.JournalEntry", "JournalEntry")
+                        .WithMany()
+                        .HasForeignKey("JournalEntryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("BankAccount");
+
+                    b.Navigation("Company");
+
+                    b.Navigation("FinancialYear");
+
+                    b.Navigation("JournalEntry");
+                });
+
+            modelBuilder.Entity("HMSMini.API.Models.Entities.ReceiptAllocation", b =>
+                {
+                    b.HasOne("HMSMini.API.Models.Entities.BanquetInvoice", "BanquetInvoice")
+                        .WithMany()
+                        .HasForeignKey("BanquetInvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("HMSMini.API.Models.Entities.Invoice", "Invoice")
+                        .WithMany()
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("HMSMini.API.Models.Entities.Receipt", "Receipt")
+                        .WithMany("Allocations")
+                        .HasForeignKey("ReceiptId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("BanquetInvoice");
+
+                    b.Navigation("Invoice");
+
+                    b.Navigation("Receipt");
                 });
 
             modelBuilder.Entity("HMSMini.API.Models.Entities.Reservation", b =>
@@ -3268,6 +4255,11 @@ namespace HMSMini.API.Migrations
                     b.Navigation("UnifiedPayments");
                 });
 
+            modelBuilder.Entity("HMSMini.API.Models.Entities.ChartOfAccount", b =>
+                {
+                    b.Navigation("ChildAccounts");
+                });
+
             modelBuilder.Entity("HMSMini.API.Models.Entities.CheckIn", b =>
                 {
                     b.Navigation("Guests");
@@ -3284,6 +4276,11 @@ namespace HMSMini.API.Migrations
                     b.Navigation("Payments");
 
                     b.Navigation("Reservations");
+                });
+
+            modelBuilder.Entity("HMSMini.API.Models.Entities.JournalEntry", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("HMSMini.API.Models.Entities.MBanquetHall", b =>
@@ -3335,6 +4332,11 @@ namespace HMSMini.API.Migrations
             modelBuilder.Entity("HMSMini.API.Models.Entities.MRoomType", b =>
                 {
                     b.Navigation("Rooms");
+                });
+
+            modelBuilder.Entity("HMSMini.API.Models.Entities.Receipt", b =>
+                {
+                    b.Navigation("Allocations");
                 });
 
             modelBuilder.Entity("HMSMini.API.Models.Entities.RoomNo", b =>

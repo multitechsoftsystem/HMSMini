@@ -51,90 +51,171 @@ public class BanquetBillingService : IBanquetBillingService
             }
         }
 
-        // Get menu charges
+        // Get menu charges with VoucherTaxConfig
         var menus = await _context.BanquetBookingMenus
             .Include(m => m.MenuPackage)
             .Include(m => m.MenuItem)
+            .Include(m => m.VoucherTaxConfig)
             .Where(m => m.BanquetBookingId == bookingId && m.DeletedAt == null)
             .ToListAsync();
 
-        var menuCharges = menus.Select(m => new BanquetMenuChargeDto
-        {
-            PackageName = m.MenuPackage?.PackageName,
-            ItemName = m.MenuItem?.ItemName,
-            Quantity = m.Quantity,
-            RatePerPlate = m.RatePerPlate,
-            TotalAmount = m.TotalAmount
-        }).ToList();
-        var menuChargesSubtotal = menuCharges.Sum(m => m.TotalAmount);
-
-        // Get service charges
+        // Get service charges with VoucherTaxConfig
         var services = await _context.BanquetBookingServices
+            .Include(s => s.VoucherTaxConfig)
             .Where(s => s.BanquetBookingId == bookingId && s.DeletedAt == null)
             .ToListAsync();
 
-        var serviceCharges = services.Select(s => new BanquetServiceChargeDto
-        {
-            ServiceName = s.ServiceName,
-            Quantity = s.Quantity,
-            Rate = s.Rate,
-            TotalAmount = s.TotalAmount,
-            ApplyTax = s.ApplyTax
-        }).ToList();
-        var serviceChargesSubtotal = serviceCharges.Sum(s => s.TotalAmount);
-
-        // Get additional charges
+        // Get additional charges with VoucherTaxConfig
         var charges = await _context.BanquetCharges
+            .Include(c => c.VoucherTaxConfig)
             .Where(c => c.BanquetBookingId == bookingId && c.DeletedAt == null)
             .ToListAsync();
 
-        var additionalCharges = charges.Select(c => new BanquetAdditionalChargeDto
-        {
-            ChargeType = c.ChargeType,
-            Description = c.Description,
-            Amount = c.Amount,
-            Quantity = c.Quantity,
-            TotalAmount = c.TotalAmount,
-            ApplyTax = c.ApplyTax
-        }).ToList();
-        var additionalChargesSubtotal = additionalCharges.Sum(c => c.TotalAmount);
-
-        // Calculate subtotal
+        // Calculate subtotals
+        var menuChargesSubtotal = menus.Sum(m => m.TotalAmount);
+        var serviceChargesSubtotal = services.Sum(s => s.TotalAmount);
+        var additionalChargesSubtotal = charges.Sum(c => c.TotalAmount);
         var subtotal = booking.HallRent + menuChargesSubtotal + serviceChargesSubtotal + additionalChargesSubtotal;
 
         // Apply discount
         var discountAmount = subtotal * booking.DiscountPercentage / 100;
+        var discountMultiplier = subtotal > 0 ? (1 - booking.DiscountPercentage / 100) : 1;
         var subtotalAfterDiscount = subtotal - discountAmount;
 
-        // Calculate tax on taxable portions
-        var taxableAmount = booking.HallRent + menuChargesSubtotal;
-        // Add taxable services
-        taxableAmount += services.Where(s => s.ApplyTax).Sum(s => s.TotalAmount);
-        // Add taxable additional charges
-        taxableAmount += charges.Where(c => c.ApplyTax).Sum(c => c.TotalAmount);
-        // Apply discount proportionally to taxable amount
-        if (subtotal > 0)
-            taxableAmount = taxableAmount * (1 - booking.DiscountPercentage / 100);
+        // Get fallback tax rates from TaxSlab
+        var fallbackTaxLines = await _taxService.CalculateTaxAsync(
+            1m, booking.TaxType, booking.EventDate, taxSnapshot);
+        decimal fallbackCgst = 0, fallbackSgst = 0, fallbackIgst = 0;
+        foreach (var tl in fallbackTaxLines)
+        {
+            if (tl.TaxType == "CGST") fallbackCgst = tl.TaxPercentage;
+            else if (tl.TaxType == "SGST") fallbackSgst = tl.TaxPercentage;
+            else if (tl.TaxType == "IGST") fallbackIgst = tl.TaxPercentage;
+        }
 
-        var taxLines = await _taxService.CalculateTaxAsync(
-            taxableAmount, booking.TaxType, booking.EventDate, taxSnapshot);
-        var totalTax = taxLines.Sum(t => t.TaxAmount);
+        // Accumulate all tax lines
+        var allTaxLines = new List<TaxSummaryDto>();
 
+        // Hall rent tax (always uses fallback/TaxSlab)
+        var hallRentAfterDiscount = booking.HallRent * discountMultiplier;
+        CalculateVoucherTax(hallRentAfterDiscount, booking.TaxType, null,
+            fallbackCgst, fallbackSgst, fallbackIgst, allTaxLines, out _);
+
+        // Build menu charge DTOs with per-item tax
+        var menuCharges = menus.Select(m =>
+        {
+            decimal itemTax = 0;
+            decimal cgst = 0, sgst = 0, igst = 0;
+            if (m.ApplyTax)
+            {
+                var amountAfterDiscount = m.TotalAmount * discountMultiplier;
+                CalculateVoucherTax(amountAfterDiscount, booking.TaxType, m.VoucherTaxConfig,
+                    fallbackCgst, fallbackSgst, fallbackIgst, allTaxLines, out itemTax);
+                cgst = m.VoucherTaxConfig?.CgstPercentage ?? fallbackCgst;
+                sgst = m.VoucherTaxConfig?.SgstPercentage ?? fallbackSgst;
+                igst = m.VoucherTaxConfig?.IgstPercentage ?? fallbackIgst;
+            }
+
+            return new BanquetMenuChargeDto
+            {
+                PackageName = m.MenuPackage?.PackageName,
+                ItemName = m.ItemName ?? m.MenuItem?.ItemName,
+                Quantity = m.Quantity,
+                RatePerPlate = m.RatePerPlate,
+                TotalAmount = m.TotalAmount,
+                ApplyTax = m.ApplyTax,
+                VoucherTaxConfigId = m.VoucherTaxConfigId,
+                TaxConfigName = m.VoucherTaxConfig?.VoucherType,
+                SACCode = m.VoucherTaxConfig?.SACCode,
+                CgstPercentage = cgst,
+                SgstPercentage = sgst,
+                IgstPercentage = igst,
+                TaxAmount = itemTax
+            };
+        }).ToList();
+
+        // Build service charge DTOs with per-item tax
+        var serviceCharges = services.Select(s =>
+        {
+            decimal itemTax = 0;
+            decimal cgst = 0, sgst = 0, igst = 0;
+            if (s.ApplyTax)
+            {
+                var amountAfterDiscount = s.TotalAmount * discountMultiplier;
+                CalculateVoucherTax(amountAfterDiscount, booking.TaxType, s.VoucherTaxConfig,
+                    fallbackCgst, fallbackSgst, fallbackIgst, allTaxLines, out itemTax);
+                cgst = s.VoucherTaxConfig?.CgstPercentage ?? fallbackCgst;
+                sgst = s.VoucherTaxConfig?.SgstPercentage ?? fallbackSgst;
+                igst = s.VoucherTaxConfig?.IgstPercentage ?? fallbackIgst;
+            }
+
+            return new BanquetServiceChargeDto
+            {
+                ServiceName = s.ServiceName,
+                Quantity = s.Quantity,
+                Rate = s.Rate,
+                TotalAmount = s.TotalAmount,
+                ApplyTax = s.ApplyTax,
+                VoucherTaxConfigId = s.VoucherTaxConfigId,
+                TaxConfigName = s.VoucherTaxConfig?.VoucherType,
+                SACCode = s.VoucherTaxConfig?.SACCode,
+                CgstPercentage = cgst,
+                SgstPercentage = sgst,
+                IgstPercentage = igst,
+                TaxAmount = itemTax
+            };
+        }).ToList();
+
+        // Build additional charge DTOs with per-item tax
+        var additionalCharges = charges.Select(c =>
+        {
+            decimal itemTax = 0;
+            decimal cgst = 0, sgst = 0, igst = 0;
+            if (c.ApplyTax)
+            {
+                var amountAfterDiscount = c.TotalAmount * discountMultiplier;
+                CalculateVoucherTax(amountAfterDiscount, booking.TaxType, c.VoucherTaxConfig,
+                    fallbackCgst, fallbackSgst, fallbackIgst, allTaxLines, out itemTax);
+                cgst = c.VoucherTaxConfig?.CgstPercentage ?? fallbackCgst;
+                sgst = c.VoucherTaxConfig?.SgstPercentage ?? fallbackSgst;
+                igst = c.VoucherTaxConfig?.IgstPercentage ?? fallbackIgst;
+            }
+
+            return new BanquetAdditionalChargeDto
+            {
+                ChargeType = c.ChargeType,
+                Description = c.Description,
+                Amount = c.Amount,
+                Quantity = c.Quantity,
+                TotalAmount = c.TotalAmount,
+                ApplyTax = c.ApplyTax,
+                VoucherTaxConfigId = c.VoucherTaxConfigId,
+                TaxConfigName = c.VoucherTaxConfig?.VoucherType,
+                SACCode = c.VoucherTaxConfig?.SACCode,
+                CgstPercentage = cgst,
+                SgstPercentage = sgst,
+                IgstPercentage = igst,
+                TaxAmount = itemTax
+            };
+        }).ToList();
+
+        // Group all tax lines into summary
+        var taxBreakdown = allTaxLines
+            .GroupBy(t => new { t.TaxType, t.TaxPercentage })
+            .Select(g => new TaxSummaryDto
+            {
+                TaxType = g.Key.TaxType,
+                TaxPercentage = g.Key.TaxPercentage,
+                TotalTaxAmount = Math.Round(g.Sum(t => t.TotalTaxAmount), 2)
+            }).ToList();
+
+        var totalTax = taxBreakdown.Sum(t => t.TotalTaxAmount);
         var grandTotal = subtotalAfterDiscount + totalTax;
 
         // Get payments
         var totalPaid = await _context.BanquetPayments
             .Where(p => p.BanquetBookingId == bookingId && p.DeletedAt == null)
             .SumAsync(p => p.Amount);
-
-        var taxBreakdown = taxLines
-            .GroupBy(t => new { t.TaxType, t.TaxPercentage })
-            .Select(g => new TaxSummaryDto
-            {
-                TaxType = g.Key.TaxType,
-                TaxPercentage = g.Key.TaxPercentage,
-                TotalTaxAmount = g.Sum(t => t.TaxAmount)
-            }).ToList();
 
         return new BanquetBillPreviewDto
         {
@@ -165,6 +246,44 @@ public class BanquetBillingService : IBanquetBillingService
             BalanceDue = grandTotal - totalPaid,
             GeneratedAt = DateTime.UtcNow
         };
+    }
+
+    private static void CalculateVoucherTax(
+        decimal taxableAmount,
+        TaxType taxType,
+        VoucherTaxConfiguration? voucherTaxConfig,
+        decimal fallbackCgst,
+        decimal fallbackSgst,
+        decimal fallbackIgst,
+        List<TaxSummaryDto> taxLines,
+        out decimal totalItemTax)
+    {
+        totalItemTax = 0;
+        if (taxableAmount <= 0) return;
+
+        if (taxType == TaxType.CgstSgst)
+        {
+            var cgstPct = voucherTaxConfig?.CgstPercentage ?? fallbackCgst;
+            var sgstPct = voucherTaxConfig?.SgstPercentage ?? fallbackSgst;
+
+            var cgstAmt = Math.Round(taxableAmount * cgstPct / 100, 2);
+            var sgstAmt = Math.Round(taxableAmount * sgstPct / 100, 2);
+            totalItemTax = cgstAmt + sgstAmt;
+
+            if (cgstAmt > 0)
+                taxLines.Add(new TaxSummaryDto { TaxType = "CGST", TaxPercentage = cgstPct, TotalTaxAmount = cgstAmt });
+            if (sgstAmt > 0)
+                taxLines.Add(new TaxSummaryDto { TaxType = "SGST", TaxPercentage = sgstPct, TotalTaxAmount = sgstAmt });
+        }
+        else
+        {
+            var igstPct = voucherTaxConfig?.IgstPercentage ?? fallbackIgst;
+            var igstAmt = Math.Round(taxableAmount * igstPct / 100, 2);
+            totalItemTax = igstAmt;
+
+            if (igstAmt > 0)
+                taxLines.Add(new TaxSummaryDto { TaxType = "IGST", TaxPercentage = igstPct, TotalTaxAmount = igstAmt });
+        }
     }
 
     public async Task<BanquetInvoiceDto> FinalizeInvoiceAsync(int bookingId, FinalizeBanquetInvoiceDto dto)
@@ -287,6 +406,35 @@ public class BanquetBillingService : IBanquetBillingService
         if (invoice == null) return null;
 
         return MapInvoiceToDto(invoice);
+    }
+
+    public async Task<List<BanquetInvoiceListDto>> GetAllInvoicesAsync()
+    {
+        var invoices = await _context.BanquetInvoices
+            .Include(i => i.BanquetBooking)
+            .Where(i => i.DeletedAt == null)
+            .OrderByDescending(i => i.InvoiceDate)
+            .Select(i => new BanquetInvoiceListDto
+            {
+                Id = i.Id,
+                InvoiceNumber = i.InvoiceNumber,
+                InvoiceDate = i.InvoiceDate,
+                BanquetBookingId = i.BanquetBookingId,
+                BookingNumber = i.BanquetBooking.BookingNumber,
+                HallName = i.HallName,
+                EventTypeName = i.EventTypeName,
+                EventDate = i.EventDate,
+                ContactPersonName = i.ContactPersonName,
+                CompanyName = i.CompanyName,
+                TotalTax = i.TotalTax,
+                GrandTotal = i.GrandTotal,
+                TotalPaid = i.TotalPaid,
+                BalanceDue = i.BalanceDue,
+                PaymentStatus = i.PaymentStatus
+            })
+            .ToListAsync();
+
+        return invoices;
     }
 
     private BanquetInvoiceDto MapInvoiceToDto(BanquetInvoice invoice)

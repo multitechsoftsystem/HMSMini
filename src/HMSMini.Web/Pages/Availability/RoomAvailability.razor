@@ -47,9 +47,10 @@
         <div class="card mb-3">
             <div class="card-body">
                 <h6>Status Legend:</h6>
-                <div class="d-flex gap-3">
+                <div class="d-flex gap-3 flex-wrap">
                     <span><span class="badge bg-success">Available</span> - Room is available</span>
                     <span><span class="badge bg-danger">Occupied</span> - Room is currently occupied</span>
+                    <span><span class="badge" style="background-color: #6f42c1; color: white;">Shared</span> - Room has multiple check-ins</span>
                     <span><span class="badge bg-warning text-dark">Reserved</span> - Room has a reservation</span>
                     <span><span class="badge bg-secondary">Blocked/Maintenance</span> - Room is not available</span>
                 </div>
@@ -183,6 +184,7 @@
         {
             "Available" => "#d4edda",      // Light green
             "Occupied" => "#f8d7da",       // Light red
+            "Shared" => "#e2d5f1",         // Light purple
             "Reserved" => "#fff3cd",       // Light yellow
             "Blocked" => "#e2e3e5",        // Light gray
             "UnderMaintenance" => "#e2e3e5",
@@ -211,6 +213,7 @@
         {
             "Available" => "A",
             "Occupied" => "O",
+            "Shared" => "S",
             "Reserved" => "R",
             "Blocked" => "B",
             "UnderMaintenance" => "M",

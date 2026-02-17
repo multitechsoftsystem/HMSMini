@@ -38,5 +38,10 @@ public enum UserRole
     /// <summary>
     /// BanquetStaff - Banquet operations (no masters, no edit invoice)
     /// </summary>
-    BanquetStaff = 6
+    BanquetStaff = 6,
+
+    /// <summary>
+    /// Developer - Software vendor support account. Full access to system-locked settings and feature configuration.
+    /// </summary>
+    Developer = 7
 }

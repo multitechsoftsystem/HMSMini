@@ -9,6 +9,7 @@ public class VoucherTaxConfigDto
     public decimal IgstPercentage { get; set; }
     public bool IsActive { get; set; }
     public string? Description { get; set; }
+    public string? SACCode { get; set; }
     public int DisplayOrder { get; set; }
 
     public string TaxRateDisplay => $"{CgstPercentage + SgstPercentage}% (CGST {CgstPercentage}% + SGST {SgstPercentage}%) or IGST {IgstPercentage}%";

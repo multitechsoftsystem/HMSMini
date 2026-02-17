@@ -1,0 +1,543 @@
+@page "/accounts/receipts"
+@inject IApiClientService ApiClient
+@inject IAuthenticationService AuthService
+@using HMSMini.Web.Services
+@using HMSMini.Web.Models
+
+<PageTitle>Receipts - MSS</PageTitle>
+
+<div class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-receipt"></i> Receipts</h2>
+        @if (canManageMasterData)
+        {
+            <button class="btn btn-primary" @onclick="ShowCreateModal">
+                <i class="bi bi-plus-circle"></i> New Receipt
+            </button>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle"></i> @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = string.Empty"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle"></i> @successMessage
+            <button type="button" class="btn-close" @onclick="() => successMessage = string.Empty"></button>
+        </div>
+    }
+
+    <!-- Date Filter -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label">From Date</label>
+                    <input type="date" class="form-control" @bind="fromDate" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">To Date</label>
+                    <input type="date" class="form-control" @bind="toDate" />
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-outline-primary" @onclick="LoadReceipts">
+                        <i class="bi bi-funnel"></i> Load
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (receipts.Any())
+    {
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>Receipt Number</th>
+                        <th>Receipt Date</th>
+                        <th>Received From</th>
+                        <th>Company</th>
+                        <th>Amount</th>
+                        <th>Payment Mode</th>
+                        <th>Created At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var receipt in receipts)
+                    {
+                        <tr>
+                            <td><strong>@receipt.ReceiptNumber</strong></td>
+                            <td>@receipt.ReceiptDate.ToString("dd MMM yyyy")</td>
+                            <td>@receipt.ReceivedFrom</td>
+                            <td>@(receipt.CompanyName ?? "-")</td>
+                            <td class="text-end">@receipt.Amount.ToString("N2")</td>
+                            <td><span class="badge bg-info">@receipt.PaymentModeName</span></td>
+                            <td>@receipt.CreatedAt.ToString("dd MMM yyyy HH:mm")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> No receipts found for the selected date range.
+        </div>
+    }
+</div>
+
+<!-- Create Receipt Modal -->
+@if (showCreateModal)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">New Receipt</h5>
+                    <button type="button" class="btn-close" @onclick="HideCreateModal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrWhiteSpace(modalErrorMessage))
+                    {
+                        <div class="alert alert-danger">@modalErrorMessage</div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(modalSuccessMessage))
+                    {
+                        <div class="alert alert-success">@modalSuccessMessage</div>
+                    }
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Receipt Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" @bind="createModel.ReceiptDate" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Received From <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" @bind="createModel.ReceivedFrom" />
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Company</label>
+                            <select class="form-select" @bind="selectedCompanyId" @bind:after="OnCompanyChanged">
+                                <option value="0">-- No Company --</option>
+                                @foreach (var company in companies)
+                                {
+                                    <option value="@company.Id">@company.CompanyName</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Amount <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" @bind="createModel.Amount" min="0.01" step="0.01" />
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Payment Mode <span class="text-danger">*</span></label>
+                            <select class="form-select" @bind="createModel.PaymentMode">
+                                <option value="@PaymentMode.Cash">Cash</option>
+                                <option value="@PaymentMode.Card">Card</option>
+                                <option value="@PaymentMode.UPI">UPI</option>
+                                <option value="@PaymentMode.BankTransfer">Bank Transfer</option>
+                                <option value="@PaymentMode.Cheque">Cheque</option>
+                            </select>
+                        </div>
+                        @if (createModel.PaymentMode != PaymentMode.Cash)
+                        {
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Bank Account <span class="text-danger">*</span></label>
+                                <select class="form-select" @bind="createModel.BankAccountId">
+                                    <option value="">-- Select Bank Account --</option>
+                                    @foreach (var account in bankAccounts)
+                                    {
+                                        <option value="@account.Id">@account.DisplayName</option>
+                                    }
+                                </select>
+                            </div>
+                        }
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Reference Number</label>
+                        <input type="text" class="form-control" @bind="createModel.ReferenceNumber" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Narration</label>
+                        <textarea class="form-control" rows="2" @bind="createModel.Narration"></textarea>
+                    </div>
+
+                    <!-- Outstanding Invoices Section -->
+                    @if (selectedCompanyId > 0)
+                    {
+                        <hr />
+                        <h6><i class="bi bi-file-earmark-text"></i> Outstanding Invoices</h6>
+
+                        @if (loadingInvoices)
+                        {
+                            <div class="text-center my-3">
+                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                    <span class="visually-hidden">Loading invoices...</span>
+                                </div>
+                                <span class="ms-2">Loading outstanding invoices...</span>
+                            </div>
+                        }
+                        else if (outstandingInvoices.Any())
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width: 40px;">
+                                                <input type="checkbox" class="form-check-input" @onchange="ToggleAllInvoices" />
+                                            </th>
+                                            <th>Invoice Number</th>
+                                            <th>Invoice Date</th>
+                                            <th>Type</th>
+                                            <th>Guest / Details</th>
+                                            <th class="text-end">Total</th>
+                                            <th class="text-end">Paid</th>
+                                            <th class="text-end">Balance Due</th>
+                                            <th style="width: 150px;">Allocated Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var invoice in outstandingInvoices)
+                                        {
+                                            var isSelected = selectedInvoiceIds.Contains(invoice.InvoiceId);
+                                            <tr class="@(isSelected ? "table-warning" : "")">
+                                                <td>
+                                                    <input type="checkbox" class="form-check-input"
+                                                           checked="@isSelected"
+                                                           @onchange="(e) => ToggleInvoice(invoice.InvoiceId, (bool)(e.Value ?? false))" />
+                                                </td>
+                                                <td>@invoice.InvoiceNumber</td>
+                                                <td>@invoice.InvoiceDate.ToString("dd MMM yyyy")</td>
+                                                <td><span class="badge bg-secondary">@invoice.InvoiceType</span></td>
+                                                <td>@(invoice.GuestNames ?? invoice.CompanyName ?? "-")</td>
+                                                <td class="text-end">@invoice.GrandTotal.ToString("N2")</td>
+                                                <td class="text-end">@invoice.TotalPaid.ToString("N2")</td>
+                                                <td class="text-end fw-bold text-danger">@invoice.BalanceDue.ToString("N2")</td>
+                                                <td>
+                                                    @if (isSelected)
+                                                    {
+                                                        <input type="number" class="form-control form-control-sm"
+                                                               value="@GetAllocationAmount(invoice.InvoiceId)"
+                                                               @onchange="(e) => SetAllocationAmount(invoice.InvoiceId, e)"
+                                                               min="0" max="@invoice.BalanceDue" step="0.01" />
+                                                    }
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                    <tfoot>
+                                        <tr class="table-info">
+                                            <td colspan="8" class="text-end fw-bold">Total Allocated:</td>
+                                            <td class="fw-bold">@GetTotalAllocated().ToString("N2")</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-secondary mt-2">
+                                <i class="bi bi-info-circle"></i> No outstanding invoices found for this company.
+                            </div>
+                        }
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideCreateModal">Cancel</button>
+                    <button type="button" class="btn btn-primary" @onclick="CreateReceipt" disabled="@saving">
+                        @if (saving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Create
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<ReceiptListModel> receipts = new();
+    private List<CompanyDto> companies = new();
+    private List<AccountDropdownModel> bankAccounts = new();
+    private List<OutstandingInvoiceModel> outstandingInvoices = new();
+    private bool isLoading = true;
+    private bool saving = false;
+    private bool showCreateModal = false;
+    private bool loadingInvoices = false;
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+    private string modalErrorMessage = string.Empty;
+    private string modalSuccessMessage = string.Empty;
+
+    private DateTime fromDate = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private DateTime toDate = DateTime.Today;
+
+    private CreateReceiptModel createModel = new();
+    private int selectedCompanyId = 0;
+    private HashSet<int> selectedInvoiceIds = new();
+    private Dictionary<int, decimal> allocationAmounts = new();
+
+    // Role-based permissions
+    private bool canManageMasterData = false;
+    private int currentUserRole = -1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckUserPermissions();
+        await LoadReceipts();
+    }
+
+    private async Task CheckUserPermissions()
+    {
+        var currentUser = await AuthService.GetCurrentUserAsync();
+        if (currentUser != null)
+        {
+            currentUserRole = currentUser.Role;
+            canManageMasterData = currentUserRole == 0 || currentUserRole == 1;
+        }
+    }
+
+    private async Task LoadReceipts()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+
+        try
+        {
+            receipts = await ApiClient.GetReceiptsAsync(fromDate, toDate);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading receipts: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ShowCreateModal()
+    {
+        createModel = new CreateReceiptModel();
+        selectedCompanyId = 0;
+        selectedInvoiceIds = new();
+        allocationAmounts = new();
+        outstandingInvoices = new();
+        modalErrorMessage = string.Empty;
+        modalSuccessMessage = string.Empty;
+
+        try
+        {
+            companies = await ApiClient.GetActiveCompaniesAsync();
+            bankAccounts = await ApiClient.GetAccountDropdownAsync(AccountType.Asset);
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading form data: {ex.Message}";
+            return;
+        }
+
+        showCreateModal = true;
+    }
+
+    private void HideCreateModal()
+    {
+        showCreateModal = false;
+        createModel = new();
+        selectedCompanyId = 0;
+        selectedInvoiceIds = new();
+        allocationAmounts = new();
+        outstandingInvoices = new();
+        modalErrorMessage = string.Empty;
+        modalSuccessMessage = string.Empty;
+    }
+
+    private async Task OnCompanyChanged()
+    {
+        selectedInvoiceIds = new();
+        allocationAmounts = new();
+        outstandingInvoices = new();
+
+        createModel.CompanyId = selectedCompanyId > 0 ? selectedCompanyId : null;
+
+        if (selectedCompanyId > 0)
+        {
+            loadingInvoices = true;
+            StateHasChanged();
+
+            try
+            {
+                outstandingInvoices = await ApiClient.GetOutstandingInvoicesAsync(selectedCompanyId);
+            }
+            catch (Exception ex)
+            {
+                modalErrorMessage = $"Error loading outstanding invoices: {ex.Message}";
+            }
+            finally
+            {
+                loadingInvoices = false;
+            }
+        }
+    }
+
+    private void ToggleInvoice(int invoiceId, bool isChecked)
+    {
+        if (isChecked)
+        {
+            selectedInvoiceIds.Add(invoiceId);
+            var invoice = outstandingInvoices.FirstOrDefault(i => i.InvoiceId == invoiceId);
+            if (invoice != null && !allocationAmounts.ContainsKey(invoiceId))
+            {
+                allocationAmounts[invoiceId] = invoice.BalanceDue;
+            }
+        }
+        else
+        {
+            selectedInvoiceIds.Remove(invoiceId);
+            allocationAmounts.Remove(invoiceId);
+        }
+    }
+
+    private void ToggleAllInvoices(ChangeEventArgs e)
+    {
+        var isChecked = (bool)(e.Value ?? false);
+        if (isChecked)
+        {
+            foreach (var invoice in outstandingInvoices)
+            {
+                selectedInvoiceIds.Add(invoice.InvoiceId);
+                if (!allocationAmounts.ContainsKey(invoice.InvoiceId))
+                {
+                    allocationAmounts[invoice.InvoiceId] = invoice.BalanceDue;
+                }
+            }
+        }
+        else
+        {
+            selectedInvoiceIds.Clear();
+            allocationAmounts.Clear();
+        }
+    }
+
+    private decimal GetAllocationAmount(int invoiceId)
+    {
+        return allocationAmounts.TryGetValue(invoiceId, out var amount) ? amount : 0;
+    }
+
+    private void SetAllocationAmount(int invoiceId, ChangeEventArgs e)
+    {
+        if (decimal.TryParse(e.Value?.ToString(), out var amount))
+        {
+            var invoice = outstandingInvoices.FirstOrDefault(i => i.InvoiceId == invoiceId);
+            if (invoice != null)
+            {
+                allocationAmounts[invoiceId] = Math.Min(amount, invoice.BalanceDue);
+            }
+        }
+    }
+
+    private decimal GetTotalAllocated()
+    {
+        return allocationAmounts.Where(a => selectedInvoiceIds.Contains(a.Key)).Sum(a => a.Value);
+    }
+
+    private async Task CreateReceipt()
+    {
+        modalErrorMessage = string.Empty;
+        modalSuccessMessage = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(createModel.ReceivedFrom))
+        {
+            modalErrorMessage = "Received From is required.";
+            return;
+        }
+
+        if (createModel.Amount <= 0)
+        {
+            modalErrorMessage = "Amount must be greater than zero.";
+            return;
+        }
+
+        if (createModel.PaymentMode != PaymentMode.Cash && !createModel.BankAccountId.HasValue)
+        {
+            modalErrorMessage = "Please select a bank account for non-cash payments.";
+            return;
+        }
+
+        var totalAllocated = GetTotalAllocated();
+        if (totalAllocated > createModel.Amount)
+        {
+            modalErrorMessage = "Total allocated amount cannot exceed the receipt amount.";
+            return;
+        }
+
+        // Build allocations from selected invoices
+        createModel.Allocations = selectedInvoiceIds
+            .Where(id => allocationAmounts.ContainsKey(id) && allocationAmounts[id] > 0)
+            .Select(id =>
+            {
+                var invoice = outstandingInvoices.FirstOrDefault(i => i.InvoiceId == id);
+                return new CreateReceiptAllocationModel
+                {
+                    InvoiceId = invoice?.InvoiceType == "Room" ? invoice.InvoiceId : null,
+                    BanquetInvoiceId = invoice?.InvoiceType == "Banquet" ? invoice.InvoiceId : null,
+                    AllocatedAmount = allocationAmounts[id]
+                };
+            })
+            .ToList();
+
+        saving = true;
+
+        try
+        {
+            var result = await ApiClient.CreateReceiptAsync(createModel);
+            if (result != null)
+            {
+                modalSuccessMessage = "Receipt created successfully!";
+                await LoadReceipts();
+                await Task.Delay(1000);
+                HideCreateModal();
+                successMessage = "Receipt created successfully!";
+            }
+            else
+            {
+                modalErrorMessage = "Failed to create receipt.";
+            }
+        }
+        catch (Exception ex)
+        {
+            modalErrorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+}

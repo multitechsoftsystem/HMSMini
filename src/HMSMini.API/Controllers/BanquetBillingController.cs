@@ -19,6 +19,13 @@ public class BanquetBillingController : ControllerBase
         _logger = logger;
     }
 
+    [HttpGet("invoices")]
+    public async Task<ActionResult<List<BanquetInvoiceListDto>>> GetAllInvoices()
+    {
+        var invoices = await _billingService.GetAllInvoicesAsync();
+        return Ok(invoices);
+    }
+
     [HttpGet("booking/{bookingId}/preview")]
     public async Task<ActionResult<BanquetBillPreviewDto>> GetBillPreview(int bookingId)
     {

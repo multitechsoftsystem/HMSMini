@@ -55,6 +55,17 @@ public class ApplicationDbContext : DbContext
     // Unified Payment System
     public DbSet<Payment> Payments { get; set; } = null!;
 
+    // Accounting Module
+    public DbSet<FinancialYear> FinancialYears { get; set; } = null!;
+    public DbSet<ChartOfAccount> ChartOfAccounts { get; set; } = null!;
+    public DbSet<JournalEntry> JournalEntries { get; set; } = null!;
+    public DbSet<JournalEntryLine> JournalEntryLines { get; set; } = null!;
+    public DbSet<MExpenseHead> ExpenseHeads { get; set; } = null!;
+    public DbSet<ExpenseVoucher> ExpenseVouchers { get; set; } = null!;
+    public DbSet<PaymentVoucher> PaymentVouchers { get; set; } = null!;
+    public DbSet<Receipt> Receipts { get; set; } = null!;
+    public DbSet<ReceiptAllocation> ReceiptAllocations { get; set; } = null!;
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -99,6 +110,17 @@ public class ApplicationDbContext : DbContext
 
         // Unified Payment System
         modelBuilder.ApplyConfiguration(new PaymentConfiguration());
+
+        // Accounting Module
+        modelBuilder.ApplyConfiguration(new FinancialYearConfiguration());
+        modelBuilder.ApplyConfiguration(new ChartOfAccountConfiguration());
+        modelBuilder.ApplyConfiguration(new JournalEntryConfiguration());
+        modelBuilder.ApplyConfiguration(new JournalEntryLineConfiguration());
+        modelBuilder.ApplyConfiguration(new MExpenseHeadConfiguration());
+        modelBuilder.ApplyConfiguration(new ExpenseVoucherConfiguration());
+        modelBuilder.ApplyConfiguration(new PaymentVoucherConfiguration());
+        modelBuilder.ApplyConfiguration(new ReceiptConfiguration());
+        modelBuilder.ApplyConfiguration(new ReceiptAllocationConfiguration());
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
@@ -116,7 +138,11 @@ public class ApplicationDbContext : DbContext
                         e.Entity is BanquetBooking || e.Entity is BanquetBookingMenu ||
                         e.Entity is BanquetBookingService || e.Entity is BanquetCharge ||
                         e.Entity is BanquetPayment || e.Entity is BanquetInvoice ||
-                        e.Entity is Payment) &&
+                        e.Entity is Payment ||
+                        e.Entity is FinancialYear || e.Entity is ChartOfAccount ||
+                        e.Entity is JournalEntry || e.Entity is MExpenseHead ||
+                        e.Entity is ExpenseVoucher || e.Entity is PaymentVoucher ||
+                        e.Entity is Receipt) &&
                        (e.State == EntityState.Added || e.State == EntityState.Modified));
 
         foreach (var entry in entries)
@@ -394,6 +420,55 @@ public class ApplicationDbContext : DbContext
                     payment.CreatedAt = DateTime.UtcNow;
                 else if (entry.State == EntityState.Modified)
                     payment.UpdatedAt = DateTime.UtcNow;
+            }
+            else if (entry.Entity is FinancialYear fy)
+            {
+                if (entry.State == EntityState.Added)
+                    fy.CreatedAt = DateTime.UtcNow;
+                else if (entry.State == EntityState.Modified)
+                    fy.UpdatedAt = DateTime.UtcNow;
+            }
+            else if (entry.Entity is ChartOfAccount coa)
+            {
+                if (entry.State == EntityState.Added)
+                    coa.CreatedAt = DateTime.UtcNow;
+                else if (entry.State == EntityState.Modified)
+                    coa.UpdatedAt = DateTime.UtcNow;
+            }
+            else if (entry.Entity is JournalEntry je)
+            {
+                if (entry.State == EntityState.Added)
+                    je.CreatedAt = DateTime.UtcNow;
+                else if (entry.State == EntityState.Modified)
+                    je.UpdatedAt = DateTime.UtcNow;
+            }
+            else if (entry.Entity is MExpenseHead expHead)
+            {
+                if (entry.State == EntityState.Added)
+                    expHead.CreatedAt = DateTime.UtcNow;
+                else if (entry.State == EntityState.Modified)
+                    expHead.UpdatedAt = DateTime.UtcNow;
+            }
+            else if (entry.Entity is ExpenseVoucher ev)
+            {
+                if (entry.State == EntityState.Added)
+                    ev.CreatedAt = DateTime.UtcNow;
+                else if (entry.State == EntityState.Modified)
+                    ev.UpdatedAt = DateTime.UtcNow;
+            }
+            else if (entry.Entity is PaymentVoucher pv)
+            {
+                if (entry.State == EntityState.Added)
+                    pv.CreatedAt = DateTime.UtcNow;
+                else if (entry.State == EntityState.Modified)
+                    pv.UpdatedAt = DateTime.UtcNow;
+            }
+            else if (entry.Entity is Receipt receipt)
+            {
+                if (entry.State == EntityState.Added)
+                    receipt.CreatedAt = DateTime.UtcNow;
+                else if (entry.State == EntityState.Modified)
+                    receipt.UpdatedAt = DateTime.UtcNow;
             }
         }
 

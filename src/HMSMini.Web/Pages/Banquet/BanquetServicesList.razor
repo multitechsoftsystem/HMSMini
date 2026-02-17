@@ -133,6 +133,16 @@ else
                     <input type="checkbox" class="form-check-input" id="applyTax" @bind="formModel.ApplyTax" />
                     <label class="form-check-label" for="applyTax">Apply Tax</label>
                 </div>
+                <div class="form-group">
+                    <label>Tax Config</label>
+                    <select class="form-control" @bind="formModel.VoucherTaxConfigId">
+                        <option value="">-- Default (TaxSlab) --</option>
+                        @foreach (var tc in voucherTaxConfigs)
+                        {
+                            <option value="@tc.Id">@tc.VoucherType (CGST @tc.CgstPercentage% + SGST @tc.SgstPercentage%)</option>
+                        }
+                    </select>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" @onclick="HideModal">Cancel</button>
@@ -146,6 +156,7 @@ else
 
 @code {
     private List<BanquetServiceModel> services = new();
+    private List<VoucherTaxConfigModel> voucherTaxConfigs = new();
     private bool isLoading = true;
     private bool showModal = false;
     private bool isSaving = false;
@@ -160,6 +171,7 @@ else
     {
         var user = await AuthService.GetCurrentUserAsync();
         canManage = user != null && (user.Role == 0 || user.Role == 1 || user.Role == 5);
+        voucherTaxConfigs = await ApiClient.GetVoucherTaxConfigsAsync(activeOnly: true);
         await LoadData();
     }
 

@@ -1,0 +1,572 @@
+@page "/accounts/chart-of-accounts"
+@inject IApiClientService ApiClient
+@inject IAuthenticationService AuthService
+@using HMSMini.Web.Services
+@using HMSMini.Web.Models
+
+<PageTitle>Chart of Accounts - MSS</PageTitle>
+
+<div class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-journal-text"></i> Chart of Accounts</h2>
+        <div>
+            <button class="btn btn-outline-primary me-2" @onclick="LoadAccounts">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+            @if (canManageMasterData)
+            {
+                <button class="btn btn-primary" @onclick="ShowCreateModal">
+                    <i class="bi bi-plus-circle"></i> New Account
+                </button>
+            }
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="bi bi-exclamation-triangle"></i> @errorMessage
+            <button type="button" class="btn-close" @onclick="() => errorMessage = null"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle"></i> @successMessage
+            <button type="button" class="btn-close" @onclick="() => successMessage = null"></button>
+        </div>
+    }
+
+    @if (!canManageMasterData)
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> You have view-only access. Contact an administrator to make changes.
+        </div>
+    }
+
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    }
+    else if (accounts.Any())
+    {
+        @foreach (var group in accounts.GroupBy(a => a.AccountType).OrderBy(g => g.Key))
+        {
+            <div class="card shadow-sm mb-4">
+                <div class="card-header @GetAccountTypeHeaderClass(group.Key)">
+                    <h5 class="mb-0">
+                        <i class="bi @GetAccountTypeIcon(group.Key)"></i>
+                        @GetAccountTypeName(group.Key)
+                        <span class="badge bg-light text-dark ms-2">@group.Count()</span>
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Account Code</th>
+                                    <th>Account Name</th>
+                                    <th>Parent Account</th>
+                                    <th>System</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var account in group.OrderBy(a => a.AccountCode))
+                                {
+                                    <tr>
+                                        <td><code>@account.AccountCode</code></td>
+                                        <td><strong>@account.AccountName</strong></td>
+                                        <td>
+                                            @if (!string.IsNullOrEmpty(account.ParentAccountName))
+                                            {
+                                                <span>@account.ParentAccountName</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">-</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (account.IsSystemAccount)
+                                            {
+                                                <span class="badge bg-info">System</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary">User</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (account.IsActive)
+                                            {
+                                                <span class="badge bg-success">Active</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-danger">Inactive</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (canManageMasterData && !account.IsSystemAccount)
+                                            {
+                                                <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => ShowEditModal(account)">
+                                                    <i class="bi bi-pencil"></i> Edit
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger" @onclick="() => ShowDeleteConfirmation(account)">
+                                                    <i class="bi bi-trash"></i> Delete
+                                                </button>
+                                            }
+                                            else if (account.IsSystemAccount)
+                                            {
+                                                <span class="text-muted"><i class="bi bi-lock"></i> Protected</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">View Only</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+    else
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> No accounts found. Click "New Account" to create one.
+        </div>
+    }
+</div>
+
+@* Create Account Modal *@
+@if (showCreateModal)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-plus-circle"></i> New Account</h5>
+                    <button type="button" class="btn-close" @onclick="HideCreateModal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrWhiteSpace(modalErrorMessage))
+                    {
+                        <div class="alert alert-danger">@modalErrorMessage</div>
+                    }
+
+                    <div class="mb-3">
+                        <label class="form-label">Account Code <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" @bind="createForm.AccountCode" placeholder="e.g., 1001" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Account Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" @bind="createForm.AccountName" placeholder="e.g., Cash in Hand" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Account Type <span class="text-danger">*</span></label>
+                        <select class="form-select" @bind="createForm.AccountType">
+                            <option value="@AccountType.Asset">Asset</option>
+                            <option value="@AccountType.Liability">Liability</option>
+                            <option value="@AccountType.Equity">Equity</option>
+                            <option value="@AccountType.Income">Income</option>
+                            <option value="@AccountType.Expense">Expense</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Parent Account</label>
+                        <select class="form-select" @bind="createForm.ParentAccountId">
+                            <option value="">-- None --</option>
+                            @foreach (var acc in accountDropdown)
+                            {
+                                <option value="@acc.Id">@acc.DisplayName</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideCreateModal">Cancel</button>
+                    <button type="button" class="btn btn-primary" @onclick="CreateAccount" disabled="@isSaving">
+                        @if (isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Create
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* Edit Account Modal *@
+@if (showEditModal)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-pencil"></i> Edit Account</h5>
+                    <button type="button" class="btn-close" @onclick="HideEditModal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrWhiteSpace(modalErrorMessage))
+                    {
+                        <div class="alert alert-danger">@modalErrorMessage</div>
+                    }
+
+                    <div class="mb-3">
+                        <label class="form-label">Account Code</label>
+                        <input type="text" class="form-control" value="@editingAccount?.AccountCode" disabled />
+                        <small class="text-muted">Account code cannot be changed.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Account Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" @bind="editForm.AccountName" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Parent Account</label>
+                        <select class="form-select" @bind="editForm.ParentAccountId">
+                            <option value="">-- None --</option>
+                            @foreach (var acc in accountDropdown.Where(a => a.Id != editingAccount?.Id))
+                            {
+                                <option value="@acc.Id">@acc.DisplayName</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input type="checkbox" class="form-check-input" id="editIsActive" @bind="editForm.IsActive" />
+                        <label class="form-check-label" for="editIsActive">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideEditModal">Cancel</button>
+                    <button type="button" class="btn btn-primary" @onclick="UpdateAccount" disabled="@isSaving">
+                        @if (isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Update
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* Delete Confirmation Modal *@
+@if (showDeleteConfirmation)
+{
+    <div class="modal-backdrop show"></div>
+    <div class="modal show d-block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Confirm Delete</h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="HideDeleteConfirmation"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to delete the account <strong>@deletingAccount?.AccountCode - @deletingAccount?.AccountName</strong>?</p>
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i> This action cannot be undone. Ensure no journal entries reference this account.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideDeleteConfirmation">Cancel</button>
+                    <button type="button" class="btn btn-danger" @onclick="DeleteAccount" disabled="@isSaving">
+                        @if (isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<ChartOfAccountModel> accounts = new();
+    private List<AccountDropdownModel> accountDropdown = new();
+    private bool isLoading = true;
+    private bool isSaving = false;
+    private string? errorMessage;
+    private string? successMessage;
+    private string? modalErrorMessage;
+
+    // Create modal
+    private bool showCreateModal = false;
+    private CreateChartOfAccountModel createForm = new();
+
+    // Edit modal
+    private bool showEditModal = false;
+    private ChartOfAccountModel? editingAccount;
+    private UpdateChartOfAccountModel editForm = new();
+
+    // Delete confirmation
+    private bool showDeleteConfirmation = false;
+    private ChartOfAccountModel? deletingAccount;
+
+    // Role-based permissions
+    private bool canManageMasterData = false;
+    private int currentUserRole = -1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckUserPermissions();
+        await LoadAccounts();
+    }
+
+    private async Task CheckUserPermissions()
+    {
+        var currentUser = await AuthService.GetCurrentUserAsync();
+        if (currentUser != null)
+        {
+            currentUserRole = currentUser.Role;
+            // Only Admin (0) and Manager (1) can manage master data
+            canManageMasterData = currentUserRole == 0 || currentUserRole == 1;
+        }
+    }
+
+    private async Task LoadAccounts()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            accounts = await ApiClient.GetChartOfAccountsAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading chart of accounts: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadAccountDropdown()
+    {
+        try
+        {
+            accountDropdown = await ApiClient.GetAccountDropdownAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error loading account dropdown: {ex.Message}";
+        }
+    }
+
+    // Create
+    private async Task ShowCreateModal()
+    {
+        await LoadAccountDropdown();
+        createForm = new CreateChartOfAccountModel
+        {
+            AccountType = AccountType.Asset
+        };
+        modalErrorMessage = null;
+        showCreateModal = true;
+    }
+
+    private void HideCreateModal()
+    {
+        showCreateModal = false;
+        createForm = new();
+        modalErrorMessage = null;
+    }
+
+    private async Task CreateAccount()
+    {
+        modalErrorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(createForm.AccountCode))
+        {
+            modalErrorMessage = "Account code is required.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(createForm.AccountName))
+        {
+            modalErrorMessage = "Account name is required.";
+            return;
+        }
+
+        isSaving = true;
+
+        try
+        {
+            var result = await ApiClient.CreateChartOfAccountAsync(createForm);
+            if (result != null)
+            {
+                successMessage = $"Account '{result.AccountCode} - {result.AccountName}' created successfully.";
+                await LoadAccounts();
+                HideCreateModal();
+            }
+            else
+            {
+                modalErrorMessage = "Failed to create account.";
+            }
+        }
+        catch (Exception ex)
+        {
+            modalErrorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    // Edit
+    private async Task ShowEditModal(ChartOfAccountModel account)
+    {
+        await LoadAccountDropdown();
+        editingAccount = account;
+        editForm = new UpdateChartOfAccountModel
+        {
+            AccountName = account.AccountName,
+            ParentAccountId = account.ParentAccountId,
+            IsActive = account.IsActive
+        };
+        modalErrorMessage = null;
+        showEditModal = true;
+    }
+
+    private void HideEditModal()
+    {
+        showEditModal = false;
+        editingAccount = null;
+        editForm = new();
+        modalErrorMessage = null;
+    }
+
+    private async Task UpdateAccount()
+    {
+        if (editingAccount == null) return;
+        modalErrorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(editForm.AccountName))
+        {
+            modalErrorMessage = "Account name is required.";
+            return;
+        }
+
+        isSaving = true;
+
+        try
+        {
+            var result = await ApiClient.UpdateChartOfAccountAsync(editingAccount.Id, editForm);
+            if (result != null)
+            {
+                successMessage = $"Account '{result.AccountCode} - {result.AccountName}' updated successfully.";
+                await LoadAccounts();
+                HideEditModal();
+            }
+            else
+            {
+                modalErrorMessage = "Failed to update account.";
+            }
+        }
+        catch (Exception ex)
+        {
+            modalErrorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    // Delete
+    private void ShowDeleteConfirmation(ChartOfAccountModel account)
+    {
+        deletingAccount = account;
+        showDeleteConfirmation = true;
+    }
+
+    private void HideDeleteConfirmation()
+    {
+        showDeleteConfirmation = false;
+        deletingAccount = null;
+    }
+
+    private async Task DeleteAccount()
+    {
+        if (deletingAccount == null) return;
+
+        isSaving = true;
+        errorMessage = null;
+        successMessage = null;
+
+        try
+        {
+            var result = await ApiClient.DeleteChartOfAccountAsync(deletingAccount.Id);
+            if (result)
+            {
+                successMessage = $"Account '{deletingAccount.AccountCode} - {deletingAccount.AccountName}' deleted successfully.";
+                HideDeleteConfirmation();
+                await LoadAccounts();
+            }
+            else
+            {
+                errorMessage = "Failed to delete account. It may be referenced by journal entries.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    // Helpers
+    private string GetAccountTypeName(AccountType type) => type switch
+    {
+        AccountType.Asset => "Assets",
+        AccountType.Liability => "Liabilities",
+        AccountType.Equity => "Equity",
+        AccountType.Income => "Income",
+        AccountType.Expense => "Expenses",
+        _ => type.ToString()
+    };
+
+    private string GetAccountTypeHeaderClass(AccountType type) => type switch
+    {
+        AccountType.Asset => "bg-primary text-white",
+        AccountType.Liability => "bg-danger text-white",
+        AccountType.Equity => "bg-success text-white",
+        AccountType.Income => "bg-info text-white",
+        AccountType.Expense => "bg-warning text-dark",
+        _ => "bg-secondary text-white"
+    };
+
+    private string GetAccountTypeIcon(AccountType type) => type switch
+    {
+        AccountType.Asset => "bi-building",
+        AccountType.Liability => "bi-credit-card",
+        AccountType.Equity => "bi-bank",
+        AccountType.Income => "bi-graph-up-arrow",
+        AccountType.Expense => "bi-cart-dash",
+        _ => "bi-journal"
+    };
+}

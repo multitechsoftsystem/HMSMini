@@ -6,6 +6,7 @@ public class BanquetBookingServiceDto
     public int BanquetBookingId { get; set; }
     public int? BanquetServiceId { get; set; }
     public string ServiceName { get; set; } = string.Empty;
+    public DateTime ServiceDate { get; set; }
     public int Quantity { get; set; }
     public decimal Rate { get; set; }
     public decimal TotalAmount { get; set; }
